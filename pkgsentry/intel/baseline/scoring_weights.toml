@@ -1,0 +1,7 @@
+# Severity point values applied to each finding before summing.
+# REPLACE semantics: overlay values fully override baseline.
+
+low = 1
+medium = 8
+high = 25
+critical = 60

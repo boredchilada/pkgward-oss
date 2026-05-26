@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pkgsentry"
+version = "0.4.0"
+description = "Multi-ecosystem supply-chain malware scanner for PyPI, crates.io, and Go modules."
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "AGPL-3.0-or-later"}
+authors = [
+    {name = "Michel Verbel"},
+]
+keywords = ["security", "malware", "supply-chain", "pypi", "crates", "scanner"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "sqlalchemy==2.0.23",
+    "psycopg2-binary>=2.9",
+    "httpx==0.27.2",
+    "apscheduler==3.10.4",
+    "typer==0.25.1",
+    "structlog==24.4.0",
+    "packaging==24.1",
+    "feedparser==6.0.11",
+    "openai>=1.50.0",
+    "ppdeep>=20200723",
+    "yara-python>=4.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.3",
+    "pytest-asyncio==0.24.0",
+    "pytest-httpx==0.32.0",
+    "black==24.8.0",
+    "ruff==0.6.9",
+]
+
+[project.scripts]
+pkgsentry = "pkgsentry.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/boredchilada/pkgsentry-oss"
+Repository = "https://github.com/boredchilada/pkgsentry-oss"
+"Bug Tracker" = "https://github.com/boredchilada/pkgsentry-oss/issues"
+Changelog = "https://github.com/boredchilada/pkgsentry-oss/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+include = ["pkgsentry*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]

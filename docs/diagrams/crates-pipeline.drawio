@@ -1,0 +1,642 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-05-23T00:00:00.000Z" agent="Claude" version="26.0.0" type="device">
+  <diagram id="crates-pipeline" name="Crates.io Ecosystem Pipeline">
+    <mxGraphModel dx="1800" dy="4500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="4400" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ===== TITLE ===== -->
+        <mxCell id="title" value="&lt;b&gt;Crates.io Ecosystem Pipeline&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=20;" vertex="1" parent="1">
+          <mxGeometry x="440" y="20" width="420" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="pkgsentry — Rust crate ingest, analysis, and triage" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=13;fontStyle=2;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="460" y="55" width="380" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== LEGEND ===== -->
+        <mxCell id="legend_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;" vertex="1" parent="1">
+          <mxGeometry x="20" y="80" width="200" height="340" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend_title" value="&lt;b&gt;Legend&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="80" y="85" width="80" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="35" y="120" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1t" value="Phase 1 &amp;mdash; Ingest" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="62" y="115" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="35" y="150" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2t" value="Phase 2 &amp;mdash; Watchlist" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="62" y="145" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="35" y="180" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3t" value="Phase 3 &amp;mdash; Fetch" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="62" y="175" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="35" y="210" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg4t" value="Phase 4 &amp;mdash; Extract + Hash" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="62" y="205" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="35" y="240" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg5t" value="Phase 5 &amp;mdash; Install-time" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="62" y="235" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="35" y="270" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg6t" value="Phase 6 &amp;mdash; Universal" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="62" y="265" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="35" y="300" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg7t" value="Phase 7 &amp;mdash; Detonation (N/A)" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="62" y="295" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg8" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="35" y="330" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg8t" value="Phase 8 &amp;mdash; LLM + Alert" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="62" y="325" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg9" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;" vertex="1" parent="1">
+          <mxGeometry x="35" y="360" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg9t" value="Log events" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="62" y="355" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg10" value="" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="35" y="388" width="20" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg10t" value="Decision" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="62" y="385" width="150" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== KEY DIFFERENCES CALLOUT ===== -->
+        <mxCell id="diff_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#f9a825;strokeWidth=2;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="990" y="80" width="370" height="280" as="geometry"/>
+        </mxCell>
+        <mxCell id="diff_title" value="&lt;b&gt;Key Differences vs PyPI&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontColor=#e65100;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="88" width="230" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="diff_items" value="&lt;div style=&quot;text-align:left;font-size:11px;line-height:1.6;&quot;&gt;&lt;b&gt;1.&lt;/b&gt; Single archive only (.crate) &amp;mdash; no wheel&lt;br&gt;&lt;b&gt;2.&lt;/b&gt; No watchlist gate at ingest &amp;mdash; ALL crates enqueued&lt;br&gt;&lt;b&gt;3.&lt;/b&gt; No cursor / backfill &amp;mdash; RSS only, backfill() = 0&lt;br&gt;&lt;b&gt;4.&lt;/b&gt; build.rs analysis (7 rules, regex)&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;vs setup.py (3 rules, AST)&lt;br&gt;&lt;b&gt;5.&lt;/b&gt; Sequential API (1 req/s) &amp;mdash; not concurrent&lt;br&gt;&lt;b&gt;6.&lt;/b&gt; No detonation (yet) &amp;mdash; future gVisor+cargo&lt;br&gt;&lt;b&gt;7.&lt;/b&gt; Top 5K watchlist (vs PyPI 10K)&lt;br&gt;&lt;b&gt;8.&lt;/b&gt; XML parser (ElementTree) &amp;mdash; not regex&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1005" y="118" width="345" height="230" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== START ===== -->
+        <mxCell id="start" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="630" y="100" width="40" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 1 — INGEST (light blue)                                    -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="170" width="740" height="480" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p1_label" value="&lt;b&gt;Phase 1 &amp;mdash; Ingest&lt;/b&gt;  (RSS polling, every 60s)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#1a3a6b;" vertex="1" parent="1">
+          <mxGeometry x="250" y="175" width="300" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- RSS Feeds -->
+        <mxCell id="n_rss_new" value="&lt;b&gt;Poll RSS: New Crates&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;static.crates.io/rss/crates.xml&lt;/font&gt;&lt;br&gt;every 60s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="340" y="220" width="250" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_rss_update" value="&lt;b&gt;Poll RSS: Version Updates&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;static.crates.io/rss/updates.xml&lt;/font&gt;&lt;br&gt;every 60s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="630" y="220" width="260" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_start_rss1" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="start" target="n_rss_new" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_start_rss2" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="start" target="n_rss_update" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- XML Parser -->
+        <mxCell id="n_xml_parse" value="&lt;b&gt;Parse with xml.etree.ElementTree&lt;/b&gt;&lt;br&gt;Proper XML parser (not regex)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="450" y="320" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rss1_parse" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_rss_new" target="n_xml_parse" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rss2_parse" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_rss_update" target="n_xml_parse" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- No backfill callout -->
+        <mxCell id="n_no_backfill" value="&lt;b&gt;No cursor / serial mechanism&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;backfill() returns 0&lt;br&gt;No equivalent of PyPI XML-RPC changelog&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="260" y="400" width="240" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_parse_nobackfill" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_xml_parse" target="n_no_backfill" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ALL enqueued callout (prominent) -->
+        <mxCell id="n_all_enqueued" value="&lt;b&gt;&lt;font color=&quot;#1565c0&quot; size=&quot;3&quot;&gt;ALL crates enqueued&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#1565c0&quot;&gt;No watchlist filter at ingest&lt;br&gt;(unlike PyPI which filters)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="490" y="400" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_parse_enqueue" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_xml_parse" target="n_all_enqueued" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Enqueue to scan queue -->
+        <mxCell id="n_enqueue" value="&lt;b&gt;Enqueue to scan_queue&lt;/b&gt;&lt;br&gt;(name, version, ecosystem=&quot;crates&quot;)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="480" y="500" width="260" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_allenq_queue" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_all_enqueued" target="n_enqueue" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log: ingest -->
+        <mxCell id="n_log_ingest" value="log: &lt;b&gt;rss_polled&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(feed, new_items)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="780" y="505" width="170" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_enqueue_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_enqueue" target="n_log_ingest" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 2 — WATCHLIST (light green)                                -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="680" width="740" height="420" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p2_label" value="&lt;b&gt;Phase 2 &amp;mdash; Watchlist&lt;/b&gt;  (weekly refresh)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#2d5016;" vertex="1" parent="1">
+          <mxGeometry x="250" y="685" width="300" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Watchlist source -->
+        <mxCell id="n_wl_source" value="&lt;b&gt;Fetch top 5,000 crates&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;crates.io/api/v1/crates?sort=downloads&lt;/font&gt;&lt;br&gt;Paginated: 100/page, 1 req/s rate limit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="420" y="720" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_enqueue_wl" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_enqueue" target="n_wl_source" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Delete-and-reinsert -->
+        <mxCell id="n_wl_reinsert" value="&lt;b&gt;Delete-and-reinsert&lt;/b&gt;&lt;br&gt;on weekly refresh cycle" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="470" y="820" width="280" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_wl_reinsert" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_wl_source" target="n_wl_reinsert" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- First boot seed -->
+        <mxCell id="n_wl_seed" value="&lt;b&gt;First boot: seed watchlist&lt;/b&gt;&lt;br&gt;Poll &lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;crates.io/api/v1/crates/{name}&lt;/font&gt;&lt;br&gt;for newest_version of each crate&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Sequential: 1 req/s (NOT concurrent like PyPI)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="400" y="900" width="420" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_reinsert_seed" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_wl_reinsert" target="n_wl_seed" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- User-Agent -->
+        <mxCell id="n_wl_ua" value="User-Agent:&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;pkgsentry/${VERSION} (+${CONTACT})&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="830" width="240" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_seed_ua" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_wl_reinsert" target="n_wl_ua" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log watchlist -->
+        <mxCell id="n_log_wl" value="log: &lt;b&gt;watchlist_refreshed&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(count=5000, duration_s)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1010" width="210" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_seed_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_wl_seed" target="n_log_wl" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 3 — FETCH (light yellow)                                   -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="1130" width="740" height="530" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p3_label" value="&lt;b&gt;Phase 3 &amp;mdash; Fetch&lt;/b&gt;  (async I/O)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b5900;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1135" width="260" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Step 1: Get expected SHA -->
+        <mxCell id="n_fetch_sha" value="&lt;b&gt;Step 1: GET expected SHA256&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;crates.io/api/v1/crates/{name}/{version}&lt;/font&gt;&lt;br&gt;&amp;rarr; version.checksum" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1175" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_seed_fetch" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_wl_seed" target="n_fetch_sha" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Step 2: Download .crate -->
+        <mxCell id="n_fetch_crate" value="&lt;b&gt;Step 2: Download .crate&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;static.crates.io/crates/{name}/{name}-{version}.crate&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Single archive only (gzipped tarball) &amp;mdash; no wheel equivalent&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="380" y="1275" width="460" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_sha_crate" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_fetch_sha" target="n_fetch_crate" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Rate limiting note -->
+        <mxCell id="n_rate_limit" value="&lt;b&gt;Rate limiting:&lt;/b&gt;&lt;br&gt;API: semaphore + 1s sleep&lt;br&gt;CDN: 10 concurrent max" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1180" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_fetch_rate" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_fetch_sha" target="n_rate_limit" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Verify SHA256 -->
+        <mxCell id="n_verify_sha" value="&lt;b&gt;Verify SHA256&lt;/b&gt;&lt;br&gt;post-download against API checksum" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="470" y="1380" width="280" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_crate_verify" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_fetch_crate" target="n_verify_sha" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Fetch metadata -->
+        <mxCell id="n_fetch_meta" value="&lt;b&gt;Fetch crate metadata&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;crates.io/api/v1/crates/{name}&lt;/font&gt;&lt;br&gt;Normalize to match PyPI schema" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="430" y="1460" width="360" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_verify_meta" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_verify_sha" target="n_fetch_meta" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Fetch OK? diamond -->
+        <mxCell id="d_fetch_ok" value="&lt;b&gt;Fetch OK?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="550" y="1555" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_meta_fetchok" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_fetch_meta" target="d_fetch_ok" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Fetch fail → error path -->
+        <mxCell id="e_fetchok_fail" value="No" style="edgeStyle=orthogonalEdgeStyle;fontColor=#cc0000;" edge="1" source="d_fetch_ok" target="n_error" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1100" y="1585"/>
+              <mxPoint x="1100" y="4080"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- strips_top_dir + temp note -->
+        <mxCell id="n_fetch_notes" value="&lt;b&gt;strips_top_dir = True&lt;/b&gt;&lt;br&gt;Temp dir: %TEMP%/pkgsentry_crates" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1470" width="200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_meta_notes" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_fetch_meta" target="n_fetch_notes" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log downloaded -->
+        <mxCell id="n_log_dl" value="log: &lt;b&gt;downloaded&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(archive=1, total_mb)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1565" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_fetchok_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="d_fetch_ok" target="n_log_dl" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 4 — EXTRACT + HASH (light green)                           -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="1690" width="740" height="260" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p4_label" value="&lt;b&gt;Phase 4 &amp;mdash; Extract + Hash&lt;/b&gt;  (asyncio.to_thread)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#2d5016;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1695" width="340" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- safe_extract -->
+        <mxCell id="n_extract" value="&lt;b&gt;safe_extract()&lt;/b&gt;&lt;br&gt;Single .crate archive (gzipped tarball)&lt;br&gt;10K file cap, 500MB cap&lt;br&gt;Reject symlinks / path traversal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="430" y="1730" width="360" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_fetchok_extract" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_fetch_ok" target="n_extract" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Per-file hashing -->
+        <mxCell id="n_hash" value="&lt;b&gt;Compute per-file hashes&lt;/b&gt;&lt;br&gt;SHA256 + entropy + ssdeep (ppdeep)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="460" y="1840" width="300" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_extract_hash" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_extract" target="n_hash" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log extracted -->
+        <mxCell id="n_log_extract" value="log: &lt;b&gt;extracted&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(kind=crate, files, duration_s)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1850" width="210" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_hash_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_hash" target="n_log_extract" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 5 — INSTALL-TIME ANALYSIS (light purple)                   -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="1980" width="740" height="520" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p5_label" value="&lt;b&gt;Phase 5 &amp;mdash; Install-time Analysis&lt;/b&gt;  (build.rs, regex-based)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#4a2d6b;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1985" width="360" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Target: build.rs -->
+        <mxCell id="n_buildrs_find" value="&lt;b&gt;Find build.rs files&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;rglob(&amp;quot;build.rs&amp;quot;)&lt;/font&gt; across entire crate&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;ALL depths (unlike PyPI depth-limited search)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="430" y="2020" width="360" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_hash_buildrs" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_hash" target="n_buildrs_find" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Regex analysis note -->
+        <mxCell id="n_regex_note" value="&lt;font color=&quot;#888888&quot;&gt;Regex-based analysis&lt;br&gt;(no Rust AST parser in Python)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="2025" width="190" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_buildrs_regex" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_buildrs_find" target="n_regex_note" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- 7 Rules Box -->
+        <mxCell id="n_rules_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9673a6;opacity=60;" vertex="1" parent="1">
+          <mxGeometry x="290" y="2110" width="640" height="370" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_rules_title" value="&lt;b&gt;7 Detection Rules for build.rs&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#4a2d6b;" vertex="1" parent="1">
+          <mxGeometry x="450" y="2115" width="320" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Rule 1 -->
+        <mxCell id="r1_name" value="crates.build_rs_net_exec_chain" style="label;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2148" width="210" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1_sev" value="CRITICAL" style="text;html=1;align=left;fontSize=9;fontColor=#b85450;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="530" y="2148" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1_desc" value="network lib (reqwest/ureq/hyper/curl/TcpStream...) + Command::new in same file" style="text;html=1;align=left;fontSize=9;fontColor=#888888;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="595" y="2148" width="320" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- Rule 2 -->
+        <mxCell id="r2_name" value="crates.build_rs_network" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2180" width="210" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r2_sev" value="HIGH" style="text;html=1;align=left;fontSize=9;fontColor=#d79b00;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="530" y="2180" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r2_desc" value="network library import alone" style="text;html=1;align=left;fontSize=9;fontColor=#888888;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="595" y="2180" width="320" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- Rule 3 -->
+        <mxCell id="r3_name" value="crates.build_rs_exec" style="label;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2212" width="210" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r3_sev" value="MEDIUM" style="text;html=1;align=left;fontSize=9;fontColor=#d6b656;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="530" y="2212" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r3_desc" value="command execution alone" style="text;html=1;align=left;fontSize=9;fontColor=#888888;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="595" y="2212" width="320" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- Rule 4 -->
+        <mxCell id="r4_name" value="crates.build_rs_env_harvest" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2244" width="210" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r4_sev" value="HIGH" style="text;html=1;align=left;fontSize=9;fontColor=#d79b00;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="530" y="2244" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r4_desc" value="3+ reads of sensitive env vars (AWS keys, GH tokens, SSH keys)" style="text;html=1;align=left;fontSize=9;fontColor=#888888;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="595" y="2244" width="320" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- Rule 5 -->
+        <mxCell id="r5_name" value="crates.build_rs_outdir_escape" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2276" width="210" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r5_sev" value="HIGH" style="text;html=1;align=left;fontSize=9;fontColor=#d79b00;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="530" y="2276" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r5_desc" value="writes outside OUT_DIR (absolute paths, $HOME)" style="text;html=1;align=left;fontSize=9;fontColor=#888888;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="595" y="2276" width="320" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- Rule 6 -->
+        <mxCell id="r6_name" value="crates.build_rs_suspicious_include" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2308" width="210" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r6_sev" value="HIGH" style="text;html=1;align=left;fontSize=9;fontColor=#d79b00;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="530" y="2308" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r6_desc" value="include_bytes! of .exe/.dll/.so/.sh/.ps1/.bat" style="text;html=1;align=left;fontSize=9;fontColor=#888888;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="595" y="2308" width="320" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- Rule 7 -->
+        <mxCell id="r7_name" value="crates.build_rs_encoded_payload" style="label;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2340" width="210" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r7_sev" value="MEDIUM" style="text;html=1;align=left;fontSize=9;fontColor=#d6b656;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="530" y="2340" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r7_desc" value="large base64 (200+ chars) or hex blobs" style="text;html=1;align=left;fontSize=9;fontColor=#888888;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="595" y="2340" width="320" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- Severity legend within rules box -->
+        <mxCell id="sev_legend" value="&lt;font size=&quot;1&quot;&gt;&lt;b&gt;Severity colors:&lt;/b&gt; &lt;font color=&quot;#b85450&quot;&gt;CRITICAL (60pt)&lt;/font&gt; | &lt;font color=&quot;#d79b00&quot;&gt;HIGH (25pt)&lt;/font&gt; | &lt;font color=&quot;#d6b656&quot;&gt;MEDIUM (8pt)&lt;/font&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="370" y="2380" width="480" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Edge from buildrs to rules -->
+        <mxCell id="e_buildrs_rules" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_buildrs_find" target="n_rules_box" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 6 — UNIVERSAL ANALYSIS (purple)                            -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="2530" width="740" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p6_label" value="&lt;b&gt;Phase 6 &amp;mdash; Universal Analysis&lt;/b&gt;  (same as PyPI)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#4a2d6b;" vertex="1" parent="1">
+          <mxGeometry x="250" y="2535" width="340" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Universal analyzers -->
+        <mxCell id="n_universal" value="&lt;b&gt;Universal Analyzers&lt;/b&gt;&lt;br&gt;analyze_imports, analyze_iocs, analyze_malware_patterns,&lt;br&gt;analyze_metadata, analyze_entropy, analyze_entropy_delta,&lt;br&gt;analyze_binary_artifacts, analyze_yara, analyze_version_diff" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="340" y="2570" width="540" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rules_universal" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_rules_box" target="n_universal" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log analyzed -->
+        <mxCell id="n_log_analyzed" value="log: &lt;b&gt;analyzed&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(kind, findings, duration_s)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="2670" width="210" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_univ_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_universal" target="n_log_analyzed" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 7 — NO DETONATION (gray)                                   -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="2760" width="740" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation&lt;/b&gt;  (NOT YET IMPLEMENTED)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#616161;" vertex="1" parent="1">
+          <mxGeometry x="250" y="2765" width="340" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- No detonation box -->
+        <mxCell id="n_no_detonate" value="&lt;b&gt;&lt;font size=&quot;3&quot; color=&quot;#757575&quot;&gt;Detonation: NOT YET IMPLEMENTED for Crates&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;Planned: gVisor sandbox with &lt;font face=&quot;Courier New&quot;&gt;cargo build&lt;/font&gt; profiles&lt;br&gt;Currently skipped: &lt;font face=&quot;Courier New&quot;&gt;if ecosystem == &amp;quot;pypi&amp;quot;&lt;/font&gt; gate in pipeline.py&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#bdbdbd;strokeWidth=2;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="370" y="2800" width="480" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_univ_nodet" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_universal" target="n_no_detonate" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Straight-through arrow bypassing detonation -->
+        <mxCell id="n_bypass_label" value="&lt;font color=&quot;#9e9e9e&quot;&gt;&lt;i&gt;Bypass &amp;mdash; no detonation&lt;/i&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="740" y="2895" width="160" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 8 — LLM TRIAGE + ALERT (light red)                        -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p8" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="2990" width="740" height="530" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p8_label" value="&lt;b&gt;Phase 8 &amp;mdash; LLM Triage + Alert&lt;/b&gt;  (if verdict == malicious)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#7f1d1d;" vertex="1" parent="1">
+          <mxGeometry x="250" y="2995" width="360" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Score + Verdict -->
+        <mxCell id="n_score" value="&lt;b&gt;score_and_verdict()&lt;/b&gt;&lt;br&gt;Points: low=1, med=8, high=25, crit=60&lt;br&gt;suspicious &amp;ge; 20, malicious &amp;ge; 61" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="430" y="3030" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_nodet_score" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_no_detonate" target="n_score" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Verdict decision -->
+        <mxCell id="d_verdict" value="&lt;b&gt;verdict ==&lt;br&gt;malicious?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="545" y="3130" width="130" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_score_verdict" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_score" target="d_verdict" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Not malicious → persist only -->
+        <mxCell id="n_skip_llm" value="&lt;font color=&quot;#888888&quot;&gt;Skip LLM triage&lt;br&gt;Persist scan results&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="780" y="3145" width="170" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_verdict_no" value="No" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_verdict" target="n_skip_llm" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Yes → LLM -->
+        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;OpenRouter &amp;rarr; GLM-5.1&lt;br&gt;Spotlighting anti-injection&lt;br&gt;Can override: malicious &amp;rarr; benign" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="440" y="3250" width="340" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_verdict_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_verdict" target="n_llm" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- LLM confirms? -->
+        <mxCell id="d_llm_confirm" value="&lt;b&gt;LLM confirms&lt;br&gt;malicious?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="545" y="3370" width="130" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llm_confirm" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_llm" target="d_llm_confirm" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Not confirmed → persist -->
+        <mxCell id="n_llm_benign" value="&lt;font color=&quot;#888888&quot;&gt;Override to benign&lt;br&gt;Persist results&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="780" y="3385" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llm_no" value="No" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_llm_confirm" target="n_llm_benign" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Confirmed → Discord -->
+        <mxCell id="n_discord" value="&lt;b&gt;Discord webhook&lt;/b&gt;&lt;br&gt;alert notification" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="510" y="3480" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llm_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_llm_confirm" target="n_discord" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log LLM -->
+        <mxCell id="n_log_llm" value="log: &lt;b&gt;llm_triage_done&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(cost, latency, verdict)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="3265" width="200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llm_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_llm" target="n_log_llm" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== CLEANUP + END ===== -->
+        <mxCell id="n_cleanup" value="&lt;b&gt;Persist + Cleanup&lt;/b&gt;&lt;br&gt;Upsert Package/Version, Scan, Findings, FileHash&lt;br&gt;Bump RuleHit counters&lt;br&gt;Remove temp dirs (%TEMP%/pkgsentry_crates)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="400" y="3580" width="420" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_discord_cleanup" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_discord" target="n_cleanup" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_skipllm_cleanup" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_skip_llm" target="n_cleanup" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="865" y="3560"/>
+              <mxPoint x="610" y="3560"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_llmbenign_cleanup" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_llm_benign" target="n_cleanup" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="860" y="3555"/>
+              <mxPoint x="610" y="3555"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Log done -->
+        <mxCell id="n_log_done" value="log: &lt;b&gt;scan_done&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(verdict, score, n_findings)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="3595" width="200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_cleanup_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_cleanup" target="n_log_done" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- END -->
+        <mxCell id="end" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="590" y="3700" width="40" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_cleanup_end" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_cleanup" target="end" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== ERROR PATH ===== -->
+        <mxCell id="n_error" value="&lt;b&gt;ERROR PATH&lt;/b&gt;&lt;br&gt;&lt;br&gt;Any unhandled exception &amp;rarr;&lt;br&gt;log: &lt;b&gt;pipeline_failed&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(error_type, error)&lt;/font&gt;&lt;br&gt;&amp;rarr; mark_failed(row, token)&lt;br&gt;&amp;rarr; cleanup temp dirs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#cc0000;fontColor=#cc0000;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="960" y="4020" width="260" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_error_label" value="&lt;font color=&quot;#cc0000&quot;&gt;&lt;i&gt;Any step can reach&lt;br&gt;error path on exception&lt;/i&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="3970" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Error → End -->
+        <mxCell id="e_error_end" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#cc0000;dashed=1;" edge="1" source="n_error" target="end" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1090" y="4190"/>
+              <mxPoint x="610" y="4190"/>
+              <mxPoint x="610" y="3740"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

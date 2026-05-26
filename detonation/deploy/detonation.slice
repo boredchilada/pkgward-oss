@@ -1,0 +1,8 @@
+[Unit]
+Description=Detonation Sandbox Resource Slice
+
+[Slice]
+CPUQuota=200%
+MemoryMax=2G
+MemoryHigh=1800M
+TasksMax=512

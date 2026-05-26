@@ -1,0 +1,50 @@
+# Per-ecosystem noise filters for the detonation Go sandbox service.
+# Trace events matching these patterns are dropped before behavioral rules
+# evaluate them — they're the expected, normal behavior of pip/npm/cargo
+# themselves. UNION semantics on each list.
+
+# PyPI: pip's own writes / cache reads / vendored module loads.
+pypi_file_noise = [
+    "/site-packages/",
+    "/.cache/pip/",
+    "/tmp/pip-",
+    "/__pycache__/",
+    "/pip/_vendor/",
+    ".dist-info/",
+    ".egg-info/",
+]
+
+# PyPI: exec of the interpreter itself / pip binary.
+pypi_exec_noise = [
+    "/python",
+    "/pip",
+]
+
+# npm: cache / lockfile / node_modules churn.
+npm_file_noise = [
+    "/.npm/_cacache/",
+    "/.npm/_logs/",
+    "/node_modules/",
+    "/tmp/npm-",
+]
+
+# npm: exec of node / npm.
+npm_exec_noise = [
+    "/node",
+    "/npm",
+]
+
+# crates.io: cargo's own work paths.
+crates_file_noise = [
+    "/.cargo/registry/",
+    "/.cargo/bin/",
+    "/.rustup/",
+    "/target/",
+]
+
+# crates.io: exec of rust toolchain.
+crates_exec_noise = [
+    "/rustc",
+    "/cargo",
+    "/rustup",
+]

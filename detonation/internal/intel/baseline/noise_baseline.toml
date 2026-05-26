@@ -1,0 +1,43 @@
+# Embedded baseline for the detonation Go service.
+# Mirror of pkgsentry/intel/baseline/detonation/noise_baseline.toml.
+# Overlay via $PKGSENTRY_INTEL_PATH/detonation/noise_baseline.toml — UNION semantics.
+
+pypi_file_noise = [
+    "/site-packages/",
+    "/.cache/pip/",
+    "/tmp/pip-",
+    "/__pycache__/",
+    "/pip/_vendor/",
+    ".dist-info/",
+    ".egg-info/",
+]
+
+pypi_exec_noise = [
+    "/python",
+    "/pip",
+]
+
+npm_file_noise = [
+    "/.npm/_cacache/",
+    "/.npm/_logs/",
+    "/node_modules/",
+    "/tmp/npm-",
+]
+
+npm_exec_noise = [
+    "/node",
+    "/npm",
+]
+
+crates_file_noise = [
+    "/.cargo/registry/",
+    "/.cargo/bin/",
+    "/.rustup/",
+    "/target/",
+]
+
+crates_exec_noise = [
+    "/rustc",
+    "/cargo",
+    "/rustup",
+]

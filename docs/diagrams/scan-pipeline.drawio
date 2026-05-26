@@ -1,0 +1,584 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-05-23T00:00:00.000Z" agent="draw.io" version="24.0.0" type="device">
+  <diagram id="scan-pipeline" name="Scan Pipeline — process_one()">
+    <mxGraphModel dx="1800" dy="2400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="4800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ===== TITLE ===== -->
+        <mxCell id="title" value="&lt;b&gt;Scan Pipeline — process_one()&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=20;" vertex="1" parent="1">
+          <mxGeometry x="440" y="20" width="420" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PHASE SWIMLANE BACKGROUNDS ===== -->
+        <!-- Phase 1 - Fetch background -->
+        <mxCell id="bg_p1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="220" y="190" width="860" height="340" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p1_label" value="&lt;b&gt;Phase 1 — Fetch&lt;/b&gt;  (async I/O)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#1a3a6b;" vertex="1" parent="1">
+          <mxGeometry x="230" y="195" width="200" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Phase 1.5 - Extract+Hash background -->
+        <mxCell id="bg_p15" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="220" y="560" width="860" height="310" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p15_label" value="&lt;b&gt;Phase 1.5 — Extract + Hash&lt;/b&gt;  (asyncio.to_thread)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#2d5016;" vertex="1" parent="1">
+          <mxGeometry x="230" y="565" width="340" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Phase 2 - Code Diff background -->
+        <mxCell id="bg_p2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="220" y="900" width="860" height="370" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p2_label" value="&lt;b&gt;Phase 2 — Code Diff&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b5900;" vertex="1" parent="1">
+          <mxGeometry x="230" y="905" width="200" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Phase 2.5 - Analyze background -->
+        <mxCell id="bg_p25" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="220" y="1300" width="860" height="380" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p25_label" value="&lt;b&gt;Phase 2.5 — Analyze&lt;/b&gt;  (asyncio.to_thread)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#4a2d6b;" vertex="1" parent="1">
+          <mxGeometry x="230" y="1305" width="310" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Phase 3 - Score+Verdict background -->
+        <mxCell id="bg_p3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="220" y="1710" width="860" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p3_label" value="&lt;b&gt;Phase 3 — Score + Verdict&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b1a17;" vertex="1" parent="1">
+          <mxGeometry x="230" y="1715" width="200" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Phase 4 - Detonation background -->
+        <mxCell id="bg_p4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="220" y="1990" width="860" height="380" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p4_label" value="&lt;b&gt;Phase 4 — Detonation&lt;/b&gt;  (PyPI only, if enabled)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
+          <mxGeometry x="230" y="1995" width="340" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Phase 5 - LLM Triage background -->
+        <mxCell id="bg_p5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0e6ff;strokeColor=#7c5cbf;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="220" y="2400" width="860" height="350" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p5_label" value="&lt;b&gt;Phase 5 — LLM Triage&lt;/b&gt;  (if verdict == malicious)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#3d2e6b;" vertex="1" parent="1">
+          <mxGeometry x="230" y="2405" width="340" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Phase 6 - Persist background -->
+        <mxCell id="bg_p6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cce5ff;strokeColor=#3399ff;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="220" y="2780" width="860" height="280" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p6_label" value="&lt;b&gt;Phase 6 — Persist&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#0059b3;" vertex="1" parent="1">
+          <mxGeometry x="230" y="2785" width="200" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Phase 7 - Alert background -->
+        <mxCell id="bg_p7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;opacity=30;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="220" y="3090" width="860" height="280" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 — Alert&lt;/b&gt;  (if LLM confirms malicious)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#7f1d1d;" vertex="1" parent="1">
+          <mxGeometry x="230" y="3095" width="340" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== START ===== -->
+        <mxCell id="start" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="630" y="80" width="40" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_claim" value="&lt;b&gt;Claim queue item&lt;/b&gt;&lt;br&gt;validate claim_token&lt;br&gt;bind structlog contextvars&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(sid, ecosystem, pkg, w)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="530" y="140" width="240" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_start_claim" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="start" target="n_claim" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PHASE 1 — FETCH ===== -->
+        <mxCell id="n_adapter" value="&lt;b&gt;Lookup adapter&lt;/b&gt;&lt;br&gt;adapter_registry[ecosystem]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="540" y="240" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_claim_adapter" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_claim" target="n_adapter" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- PyPI path -->
+        <mxCell id="n_pypi_fetch" value="&lt;b&gt;PyPI Adapter&lt;/b&gt;&lt;br&gt;GET pypi.org/pypi/{name}/{version}/json&lt;br&gt;Pick sdist + wheel&lt;br&gt;Download concurrently" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="310" y="320" width="250" height="80" as="geometry"/>
+        </mxCell>
+        <!-- Crates path -->
+        <mxCell id="n_crates_fetch" value="&lt;b&gt;Crates Adapter&lt;/b&gt;&lt;br&gt;GET crates.io API for checksum&lt;br&gt;Download .crate from&lt;br&gt;static.crates.io CDN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="740" y="320" width="250" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_adapter_pypi" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_adapter" target="n_pypi_fetch" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_adapter_crates" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_adapter" target="n_crates_fetch" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Verify SHA256 -->
+        <mxCell id="n_verify_sha" value="&lt;b&gt;Verify SHA256&lt;/b&gt;&lt;br&gt;against registry checksum" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="530" y="430" width="240" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_pypi_sha" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_pypi_fetch" target="n_verify_sha" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_crates_sha" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_crates_fetch" target="n_verify_sha" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Fetch OK? diamond -->
+        <mxCell id="d_fetch_ok" value="&lt;b&gt;Fetch OK?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="590" y="500" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_sha_fetchok" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_verify_sha" target="d_fetch_ok" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Fetch fail → error path -->
+        <mxCell id="e_fetchok_fail" value="No" style="edgeStyle=orthogonalEdgeStyle;fontColor=#cc0000;" edge="1" source="d_fetch_ok" target="n_error" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1200" y="530"/>
+              <mxPoint x="1200" y="3660"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Log downloaded -->
+        <mxCell id="n_log_downloaded" value="log: &lt;b&gt;downloaded&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(archives, total_mb)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="505" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_fetchok_log" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#CCCCCC;" edge="1" source="d_fetch_ok" target="n_log_downloaded" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PHASE 1.5 — EXTRACT + HASH ===== -->
+        <mxCell id="n_extract" value="&lt;b&gt;safe_extract()&lt;/b&gt;&lt;br&gt;For each archive (sdist, wheel, crate)&lt;br&gt;10K file cap, 500MB cap&lt;br&gt;Reject symlinks / path traversal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="490" y="600" width="320" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_fetchok_extract" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_fetch_ok" target="n_extract" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n_hash" value="&lt;b&gt;Compute per-file hashes&lt;/b&gt;&lt;br&gt;SHA256 + entropy + ssdeep (ppdeep)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="510" y="710" width="280" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_extract_hash" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_extract" target="n_hash" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log extracted -->
+        <mxCell id="n_log_extracted" value="log: &lt;b&gt;extracting&lt;/b&gt; → &lt;b&gt;extracted&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(kind, files, duration_s)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="790" width="210" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_hash_log" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_hash" target="n_log_extracted" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="650" y="790"/>
+              <mxPoint x="500" y="790"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== PHASE 2 — CODE DIFF ===== -->
+        <mxCell id="n_fetch_prev" value="&lt;b&gt;Fetch previous version&lt;/b&gt;&lt;br&gt;file hashes from DB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="530" y="940" width="240" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_hash_fetchprev" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_hash" target="n_fetch_prev" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Decision: previous hashes exist? -->
+        <mxCell id="d_prev_exist" value="&lt;b&gt;Previous&lt;br&gt;hashes exist?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="585" y="1010" width="130" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_fetchprev_exist" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_fetch_prev" target="d_prev_exist" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- No previous → analyze all files -->
+        <mxCell id="n_analyze_all" value="Analyze &lt;b&gt;all files&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(first version seen)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="790" y="1020" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_noexist" value="No" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_prev_exist" target="n_analyze_all" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Yes previous → compare -->
+        <mxCell id="n_compare" value="&lt;b&gt;Compare SHA256&lt;/b&gt;&lt;br&gt;current vs previous&lt;br&gt;per normalized path" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="530" y="1110" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_exist_compare" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_prev_exist" target="n_compare" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Decision: files changed? -->
+        <mxCell id="d_changed" value="&lt;b&gt;Files&lt;br&gt;changed?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="595" y="1195" width="110" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_compare_changed" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_compare" target="d_changed" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- No changes → skip -->
+        <mxCell id="n_skip" value="&lt;b&gt;Skip analysis&lt;/b&gt;&lt;br&gt;log: no_code_changes&lt;br&gt;→ jump to Persist" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#888888;" vertex="1" parent="1">
+          <mxGeometry x="310" y="1195" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_nochanged_skip" value="No" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_changed" target="n_skip" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Skip → Persist (long arrow) -->
+        <mxCell id="e_skip_persist" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#999999;" edge="1" source="n_skip" target="n_persist" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="250" y="1225"/>
+              <mxPoint x="250" y="2840"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Log code_diff -->
+        <mxCell id="n_log_diff" value="log: &lt;b&gt;code_diff&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(changed_count, total_count)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="810" y="1210" width="210" height="36" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_changed_log" value="Yes" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#CCCCCC;" edge="1" source="d_changed" target="n_log_diff" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PHASE 2.5 — ANALYZE ===== -->
+        <mxCell id="n_analyze_merge" value="&lt;b&gt;Analyze changed files only&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(pass changed_files set to analyzers)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="510" y="1340" width="280" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_changed_analyze" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_changed" target="n_analyze_merge" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_analyzeall_merge" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_analyze_all" target="n_analyze_merge" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="890" y="1280"/>
+              <mxPoint x="650" y="1280"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- PyPI analyzers -->
+        <mxCell id="n_pypi_analyze" value="&lt;b&gt;PyPI-specific Analyzers&lt;/b&gt;&lt;br&gt;analyze_install_scripts (setup.py AST)&lt;br&gt;analyze_imports (AST)&lt;br&gt;analyze_malware_patterns" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1420" width="260" height="80" as="geometry"/>
+        </mxCell>
+        <!-- Crates analyzers -->
+        <mxCell id="n_crates_analyze" value="&lt;b&gt;Crates-specific Analyzers&lt;/b&gt;&lt;br&gt;analyze_build_rs&lt;br&gt;(build.rs patterns)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="760" y="1420" width="250" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_merge_pypi_a" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_analyze_merge" target="n_pypi_analyze" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_merge_crates_a" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_analyze_merge" target="n_crates_analyze" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Universal analyzers -->
+        <mxCell id="n_universal" value="&lt;b&gt;Universal Analyzers&lt;/b&gt;&lt;br&gt;analyze_iocs, analyze_entropy, analyze_entropy_delta,&lt;br&gt;analyze_binary_artifacts, analyze_yara" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="430" y="1530" width="440" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_pypi_univ" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_pypi_analyze" target="n_universal" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_crates_univ" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_crates_analyze" target="n_universal" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log analyzed -->
+        <mxCell id="n_log_analyzed" value="log: &lt;b&gt;analyzing&lt;/b&gt; → &lt;b&gt;analyzed&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(kind, findings, duration_s)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1545" width="220" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_univ_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_universal" target="n_log_analyzed" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PHASE 3 — SCORE + VERDICT ===== -->
+        <mxCell id="n_score" value="&lt;b&gt;score_and_verdict()&lt;/b&gt;&lt;br&gt;Points: low=1, med=8, high=25, crit=60&lt;br&gt;Category cap = 30&lt;br&gt;suspicious &amp;ge; 20, malicious &amp;ge; 61" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="470" y="1750" width="360" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_univ_score" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_universal" target="n_score" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n_watchlist_esc" value="&lt;b&gt;Watchlist escalation&lt;/b&gt;&lt;br&gt;medium+ → suspicious&lt;br&gt;top-100 high/crit → malicious" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="510" y="1860" width="280" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_score_escalate" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_score" target="n_watchlist_esc" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log persisting -->
+        <mxCell id="n_log_persisting" value="log: &lt;b&gt;persisting&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(findings, hashes)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="290" y="1760" width="160" height="36" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_score_logp" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_score" target="n_log_persisting" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PHASE 4 — DETONATION ===== -->
+        <mxCell id="d_detonate" value="&lt;b&gt;should_detonate()?&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;verdict, score,&lt;br&gt;watchlist_rank,&lt;br&gt;is_new_package&lt;/font&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="570" y="2030" width="160" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_esc_detonate" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_watchlist_esc" target="d_detonate" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Detonate: No → skip to LLM check -->
+        <mxCell id="n_det_skip" value="&lt;font color=&quot;#888888&quot;&gt;Skip detonation&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="810" y="2065" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_det_no" value="No" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_detonate" target="n_det_skip" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Detonate: Yes -->
+        <mxCell id="n_sandbox" value="&lt;b&gt;Send sdist to gVisor sandbox&lt;/b&gt;&lt;br&gt;via UNIX socket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="520" y="2190" width="260" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_det_yes" value="Yes (PyPI only)" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_detonate" target="n_sandbox" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n_tetragon" value="&lt;b&gt;Tetragon eBPF traces&lt;/b&gt;&lt;br&gt;→ behavioral rules → dynamic findings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="510" y="2270" width="280" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_sandbox_tetragon" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_sandbox" target="n_tetragon" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n_rescore" value="&lt;b&gt;Re-score&lt;/b&gt; with dynamic findings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="530" y="2340" width="240" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_tetragon_rescore" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_tetragon" target="n_rescore" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log detonation -->
+        <mxCell id="n_log_det" value="log: &lt;b&gt;detonation_start&lt;/b&gt;&lt;br&gt;→ &lt;b&gt;detonation_done&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="290" y="2200" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_sandbox_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_sandbox" target="n_log_det" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PHASE 5 — LLM TRIAGE ===== -->
+        <mxCell id="d_verdict_mal" value="&lt;b&gt;verdict ==&lt;br&gt;malicious?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f0e6ff;strokeColor=#7c5cbf;" vertex="1" parent="1">
+          <mxGeometry x="585" y="2440" width="130" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rescore_verdict" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_rescore" target="d_verdict_mal" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_detskip_verdict" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_det_skip" target="d_verdict_mal" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="885" y="2420"/>
+              <mxPoint x="650" y="2420"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Not malicious → skip LLM -->
+        <mxCell id="n_llm_skip" value="&lt;font color=&quot;#888888&quot;&gt;Skip LLM triage&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0e6ff;strokeColor=#7c5cbf;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="810" y="2460" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_verdict_no" value="No" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_verdict_mal" target="n_llm_skip" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Malicious → LLM -->
+        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;OpenRouter → GLM-5.1&lt;br&gt;Spotlighting anti-injection&lt;br&gt;Budget: $20/process, 1000 calls/hr" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0e6ff;strokeColor=#7c5cbf;" vertex="1" parent="1">
+          <mxGeometry x="490" y="2560" width="320" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_verdict_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_verdict_mal" target="n_llm" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n_llm_override" value="Can override verdict&lt;br&gt;&lt;b&gt;malicious → benign&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0e6ff;strokeColor=#7c5cbf;" vertex="1" parent="1">
+          <mxGeometry x="530" y="2670" width="240" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llm_override" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_llm" target="n_llm_override" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log LLM -->
+        <mxCell id="n_log_llm" value="log: &lt;b&gt;llm_triage_start&lt;/b&gt;&lt;br&gt;→ &lt;b&gt;llm_triage_done&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(cost, latency)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="2570" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llm_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_llm" target="n_log_llm" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PHASE 6 — PERSIST ===== -->
+        <mxCell id="n_persist" value="&lt;b&gt;Upsert Package / Version&lt;/b&gt;&lt;br&gt;Create Scan row, write Findings&lt;br&gt;Store FileHash rows&lt;br&gt;mark_done(row, token)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cce5ff;strokeColor=#3399ff;" vertex="1" parent="1">
+          <mxGeometry x="480" y="2820" width="340" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_override_persist" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_llm_override" target="n_persist" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llmskip_persist" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_llm_skip" target="n_persist" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="885" y="2770"/>
+              <mxPoint x="650" y="2770"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="n_rulehit" value="&lt;b&gt;Bump RuleHit counters&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(separate transaction — avoids deadlocks)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cce5ff;strokeColor=#3399ff;" vertex="1" parent="1">
+          <mxGeometry x="490" y="2930" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_persist_rulehit" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_persist" target="n_rulehit" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Log scan_done -->
+        <mxCell id="n_log_done" value="log: &lt;b&gt;scan_done&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(verdict, score, n_findings, duration_s)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="2940" width="210" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rulehit_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_rulehit" target="n_log_done" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PHASE 7 — ALERT ===== -->
+        <mxCell id="d_alert" value="&lt;b&gt;LLM confirmed&lt;br&gt;malicious?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="585" y="3120" width="130" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rulehit_alert" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_rulehit" target="d_alert" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n_discord" value="&lt;b&gt;Discord webhook&lt;/b&gt;&lt;br&gt;notification" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="560" y="3240" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_alert_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_alert" target="n_discord" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n_alert_skip" value="&lt;font color=&quot;#888888&quot;&gt;No alert&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="810" y="3140" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_alert_no" value="No" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_alert" target="n_alert_skip" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== FINALLY — CLEANUP ===== -->
+        <mxCell id="n_cleanup" value="&lt;b&gt;Finally: Cleanup&lt;/b&gt;&lt;br&gt;Remove temp dirs&lt;br&gt;(extraction + archives)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="530" y="3420" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_discord_cleanup" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_discord" target="n_cleanup" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_alertskip_cleanup" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_alert_skip" target="n_cleanup" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="870" y="3390"/>
+              <mxPoint x="650" y="3390"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== END ===== -->
+        <mxCell id="end" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="630" y="3520" width="40" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_cleanup_end" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_cleanup" target="end" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== ERROR PATH ===== -->
+        <mxCell id="n_error" value="&lt;b&gt;ERROR PATH&lt;/b&gt;&lt;br&gt;&lt;br&gt;Any unhandled exception →&lt;br&gt;log: &lt;b&gt;pipeline_failed&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(error_type, error)&lt;/font&gt;&lt;br&gt;→ mark_failed(row, token)&lt;br&gt;→ cleanup temp dirs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#cc0000;fontColor=#cc0000;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="3610" width="260" height="130" as="geometry"/>
+        </mxCell>
+        <!-- Error path arrow from left side (any step can fail) -->
+        <mxCell id="n_error_label" value="&lt;font color=&quot;#cc0000&quot;&gt;&lt;i&gt;Any step can reach&lt;br&gt;error path on exception&lt;/i&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="3560" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Error → End -->
+        <mxCell id="e_error_end" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#cc0000;dashed=1;" edge="1" source="n_error" target="end" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1190" y="3780"/>
+              <mxPoint x="650" y="3780"/>
+              <mxPoint x="650" y="3560"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== LEGEND ===== -->
+        <mxCell id="legend_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;" vertex="1" parent="1">
+          <mxGeometry x="30" y="80" width="180" height="340" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend_title" value="&lt;b&gt;Legend&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="80" y="85" width="80" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="45" y="120" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1t" value="Phase 1 — Fetch" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="115" width="130" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="45" y="150" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2t" value="Phase 1.5 — Extract" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="145" width="130" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="45" y="180" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3t" value="Phase 2 — Code Diff" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="175" width="130" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="45" y="210" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg4t" value="Phase 2.5 — Analyze" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="205" width="130" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="45" y="240" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg5t" value="Phase 3 — Score" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="235" width="130" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="45" y="270" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg6t" value="Phase 4 — Detonation" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="265" width="130" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0e6ff;strokeColor=#7c5cbf;" vertex="1" parent="1">
+          <mxGeometry x="45" y="300" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg7t" value="Phase 5 — LLM Triage" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="295" width="130" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg8" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cce5ff;strokeColor=#3399ff;" vertex="1" parent="1">
+          <mxGeometry x="45" y="330" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg8t" value="Phase 6 — Persist" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="325" width="130" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg9" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="45" y="360" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg9t" value="Phase 7 — Alert" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="355" width="130" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg10" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;" vertex="1" parent="1">
+          <mxGeometry x="45" y="390" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg10t" value="Log events" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="385" width="130" height="24" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,37 @@
+rules:
+  - id: buildrs_env_to_net
+    mode: taint
+    message: >-
+      Sensitive env var read tainted into network call body in build.rs.
+      Credential harvesting at compile time.
+    languages: [rust]
+    severity: ERROR
+    paths:
+      include:
+        - "**/build.rs"
+    metadata:
+      severity: high
+      confidence: high
+      category: installer
+      pkgsentry_layer: opengrep
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: std::env::var("AWS_SECRET_ACCESS_KEY")
+              - pattern: std::env::var("AWS_ACCESS_KEY_ID")
+              - pattern: std::env::var("GITHUB_TOKEN")
+              - pattern: std::env::var("GH_TOKEN")
+              - pattern: std::env::var("CARGO_REGISTRY_TOKEN")
+              - pattern: std::env::var("NPM_TOKEN")
+              - pattern: std::env::var("SSH_PRIVATE_KEY")
+              - pattern: std::env::var("DATABASE_URL")
+              - pattern: env::var("AWS_SECRET_ACCESS_KEY")
+              - pattern: env::var("GITHUB_TOKEN")
+              - pattern: env::var("CARGO_REGISTRY_TOKEN")
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: reqwest::Client::new().post($URL).body($X)
+              - pattern: reqwest::blocking::Client::new().post($URL).body($X)
+              - pattern: ureq::post($URL).send_string($X)
+              - pattern: ureq::post($URL).send_bytes($X)

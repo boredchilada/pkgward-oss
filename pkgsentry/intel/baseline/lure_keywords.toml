@@ -1,0 +1,37 @@
+# Keyword categories for lure-name detection. A brand-new package whose
+# name matches keywords in 2+ categories produces a finding (single-category
+# hits are too common to be useful signal). UNION semantics: overlay
+# keywords are added to the corresponding category.
+#
+# Baseline ships a small set of obviously-attack-themed terms. Tuned
+# category lists (longer keyword sets, themed campaigns) typically come
+# from the operator's private overlay.
+
+[categories]
+
+crypto = [
+    "wallet",
+    "mnemonic",
+    "blockchain",
+    "web3-",
+    "defi-",
+    "nft-",
+]
+
+security_theater = [
+    "security-",
+    "-security",
+    "scanner",
+    "audit",
+    "verifier",
+    "validator",
+]
+
+credential_secret = [
+    "credential",
+    "secret",
+    "api-key",
+    "access-token",
+    "password-",
+    "ssh-key",
+]

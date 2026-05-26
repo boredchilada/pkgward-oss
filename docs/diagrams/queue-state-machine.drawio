@@ -1,0 +1,187 @@
+<mxfile host="app.diagrams.net" agent="Claude" version="26.0.0">
+  <diagram id="queue-state-machine" name="Queue State Machine">
+    <mxGraphModel dx="1400" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="ScanQueue State Machine" style="text;html=1;fontSize=22;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="450" y="20" width="400" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== STATES ==================== -->
+
+        <!-- [new] pseudo-state -->
+        <mxCell id="new" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="220" y="130" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="newLabel" value="&lt;font style=&quot;font-size:11px&quot;&gt;new scan&lt;br&gt;request&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="185" y="95" width="100" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- PENDING -->
+        <mxCell id="pending" value="&lt;b style=&quot;font-size:16px&quot;&gt;PENDING&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=0;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="100" width="160" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- PENDING detail box -->
+        <mxCell id="pendingDetail" value="&lt;font style=&quot;font-size:11px&quot;&gt;&lt;b&gt;Ordering:&lt;/b&gt; priority (high &amp;rarr; normal &amp;rarr; low),&lt;br&gt;then FIFO within priority.&lt;br&gt;&lt;b&gt;Fair scheduling:&lt;/b&gt; random shuffle across&lt;br&gt;ecosystems prevents starvation.&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="280" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- CLAIMED -->
+        <mxCell id="claimed" value="&lt;b style=&quot;font-size:16px&quot;&gt;CLAIMED&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;fontStyle=0;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="100" width="160" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- CLAIMED detail box -->
+        <mxCell id="claimedDetail" value="&lt;font style=&quot;font-size:11px&quot;&gt;&lt;b&gt;claim_token:&lt;/b&gt; UUID4 (optimistic lock)&lt;br&gt;&lt;b&gt;attempts:&lt;/b&gt; incremented on claim&lt;br&gt;&lt;b&gt;stale timeout:&lt;/b&gt; 10 min&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="930" y="80" width="240" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- DONE -->
+        <mxCell id="done" value="&lt;b style=&quot;font-size:16px&quot;&gt;DONE&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=0;shadow=1;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="700" y="400" width="160" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- DONE detail -->
+        <mxCell id="doneDetail" value="&lt;font style=&quot;font-size:11px&quot;&gt;&lt;b&gt;Terminal state&lt;/b&gt;&lt;br&gt;(unless CLI rescan)&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=top;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="710" y="490" width="140" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- FAILED -->
+        <mxCell id="failed" value="&lt;b style=&quot;font-size:16px&quot;&gt;FAILED&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=0;shadow=1;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="400" y="400" width="160" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- FAILED detail -->
+        <mxCell id="failedDetail" value="&lt;font style=&quot;font-size:11px&quot;&gt;&lt;b&gt;Auto-retry:&lt;/b&gt; if attempts &amp;lt; 3&lt;br&gt;&lt;b&gt;Permanent:&lt;/b&gt; if attempts &amp;ge; 3&lt;br&gt;&lt;b&gt;last_error:&lt;/b&gt; stored&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="140" y="420" width="210" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== TRANSITIONS ==================== -->
+
+        <!-- [new] → PENDING -->
+        <mxCell id="t_new_pending" value="&lt;b&gt;enqueue()&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;dedup: UNIQUE&lt;br&gt;(ecosystem, name, version)&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" source="new" target="pending" parent="1">
+          <mxGeometry x="0.1" y="10" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- PENDING → CLAIMED -->
+        <mxCell id="t_pending_claimed" value="&lt;b&gt;claim_next()&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;optimistic lock:&lt;br&gt;UPDATE WHERE status=pending,&lt;br&gt;rowcount == 1&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" source="pending" target="claimed" parent="1">
+          <mxGeometry x="-0.1" y="-25" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- CLAIMED → DONE -->
+        <mxCell id="t_claimed_done" value="&lt;b&gt;mark_done()&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;token verified&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" source="claimed" target="done" parent="1">
+          <mxGeometry x="-0.2" y="15" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- CLAIMED → FAILED (worker error) -->
+        <mxCell id="t_claimed_failed" value="&lt;b&gt;mark_failed()&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;token verified,&lt;br&gt;last_error stored&lt;/font&gt;" style="rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" source="claimed" target="failed" parent="1">
+          <mxGeometry x="-0.15" y="-10" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="740" y="320" />
+              <mxPoint x="520" y="320" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- FAILED → PENDING (auto-retry) -->
+        <mxCell id="t_failed_pending" value="&lt;b&gt;auto-retry&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;re-enqueue&lt;br&gt;if attempts &amp;lt; 3&lt;/font&gt;" style="rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" edge="1" source="failed" target="pending" parent="1">
+          <mxGeometry x="0.1" y="-15" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="440" y="340" />
+              <mxPoint x="440" y="260" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- CLAIMED → PENDING (stale sweep, attempts < 3) -->
+        <mxCell id="t_stale_pending" value="&lt;b&gt;sweep_stale_claims()&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;every 2 min, if claimed_at &amp;gt; 10 min ago&lt;br&gt;AND attempts &amp;lt; 3&lt;/font&gt;" style="rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;dashPattern=8 4;" edge="1" source="claimed" target="pending" parent="1">
+          <mxGeometry x="0.05" y="25" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="660" y="215" />
+              <mxPoint x="600" y="215" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- CLAIMED → FAILED (stale sweep, attempts >= 3) -->
+        <mxCell id="t_stale_failed" value="&lt;b&gt;sweep_stale&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;if attempts &amp;ge; 3&lt;/font&gt;" style="rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0;entryDx=0;entryDy=0;dashed=1;dashPattern=8 4;" edge="1" source="claimed" target="failed" parent="1">
+          <mxGeometry x="-0.2" y="10" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="350" />
+              <mxPoint x="570" y="350" />
+              <mxPoint x="570" y="390" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- DONE → PENDING (CLI rescan) -->
+        <mxCell id="t_done_pending" value="&lt;b&gt;allow_rescan=True&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;CLI rescan command&lt;/font&gt;" style="rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;dashed=1;strokeColor=#82b366;" edge="1" source="done" target="pending" parent="1">
+          <mxGeometry x="0.05" y="30" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="570" />
+              <mxPoint x="480" y="570" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== LEGEND / NOTES ==================== -->
+
+        <!-- Fair scheduling note -->
+        <mxCell id="fairNote" value="&lt;b&gt;Fair Scheduling (claim_next)&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:11px&quot;&gt;1. Find ecosystems with pending items at each priority tier&lt;br&gt;2. Shuffle ecosystems randomly&lt;br&gt;3. Pick oldest item within chosen ecosystem&lt;br&gt;&lt;br&gt;Prevents one ecosystem's backlog&lt;br&gt;from starving another.&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#E6F3FF;strokeColor=#6c8ebf;fontSize=12;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="960" y="280" width="310" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#b3b3b3;strokeWidth=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="960" y="450" width="310" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="legendTitle" value="&lt;b&gt;Legend&lt;/b&gt;" style="text;html=1;fontSize=12;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="975" y="455" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="" style="endArrow=classic;html=1;rounded=1;strokeWidth=1.5;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="980" y="495" as="sourcePoint" />
+            <mxPoint x="1040" y="495" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg1label" value="&lt;font style=&quot;font-size:11px&quot;&gt;Worker-driven transition&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="485" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="" style="endArrow=classic;html=1;rounded=1;strokeWidth=1.5;dashed=1;dashPattern=8 4;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="980" y="520" as="sourcePoint" />
+            <mxPoint x="1040" y="520" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg2label" value="&lt;font style=&quot;font-size:11px&quot;&gt;Automatic / sweep transition&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="510" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="" style="endArrow=classic;html=1;rounded=1;strokeWidth=1.5;dashed=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="980" y="548" as="sourcePoint" />
+            <mxPoint x="1040" y="548" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg3label" value="&lt;font style=&quot;font-size:11px&quot;&gt;Manual CLI override&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="538" width="200" height="20" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

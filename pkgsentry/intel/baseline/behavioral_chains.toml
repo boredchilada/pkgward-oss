@@ -1,0 +1,20 @@
+# Rule IDs that, when fired, auto-escalate verdict to malicious.
+# UNION semantics: overlay rule IDs are added to this set.
+#
+# A "chain" is a multi-signal correlation (e.g. urlopen + exec in install).
+# When the underlying analyzer emits a finding with one of these IDs, the
+# scoring layer treats it as a hard malicious signal regardless of total
+# score. This list itself is rule-identifier metadata — the actual chain
+# detection logic lives in the analyzers.
+
+chain_ids = [
+    "installer.urlopen_exec_chain",
+    "imports.network_subprocess_chain",
+    "malware.deobfuscation_exec_chain",
+    "malware.discord_webhook",
+    "malware.env_bulk_exfil",
+    "malware.pth_import_injection",
+    "dyn_install_exfil",
+    "dyn_reverse_shell",
+    "dyn_proc_inject",
+]

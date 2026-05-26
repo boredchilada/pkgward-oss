@@ -1,0 +1,62 @@
+# Self-contained pkgsentry stack — includes PostgreSQL.
+#
+# Use this if you don't have your own Postgres instance.
+# For production with an external DB, use docker-compose.yml instead.
+#
+#   docker compose -f docker-compose.standalone.yml up -d
+#
+# Tables are created automatically on first start — no separate init step needed.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pkgsentry-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pkgsentry
+      POSTGRES_PASSWORD: pkgsentry
+      POSTGRES_DB: pkgsentry
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pkgsentry"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  scanner:
+    build: .
+    container_name: pkgsentry
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - scanner-data:/data
+      # Uncomment to load a private intel overlay (see docs/intel-pack.md):
+      # - ./intel/private:/app/intel/private:ro
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SCANNER_INGEST=1
+      - PKGSENTRY_DB_URL=postgresql://pkgsentry:pkgsentry@postgres:5432/pkgsentry
+      # Uncomment alongside the volume mount above:
+      # - PKGSENTRY_INTEL_PATH=/app/intel/private
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    command: ["run", "--workers", "4"]
+
+volumes:
+  pgdata:
+    name: pkgsentry-pgdata
+  scanner-data:
+    name: pkgsentry-data

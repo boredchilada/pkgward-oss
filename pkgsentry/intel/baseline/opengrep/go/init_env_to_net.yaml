@@ -1,0 +1,40 @@
+rules:
+  - id: init_env_to_net
+    mode: taint
+    message: >-
+      Sensitive env var read inside init() is tainted into network call —
+      credential harvest at module import time.
+    languages: [go]
+    severity: ERROR
+    metadata:
+      severity: high
+      confidence: high
+      category: gomod
+      pkgsentry_layer: opengrep
+    pattern-sources:
+      - patterns:
+          - pattern-inside: |
+              func init() {
+                ...
+              }
+          - pattern-either:
+              - pattern: os.Getenv("AWS_SECRET_ACCESS_KEY")
+              - pattern: os.Getenv("AWS_ACCESS_KEY_ID")
+              - pattern: os.Getenv("GITHUB_TOKEN")
+              - pattern: os.Getenv("GH_TOKEN")
+              - pattern: os.Getenv("DOCKER_PASSWORD")
+              - pattern: os.Getenv("NPM_TOKEN")
+              - pattern: os.Getenv("CARGO_REGISTRY_TOKEN")
+              - pattern: os.Getenv("DATABASE_URL")
+              - pattern: os.Getenv("SSH_PRIVATE_KEY")
+    pattern-sinks:
+      - patterns:
+          - pattern-inside: |
+              func init() {
+                ...
+              }
+          - pattern-either:
+              - pattern: http.Post($URL, ..., $BODY)
+              - pattern: http.PostForm($URL, $BODY)
+              - pattern: http.DefaultClient.Do($REQ)
+              - pattern: io.Copy($CONN, $BODY)

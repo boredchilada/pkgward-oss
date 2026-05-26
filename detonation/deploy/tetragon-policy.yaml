@@ -1,0 +1,42 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: detonation-monitor
+spec:
+  kprobes:
+    - call: "tcp_connect"
+      syscall: false
+      args:
+        - index: 0
+          type: "sock"
+      selectors:
+        - matchNamespaces:
+            - namespace: Pid
+              operator: NotIn
+              values: ["4026531836"]
+
+    - call: "__x64_sys_openat"
+      syscall: true
+      args:
+        - index: 1
+          type: "string"
+      selectors:
+        - matchArgs:
+            - index: 1
+              operator: "Prefix"
+              values:
+                - "/root/.ssh"
+                - "/root/.aws"
+                - "/root/.gnupg"
+                - "/root/.npmrc"
+                - "/root/.cargo/credentials"
+                - "/root/.docker/config.json"
+                - "/root/.kube"
+                - "/etc/shadow"
+                - "/etc/passwd"
+
+    - call: "sys_ptrace"
+      syscall: true
+      args:
+        - index: 0
+          type: "int"

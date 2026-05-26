@@ -1,0 +1,23 @@
+rules:
+  - id: buildrs_include_executable
+    message: >-
+      build.rs embeds an executable via include_bytes! — likely a smuggled
+      binary payload that the build script will write to disk and execute.
+    languages: [rust]
+    severity: ERROR
+    paths:
+      include:
+        - "**/build.rs"
+    metadata:
+      severity: high
+      confidence: medium
+      category: installer
+      pkgsentry_layer: opengrep
+    pattern-either:
+      - pattern-regex: 'include_bytes!\s*\(\s*"[^"]*\.exe"'
+      - pattern-regex: 'include_bytes!\s*\(\s*"[^"]*\.dll"'
+      - pattern-regex: 'include_bytes!\s*\(\s*"[^"]*\.so"'
+      - pattern-regex: 'include_bytes!\s*\(\s*"[^"]*\.dylib"'
+      - pattern-regex: 'include_bytes!\s*\(\s*"[^"]*\.sh"'
+      - pattern-regex: 'include_bytes!\s*\(\s*"[^"]*\.ps1"'
+      - pattern-regex: 'include_bytes!\s*\(\s*"[^"]*\.bat"'

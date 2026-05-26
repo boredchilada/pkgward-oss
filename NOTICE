@@ -1,0 +1,26 @@
+pkgsentry
+Copyright 2026 Michel Verbel
+
+This product includes software developed under the GNU Affero General Public License v3.0
+(LICENSE). Portions of the public baseline intel pack include or adapt
+content from the following open-source projects; attribution and license
+terms are preserved at the source-file level.
+
+YARA rules in pkgsentry/intel/baseline/yara/community_sigbase.yar are adapted
+from Neo23x0/signature-base, used under the Detection Rule License (DRL) 1.1:
+
+  https://github.com/Neo23x0/signature-base
+  https://github.com/Neo23x0/signature-base/blob/master/LICENSE
+
+Specific rule attributions (author, original_id, reference) are preserved in
+each rule's `meta` block within community_sigbase.yar. If you redistribute
+this baseline pack, those attributions must remain intact.
+
+YARA rules in pkgsentry/intel/baseline/yara/python_baseline.yar are authored
+by the pkgsentry project. Each rule cites a public technical reference where
+the underlying malware pattern is documented.
+
+The detonation Go service depends on the following third-party libraries
+(see detonation/go.mod for the authoritative list):
+
+  github.com/BurntSushi/toml — MIT

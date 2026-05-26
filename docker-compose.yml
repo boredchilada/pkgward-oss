@@ -1,0 +1,37 @@
+# Production compose — BYO Postgres + optional detonation + optional intel overlay.
+# For a self-contained setup with bundled Postgres, use docker-compose.standalone.yml.
+#
+# Requires PKGSENTRY_DB_URL in .env pointing at your Postgres instance.
+# Detonation and intel overlay mounts are optional — remove them if not deployed.
+
+services:
+  scanner:
+    build: .
+    container_name: pkgsentry
+    restart: unless-stopped
+    volumes:
+      - scanner-data:/data
+      # Optional: detonation sandbox socket (see docs/detonation.md)
+      - /var/run/detonation/detonation.sock:/var/run/detonation/detonation.sock
+      # Shared staging dir so the detonation service (host-side) can
+      # bind-mount archives the scanner creates inside the container.
+      - /tmp/pkgsentry:/tmp/pkgsentry
+      # Optional: private intel overlay (see docs/intel-pack.md)
+      - ./intel/private:/app/intel/private:ro
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SCANNER_INGEST=1
+      - DETONATION_SOCKET=/var/run/detonation/detonation.sock
+      - PKGSENTRY_INTEL_PATH=/app/intel/private
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    command: ["run", "--workers", "6"]
+
+volumes:
+  scanner-data:
+    name: pkgsentry-data

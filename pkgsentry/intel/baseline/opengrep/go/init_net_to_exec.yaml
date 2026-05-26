@@ -1,0 +1,36 @@
+rules:
+  - id: init_net_to_exec
+    mode: taint
+    message: >-
+      Network response inside init() is tainted into exec.Command. Module
+      runs malicious code at import time — the Go-side equivalent of
+      Python's network_at_import + subprocess chain.
+    languages: [go]
+    severity: ERROR
+    metadata:
+      severity: critical
+      confidence: high
+      category: gomod
+      pkgsentry_layer: opengrep
+    pattern-sources:
+      - patterns:
+          - pattern-inside: |
+              func init() {
+                ...
+              }
+          - pattern-either:
+              - pattern: http.Get($URL)
+              - pattern: http.Post($URL, ...)
+              - pattern: http.PostForm($URL, ...)
+              - pattern: http.DefaultClient.Get($URL)
+              - pattern: http.DefaultClient.Do($REQ)
+              - pattern: net.Dial($PROTO, $ADDR)
+    pattern-sinks:
+      - patterns:
+          - pattern-inside: |
+              func init() {
+                ...
+              }
+          - pattern-either:
+              - pattern: exec.Command($X, ...)
+              - pattern: exec.CommandContext($CTX, $X, ...)

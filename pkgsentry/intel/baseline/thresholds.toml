@@ -1,0 +1,13 @@
+# Verdict thresholds.
+# A scan's total score crosses these to graduate from clean → suspicious → malicious.
+# REPLACE semantics: overlay values fully override baseline.
+
+suspicious_min = 20
+malicious_min = 61
+category_cap = 30
+
+# Minimum leading-spaces count for the whitespace-hidden-payload detector
+# in analyze/malware_patterns.py. Real-world malware (pytoileur) used 200+
+# leading spaces to hide code off-screen in editors.
+whitespace_min_leading_spaces = 200
+

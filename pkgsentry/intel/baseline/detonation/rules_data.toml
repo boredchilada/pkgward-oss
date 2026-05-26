@@ -1,0 +1,54 @@
+# Reference data for the detonation Go sandbox service's behavioral rules.
+# The rule LOGIC (closures that walk trace events) lives compiled into
+# the Go binary. The DATA below — what counts as "sensitive" — is loaded
+# at startup and can be extended via overlay. UNION semantics on each list.
+#
+# Loaded by the Go service from $PKGSENTRY_INTEL_PATH/detonation/rules_data.toml
+# (or this baseline file if no overlay is set).
+
+# Paths whose access during install/import is flagged as credential-read.
+sensitive_path_prefixes = [
+    "/root/.ssh/",
+    "/home/",
+    "/.ssh/",
+    "/root/.aws/",
+    "/.aws/",
+    "/root/.gnupg/",
+    "/.gnupg/",
+    "/root/.npmrc",
+    "/.npmrc",
+    "/root/.cargo/credentials",
+    "/.cargo/credentials",
+    "/root/.docker/config.json",
+    "/.docker/config.json",
+    "/root/.kube/config",
+    "/.kube/config",
+    "/etc/shadow",
+]
+
+# Env var prefixes whose read during install/import is flagged.
+sensitive_env_prefixes = [
+    "AWS_SECRET",
+    "AWS_ACCESS_KEY",
+    "GITHUB_TOKEN",
+    "GH_TOKEN",
+    "NPM_TOKEN",
+    "CARGO_REGISTRY_TOKEN",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "DATABASE_URL",
+    "DB_PASSWORD",
+    "DISCORD_TOKEN",
+    "SLACK_TOKEN",
+]
+
+# Shell binaries — exec of these during install/import suggests command-line
+# attack (reverse shell prep, supply-chain exec).
+shell_binaries = [
+    "/bin/sh",
+    "/bin/bash",
+    "/bin/zsh",
+    "/bin/dash",
+    "/usr/bin/sh",
+    "/usr/bin/bash",
+]

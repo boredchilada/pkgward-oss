@@ -1,0 +1,3 @@
+
+
+IMPORTANT CONTEXT: Only ~{visible_pct}% of the package source was provided ({source_files_total} source files total). The files where rules fired may be truncated or missing. When source is incomplete, you MUST NOT assume YARA rule matches indicate malice — YARA pattern-matches are positional (e.g. "urlopen" for an API call + "subprocess" for a CLI wrapper in the same large file). Lower your confidence proportionally to how much source you cannot see. If the visible code looks like a legitimate SDK/library, say so even if rules fired.

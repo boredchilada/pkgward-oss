@@ -1,0 +1,33 @@
+name: Build detonation
+
+on:
+  pull_request:
+    paths:
+      - "detonation/**"
+  push:
+    branches: [main]
+    paths:
+      - "detonation/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: detonation
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: detonation/go.mod
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./... -v
+
+      - name: go build
+        run: go build ./...

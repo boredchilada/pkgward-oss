@@ -1,0 +1,34 @@
+rules:
+  - id: setup_net_to_exec
+    mode: taint
+    message: >-
+      Network response is tainted into exec/eval/compile at install time —
+      this is the canonical "fetch then run remote code" supply-chain attack.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      severity: critical
+      confidence: high
+      category: installer
+      pkgsentry_layer: opengrep
+      references:
+        - https://github.com/opengrep/opengrep
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: urllib.request.urlopen(...)
+              - pattern: urllib.urlopen(...)
+              - pattern: urllib.request.urlretrieve(...)
+              - pattern: requests.get(...)
+              - pattern: requests.post(...)
+              - pattern: requests.request(...)
+              - pattern: httpx.get(...)
+              - pattern: httpx.post(...)
+              - pattern: urllib3.PoolManager(...).request(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: exec($X)
+              - pattern: eval($X)
+              - pattern: compile($X, ...)
+              - pattern: __import__($X)

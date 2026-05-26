@@ -1,0 +1,32 @@
+rules:
+  - id: setup_net_to_subprocess
+    mode: taint
+    message: >-
+      Network response is tainted into subprocess/os.system at install time.
+      Variant of net-to-exec where the attacker shells out instead of using
+      Python's exec().
+    languages: [python]
+    severity: ERROR
+    metadata:
+      severity: critical
+      confidence: high
+      category: installer
+      pkgsentry_layer: opengrep
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: urllib.request.urlopen(...)
+              - pattern: requests.get(...)
+              - pattern: requests.post(...)
+              - pattern: httpx.get(...)
+              - pattern: httpx.post(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: subprocess.Popen($X, ...)
+              - pattern: subprocess.run($X, ...)
+              - pattern: subprocess.call($X, ...)
+              - pattern: subprocess.check_call($X, ...)
+              - pattern: subprocess.check_output($X, ...)
+              - pattern: os.system($X)
+              - pattern: os.popen($X)

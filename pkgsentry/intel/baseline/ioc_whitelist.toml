@@ -1,0 +1,48 @@
+# Domains that appear constantly in legitimate packages and should NOT
+# generate IOC findings. UNION semantics: overlay entries are added.
+#
+# The baseline ships a small, obviously-benign set — the source registries
+# themselves, major hosting platforms, and standards bodies. Operators
+# typically extend this via private overlay based on their own
+# false-positive history.
+
+benign_domains = [
+    # Package registries themselves
+    "pypi.org",
+    "files.pythonhosted.org",
+    "crates.io",
+    "static.crates.io",
+    "docs.rs",
+    "proxy.golang.org",
+    "index.golang.org",
+    "pkg.go.dev",
+    "npmjs.org",
+    "npmjs.com",
+    "rubygems.org",
+    "packagist.org",
+    # Source hosting
+    "github.com",
+    "github.io",
+    "githubusercontent.com",
+    "raw.githubusercontent.com",
+    "gitlab.com",
+    "bitbucket.org",
+    # Standards bodies and major docs
+    "python.org",
+    "docs.python.org",
+    "readthedocs.io",
+    "readthedocs.org",
+    "w3.org",
+    "ietf.org",
+    "apache.org",
+    "mozilla.org",
+    "opensource.org",
+    "spdx.org",
+    # Common testing / example domains (RFC 2606)
+    "example.com",
+    "example.org",
+    "example.net",
+    "example.invalid",
+    "localhost",
+    "127.0.0.1",
+]

@@ -1,0 +1,14 @@
+# pkgsentry baseline intel pack
+#
+# Ships with the open-source engine. Provides generic, publicly-derivable
+# detection content sufficient to demonstrate the engine works against
+# obviously malicious test inputs. Operators with their own tuned threat
+# intel should layer a private overlay via PKGSENTRY_INTEL_PATH.
+#
+# Per-field merge semantics (overlay vs baseline) defined in
+# pkgsentry/intel/pack.py:IntelPack.merge().
+
+name = "pkgsentry-baseline"
+version = "0.1.0"
+extends = "none"
+license = "Apache-2.0"

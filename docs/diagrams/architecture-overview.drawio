@@ -1,0 +1,280 @@
+<mxfile host="app.diagrams.net" modified="2026-05-23" agent="pkgsentry" version="24.0.0" type="device">
+  <diagram id="pkgsentry-arch" name="Architecture Overview">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ========== TITLE ========== -->
+        <mxCell id="title" value="pkgsentry &amp;mdash; Multi-Ecosystem Architecture" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="450" y="10" width="700" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ========== EXTERNAL SOURCES (Blue #dae8fc) ========== -->
+
+        <!-- PyPI sources -->
+        <mxCell id="pypi_group" value="PyPI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="80" y="70" width="350" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="pypi_rss" value="RSS Feeds&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;updates.xml, packages.xml&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="95" y="105" width="140" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="pypi_cursor" value="XML-RPC Cursor&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;changelog_since_serial&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="245" y="105" width="140" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="pypi_top" value="hugovk top-pypi-packages&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;top-pypi-packages.min.json&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="95" y="155" width="290" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Crates.io sources -->
+        <mxCell id="crates_group" value="Crates.io" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="480" y="70" width="350" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="crates_rss" value="RSS Feeds&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;crates.xml, updates.xml&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="500" y="105" width="140" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="crates_api" value="crates.io API&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;/api/v1/crates&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="660" y="105" width="140" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Download hosts -->
+        <mxCell id="pypi_dl" value="files.pythonhosted.org&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;PyPI downloads&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="900" y="70" width="170" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="crates_dl" value="static.crates.io&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;crate downloads&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="900" y="130" width="170" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ========== INGEST LAYER (Yellow #fff2cc) ========== -->
+        <mxCell id="ingest_group" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="230" width="750" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest_label" value="Ingest Layer (APScheduler)" style="text;html=1;fontSize=14;fontStyle=1;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="90" y="235" width="250" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pypi_ingest" value="&lt;b&gt;PyPI Adapter&lt;/b&gt;&lt;br&gt;feeds: 60s&lt;br&gt;cursor: 120s&lt;br&gt;watchlist: weekly" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="110" y="260" width="150" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="crates_ingest" value="&lt;b&gt;Crates Adapter&lt;/b&gt;&lt;br&gt;feeds: 60s&lt;br&gt;watchlist: weekly" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="300" y="260" width="150" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="scheduler_icon" value="&lt;b&gt;APScheduler&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;cron + interval triggers&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D4E1F5;strokeColor=#7EA6E0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="540" y="265" width="160" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- ========== QUEUE (Purple #e1d5e7) ========== -->
+        <mxCell id="queue" value="&lt;b&gt;scan_queue&lt;/b&gt; (PostgreSQL table)&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Priority: high &amp;rarr; normal &amp;rarr; low&lt;br&gt;Fair round-robin across ecosystems&lt;br&gt;States: pending &amp;rarr; claimed &amp;rarr; done / failed&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;size=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="365" width="260" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- ========== WORKER POOL (Green #d5e8d4) ========== -->
+        <mxCell id="workers_group" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="500" width="410" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="workers_label" value="Worker Pool (6 async workers)" style="text;html=1;fontSize=13;fontStyle=1;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="90" y="505" width="300" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="w0" value="W0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="530" width="50" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="w1" value="W1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="160" y="530" width="50" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="w2" value="W2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="530" width="50" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="w3" value="W3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="530" width="50" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="w4" value="W4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="530" width="50" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="w5" value="W5" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="530" width="50" height="35" as="geometry" />
+        </mxCell>
+
+        <mxCell id="structlog_note" value="&lt;font style=&quot;font-size:9px&quot;&gt;structlog contextvars: w (worker ID), sid (scan trace ID)&lt;/font&gt;" style="text;html=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="100" y="565" width="350" height="18" as="geometry" />
+        </mxCell>
+
+        <!-- ========== PIPELINE (Red #f8cecc) ========== -->
+        <mxCell id="pipeline_group" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="625" width="1050" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="pipeline_label" value="Pipeline (process_one)" style="text;html=1;fontSize=13;fontStyle=1;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="90" y="628" width="250" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p_fetch" value="fetch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="655" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p_extract" value="extract&lt;br&gt;+ hash" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="210" y="655" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p_diff" value="code-diff" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="655" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p_analyze" value="analyze" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="430" y="655" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p_score" value="score" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="655" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p_detonate" value="detonate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="655" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p_llm" value="LLM&lt;br&gt;triage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="655" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p_persist" value="persist" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="870" y="655" width="80" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Pipeline arrows -->
+        <mxCell id="pa1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="p_fetch" target="p_extract">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pa2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="p_extract" target="p_diff">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pa3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="p_diff" target="p_analyze">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pa4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="p_analyze" target="p_score">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pa5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="p_score" target="p_detonate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pa6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="p_detonate" target="p_llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pa7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" parent="1" source="p_llm" target="p_persist">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ========== DATA STORE (Purple #e1d5e7) ========== -->
+        <mxCell id="datastore" value="&lt;b&gt;PostgreSQL&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Package, Version, Scan, Finding,&lt;br&gt;FileHash, RuleHit, Watchlist,&lt;br&gt;ScanQueue, Detonation&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;size=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="640" y="370" width="220" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- ========== EXTERNAL SERVICES (Blue #dae8fc) ========== -->
+        <mxCell id="openrouter" value="&lt;b&gt;OpenRouter&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;LLM triage (GLM-5.1)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="630" width="150" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="sandbox" value="&lt;b&gt;Detonation Sandbox&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;gVisor + Tetragon (Go)&lt;br&gt;UNIX socket&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="695" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="discord" value="&lt;b&gt;Discord Webhook&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;malicious alerts&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="760" width="150" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_svc_label" value="External Services" style="text;html=1;fontSize=13;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="600" width="150" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- ========== EDGES: Sources → Ingest ========== -->
+        <mxCell id="e_pypi_ingest" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pypi_group" target="pypi_ingest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_crates_ingest" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="crates_group" target="crates_ingest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ========== EDGES: Ingest → Queue ========== -->
+        <mxCell id="e_pypi_q" value="enqueue" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#d6b656;fontSize=9;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=12;entryPerimeter=0;" edge="1" parent="1" source="pypi_ingest" target="queue">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_crates_q" value="enqueue" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#d6b656;fontSize=9;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=12;entryPerimeter=0;" edge="1" parent="1" source="crates_ingest" target="queue">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ========== EDGES: Queue → Workers ========== -->
+        <mxCell id="e_q_workers" value="claim" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;fontSize=9;exitX=0.3;exitY=1;exitDx=0;exitDy=-12;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="queue" target="workers_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ========== EDGES: Workers → Pipeline ========== -->
+        <mxCell id="e_workers_pipe" value="process_one" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#b85450;fontSize=9;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.15;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="workers_group" target="pipeline_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ========== EDGES: Download hosts → Pipeline (fetch step) ========== -->
+        <mxCell id="e_pypi_dl_pipe" value="download" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;fontSize=9;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pypi_dl" target="p_fetch">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="985" y="210" />
+              <mxPoint x="1070" y="210" />
+              <mxPoint x="1070" y="640" />
+              <mxPoint x="140" y="640" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_crates_dl_pipe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="crates_dl" target="p_fetch">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1090" y="155" />
+              <mxPoint x="1090" y="640" />
+              <mxPoint x="140" y="640" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ========== EDGES: Pipeline → Data Store (persist) ========== -->
+        <mxCell id="e_persist_db" value="persist" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9673a6;fontSize=9;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=-12;entryPerimeter=0;" edge="1" parent="1" source="p_persist" target="datastore">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="910" y="530" />
+              <mxPoint x="750" y="530" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ========== EDGES: Queue lives inside Data Store (visual link) ========== -->
+        <mxCell id="e_queue_db" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9673a6;strokeWidth=1;dashed=1;fontSize=9;" edge="1" parent="1" source="queue" target="datastore">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ========== EDGES: Pipeline → External Services ========== -->
+        <mxCell id="e_llm_openrouter" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p_llm" target="openrouter">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1160" y="675" />
+              <mxPoint x="1160" y="653" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_detonate_sandbox" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;fontSize=9;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p_detonate" target="sandbox">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="690" y="720" />
+              <mxPoint x="1160" y="720" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_persist_discord" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;fontSize=9;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p_persist" target="discord">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="910" y="783" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ========== EDGES: Scheduler → Adapters ========== -->
+        <mxCell id="e_sched_pypi" value="triggers" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7EA6E0;fontSize=9;dashed=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="scheduler_icon" target="pypi_ingest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sched_crates" value="triggers" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7EA6E0;fontSize=9;dashed=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="scheduler_icon" target="crates_ingest">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="288" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

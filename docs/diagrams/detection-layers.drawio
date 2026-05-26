@@ -1,0 +1,442 @@
+<mxfile host="app.diagrams.net" agent="Claude" version="26.0.0">
+  <diagram id="detection-layers" name="Detection Layers">
+    <mxGraphModel dx="1800" dy="1400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="2200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="Detection Layers" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=28;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="550" y="20" width="500" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="pkgsentry Multi-Ecosystem Malware Scanner" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;fontStyle=2;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="550" y="65" width="500" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="20" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_title" value="Ecosystem Applicability" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="25" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_green" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="50" width="20" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_green_text" value="Universal (PyPI + Crates)" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="48" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_yellow" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="72" width="20" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_yellow_text" value="PyPI Only" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="70" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_orange" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce5cd;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="1195" y="94" width="20" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_orange_text" value="Crates Only" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="92" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- STATIC ANALYSIS GROUP                      -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="static_group" value="&lt;b&gt;STATIC ANALYSIS&lt;/b&gt;&lt;br&gt;Runs on extracted source" style="swimlane;startSize=40;fillColor=#e8edf3;strokeColor=#36393f;fontStyle=0;fontSize=14;rounded=1;arcSize=6;collapsible=0;fontColor=#36393f;swimlaneLine=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="140" width="1420" height="1140" as="geometry" />
+        </mxCell>
+
+        <!-- Row 1: Ecosystem-Specific Install/Build Script Analysis -->
+        <mxCell id="row1_label" value="&lt;b&gt;Install / Build Script Analysis&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fillColor=none;strokeColor=none;fontColor=#444444;" vertex="1" parent="static_group">
+          <mxGeometry x="20" y="50" width="300" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 1: Install Script Analysis (PyPI) -->
+        <mxCell id="layer1" value="&lt;b&gt;Layer 1 — Install Script Analysis&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="20" y="75" width="460" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="layer1_fn" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_install_scripts()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="100" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer1_desc" value="AST parse setup.py / setup.cfg" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="118" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer1_d1" value="urlopen_exec_chain" style="label;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="142" width="135" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer1_d1_sev" value="CRITICAL" style="text;html=1;align=left;fontSize=9;fontColor=#b85450;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="175" y="142" width="60" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer1_d2" value="subprocess_at_install" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="170" width="135" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer1_d2_sev" value="HIGH" style="text;html=1;align=left;fontSize=9;fontColor=#d79b00;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="175" y="170" width="40" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer1_d3" value="os_system_at_install" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="240" y="170" width="135" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer1_d3_sev" value="HIGH" style="text;html=1;align=left;fontSize=9;fontColor=#d79b00;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="380" y="170" width="40" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer1_eco" value="PyPI" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#d6b656;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="390" y="78" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 2: Build Script Analysis (Crates) -->
+        <mxCell id="layer2" value="&lt;b&gt;Layer 2 — Build Script Analysis&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce5cd;strokeColor=#d79b00;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="510" y="75" width="460" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="layer2_fn" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_build_rs()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="525" y="100" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer2_desc" value="Checks build.rs for suspicious patterns" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="static_group">
+          <mxGeometry x="525" y="118" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer2_d1" value="network calls" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="525" y="142" width="100" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer2_d2" value="command execution" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="635" y="142" width="120" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer2_d3" value="env var access" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="765" y="142" width="100" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer2_eco" value="Crates" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#d79b00;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="880" y="78" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Row 2: Import + Malware Patterns (PyPI-specific) -->
+        <mxCell id="row2_label" value="&lt;b&gt;Code Pattern Analysis&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fillColor=none;strokeColor=none;fontColor=#444444;" vertex="1" parent="static_group">
+          <mxGeometry x="20" y="230" width="300" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 3: Import Analysis -->
+        <mxCell id="layer3" value="&lt;b&gt;Layer 3 — Import Analysis&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="20" y="255" width="460" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="layer3_fn" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_imports()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="280" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer3_desc" value="AST walk module-level code" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="298" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer3_d1" value="network_at_import" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="322" width="120" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer3_d2" value="exec_at_import" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="165" y="322" width="100" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer3_d3" value="subprocess_at_import" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="350" width="135" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer3_d4" value="network_subprocess_chain" style="label;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="180" y="350" width="155" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer3_eco" value="PyPI" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#d6b656;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="390" y="258" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 4: Malware Patterns -->
+        <mxCell id="layer4" value="&lt;b&gt;Layer 4 — Malware Patterns&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="510" y="255" width="460" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="layer4_fn" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_malware_patterns()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="525" y="280" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer4_desc" value="Install-time file patterns" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="static_group">
+          <mxGeometry x="525" y="298" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer4_d1" value="obfuscation" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="525" y="322" width="85" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer4_d2" value="eval/exec patterns" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="620" y="322" width="120" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer4_d3" value="encoded payloads" style="label;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="750" y="322" width="115" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer4_eco" value="PyPI" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#d6b656;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="880" y="258" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Row 3: Universal Layers (IOC, Entropy, Binary, YARA) -->
+        <mxCell id="row3_label" value="&lt;b&gt;Content &amp;amp; Signature Analysis&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fillColor=none;strokeColor=none;fontColor=#444444;" vertex="1" parent="static_group">
+          <mxGeometry x="20" y="400" width="300" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 5: IOC Extraction -->
+        <mxCell id="layer5" value="&lt;b&gt;Layer 5 — IOC Extraction&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="20" y="425" width="340" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="layer5_fn" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_iocs()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="450" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer5_desc" value="Regex scan all text files" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="468" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer5_d1" value="URLs" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="492" width="50" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer5_d2" value="public IPs" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="95" y="492" width="70" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer5_d3" value=".onion" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="175" y="492" width="55" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer5_d4" value="base64 blobs ≥160c" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="240" y="492" width="115" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer5_note" value="Has benign domain whitelist" style="text;html=1;align=left;verticalAlign=top;fontSize=9;fillColor=none;strokeColor=none;fontColor=#999999;fontStyle=2;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="520" width="200" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer5_eco" value="Universal" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#82b366;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="260" y="428" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 6: Entropy Analysis -->
+        <mxCell id="layer6" value="&lt;b&gt;Layer 6 — Entropy Analysis&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="380" y="425" width="340" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="layer6_fn1" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_entropy()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="395" y="450" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer6_fn2" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_entropy_delta()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="395" y="468" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer6_desc" value="Shannon entropy per file + delta vs prev version" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="static_group">
+          <mxGeometry x="395" y="490" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer6_d1" value="packed/encrypted content" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="395" y="515" width="150" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer6_d2" value="obfuscation" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="555" y="515" width="85" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer6_eco" value="Universal" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#82b366;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="620" y="428" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 7: Binary Artifacts -->
+        <mxCell id="layer7" value="&lt;b&gt;Layer 7 — Binary Artifacts&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="740" y="425" width="340" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="layer7_fn" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_binary_artifacts()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="755" y="450" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer7_desc" value="Detect unexpected binary files" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="static_group">
+          <mxGeometry x="755" y="468" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer7_d1" value="executables" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="755" y="495" width="85" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer7_d2" value="shared libraries" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="850" y="495" width="105" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer7_note" value="In pure-Python / Rust packages" style="text;html=1;align=left;verticalAlign=top;fontSize=9;fillColor=none;strokeColor=none;fontColor=#999999;fontStyle=2;" vertex="1" parent="static_group">
+          <mxGeometry x="755" y="523" width="200" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer7_eco" value="Universal" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#82b366;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="980" y="428" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Row 4: YARA -->
+        <mxCell id="row4_label" value="&lt;b&gt;Signature Matching&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fillColor=none;strokeColor=none;fontColor=#444444;" vertex="1" parent="static_group">
+          <mxGeometry x="20" y="580" width="300" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 8: YARA Rules -->
+        <mxCell id="layer8" value="&lt;b&gt;Layer 8 — YARA Rules&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="20" y="605" width="1060" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="layer8_fn" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_yara()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="630" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- python_malware.yar sub-box -->
+        <mxCell id="layer8_yar1" value="&lt;b&gt;python_malware.yar&lt;/b&gt; — 11 rules" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6ffe6;strokeColor=#82b366;fontSize=11;verticalAlign=top;spacingTop=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="655" width="500" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="layer8_yar1_tags" value="W4SP &amp;nbsp;|&amp;nbsp; browser theft &amp;nbsp;|&amp;nbsp; crypto wallets &amp;nbsp;|&amp;nbsp; staged_payload_exec &amp;nbsp;|&amp;nbsp; env_credential_harvest" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="static_group">
+          <mxGeometry x="40" y="680" width="490" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- community_sigbase.yar sub-box -->
+        <mxCell id="layer8_yar2" value="&lt;b&gt;community_sigbase.yar&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6ffe6;strokeColor=#82b366;fontSize=11;verticalAlign=top;spacingTop=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="555" y="655" width="500" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="layer8_yar2_desc" value="Adapted Neo23x0/signature-base + community rules" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="static_group">
+          <mxGeometry x="560" y="680" width="490" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="layer8_eco" value="Universal" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#82b366;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="980" y="608" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Row 5: Metadata + Version Diff -->
+        <mxCell id="row5_label" value="&lt;b&gt;Package-Level Analysis&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fillColor=none;strokeColor=none;fontColor=#444444;" vertex="1" parent="static_group">
+          <mxGeometry x="20" y="760" width="300" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 9: Metadata Analysis -->
+        <mxCell id="layer9" value="&lt;b&gt;Layer 9 — Metadata Analysis&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="20" y="785" width="510" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="layer9_fn" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_metadata()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="810" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer9_desc" value="Package metadata checks" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="828" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer9_d1" value="typosquatting" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="35" y="855" width="95" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer9_d2" value="rapid_release" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="140" y="855" width="95" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer9_d3" value="maintainer_change" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="245" y="855" width="120" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer9_d4" value="sdist_wheel_mismatch" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="375" y="855" width="140" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer9_eco" value="Universal" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#82b366;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="430" y="788" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 10: Version Diff -->
+        <mxCell id="layer10" value="&lt;b&gt;Layer 10 — Version Diff&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="560" y="785" width="520" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="layer10_fn" value="&lt;font face=&quot;Courier New&quot;&gt;analyze_version_diff()&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="static_group">
+          <mxGeometry x="575" y="810" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer10_desc" value="Compare against previous version" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fillColor=none;strokeColor=none;fontColor=#888888;" vertex="1" parent="static_group">
+          <mxGeometry x="575" y="828" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="layer10_d1" value="clean→critical transitions" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="575" y="855" width="155" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer10_d2" value="author changes" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="740" y="855" width="105" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer10_d3" value="dependency spikes" style="label;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="static_group">
+          <mxGeometry x="855" y="855" width="115" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer10_eco" value="Universal" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#82b366;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
+          <mxGeometry x="980" y="788" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Upward flow arrow from static to dynamic -->
+        <mxCell id="flow_static_to_dynamic" value="" style="endArrow=block;endFill=1;html=1;strokeColor=#666666;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="770" y="1280" as="sourcePoint" />
+            <mxPoint x="770" y="1320" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="flow_label1" value="Findings feed forward" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#666666;fillColor=none;strokeColor=none;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="780" y="1285" width="140" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- DYNAMIC ANALYSIS GROUP                     -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="dynamic_group" value="&lt;b&gt;DYNAMIC ANALYSIS&lt;/b&gt;&lt;br&gt;Runs in sandbox" style="swimlane;startSize=40;fillColor=#fce4ec;strokeColor=#c62828;fontStyle=0;fontSize=14;rounded=1;arcSize=6;collapsible=0;fontColor=#c62828;swimlaneLine=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1320" width="1420" height="280" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 11: Detonation -->
+        <mxCell id="layer11" value="&lt;b&gt;Layer 11 — Dynamic Analysis / Detonation&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="20" y="50" width="1060" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="layer11_desc" value="gVisor sandbox + Tetragon eBPF monitoring" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="35" y="75" width="350" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer11_eco" value="PyPI only (currently)" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#d6b656;fillColor=none;strokeColor=none;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="880" y="53" width="190" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- 8 Behavioral Rules as a 2x4 grid -->
+        <mxCell id="rule_label" value="8 Behavioral Rules:" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="35" y="100" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rule1" value="&lt;b&gt;exfiltration&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888&quot; style=&quot;font-size:9px&quot;&gt;Data sent to external host&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;align=center;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="35" y="125" width="230" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="rule2" value="&lt;b&gt;credential access&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888&quot; style=&quot;font-size:9px&quot;&gt;Reads keys / tokens / passwords&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;align=center;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="280" y="125" width="230" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="rule3" value="&lt;b&gt;reverse shell&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888&quot; style=&quot;font-size:9px&quot;&gt;Outbound shell connection&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;align=center;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="525" y="125" width="230" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="rule4" value="&lt;b&gt;process injection&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888&quot; style=&quot;font-size:9px&quot;&gt;Injects into other processes&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;align=center;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="770" y="125" width="230" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="rule5" value="&lt;b&gt;DNS exfil&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888&quot; style=&quot;font-size:9px&quot;&gt;Data encoded in DNS queries&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;align=center;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="35" y="180" width="230" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="rule6" value="&lt;b&gt;env harvest&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888&quot; style=&quot;font-size:9px&quot;&gt;Collects environment variables&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;align=center;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="280" y="180" width="230" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="rule7" value="&lt;b&gt;suspicious writes&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888&quot; style=&quot;font-size:9px&quot;&gt;Writes to sensitive paths&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;align=center;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="525" y="180" width="230" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="rule8" value="&lt;b&gt;(reserved)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#cccccc;fontSize=10;verticalAlign=middle;align=center;fontColor=#999999;" vertex="1" parent="dynamic_group">
+          <mxGeometry x="770" y="180" width="230" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Flow arrow from dynamic to AI -->
+        <mxCell id="flow_dynamic_to_ai" value="" style="endArrow=block;endFill=1;html=1;strokeColor=#666666;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="770" y="1600" as="sourcePoint" />
+            <mxPoint x="770" y="1640" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="flow_label2" value="verdict == malicious gates LLM" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#666666;fillColor=none;strokeColor=none;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="780" y="1605" width="190" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- AI TRIAGE GROUP                            -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="ai_group" value="&lt;b&gt;AI TRIAGE&lt;/b&gt;&lt;br&gt;LLM second opinion" style="swimlane;startSize=40;fillColor=#e8eaf6;strokeColor=#3f51b5;fontStyle=0;fontSize=14;rounded=1;arcSize=6;collapsible=0;fontColor=#3f51b5;swimlaneLine=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1640" width="1420" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 12: LLM Triage -->
+        <mxCell id="layer12" value="&lt;b&gt;Layer 12 — LLM Triage&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="ai_group">
+          <mxGeometry x="20" y="50" width="1060" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="layer12_desc" value="OpenRouter → GLM-5.1" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="ai_group">
+          <mxGeometry x="35" y="75" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="layer12_eco" value="Universal" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#82b366;fillColor=none;strokeColor=none;" vertex="1" parent="ai_group">
+          <mxGeometry x="980" y="53" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="layer12_gate" value="&lt;b&gt;Gate:&lt;/b&gt; Only runs when verdict == malicious" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="ai_group">
+          <mxGeometry x="35" y="95" width="350" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="layer12_feat1" value="Can override rule verdict" style="label;whiteSpace=wrap;html=1;fillColor=#e8eaf6;strokeColor=#3f51b5;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="ai_group">
+          <mxGeometry x="35" y="122" width="155" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer12_feat2" value="Spotlighting anti-injection" style="label;whiteSpace=wrap;html=1;fillColor=#e8eaf6;strokeColor=#3f51b5;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="ai_group">
+          <mxGeometry x="200" y="122" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="layer12_feat3" value="Truncation-aware prompt" style="label;whiteSpace=wrap;html=1;fillColor=#e8eaf6;strokeColor=#3f51b5;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;" vertex="1" parent="ai_group">
+          <mxGeometry x="370" y="122" width="155" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- Pipeline flow indicators on the right side -->
+        <mxCell id="pipeline_arrow" value="" style="shape=mxgraph.arrows2.arrow;dy=0.6;dx=40;notch=0;strokeColor=#36393f;fillColor=#36393f;opacity=15;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="540" width="40" height="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="pipeline_label" value="&lt;b&gt;Pipeline Flow&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#555555;fillColor=none;strokeColor=none;rotation=-90;" vertex="1" parent="1">
+          <mxGeometry x="1470" y="1080" width="120" height="20" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

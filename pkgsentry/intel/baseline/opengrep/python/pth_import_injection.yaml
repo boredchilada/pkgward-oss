@@ -1,0 +1,17 @@
+rules:
+  - id: pth_import_injection
+    message: >-
+      .pth file content containing 'import' — Python executes any line in a
+      .pth file that begins with 'import' at interpreter startup. Standard
+      attack vector for persistence inside a package install.
+    languages: [generic]
+    severity: ERROR
+    metadata:
+      severity: critical
+      confidence: high
+      category: malware
+      pkgsentry_layer: opengrep
+    paths:
+      include:
+        - "*.pth"
+    pattern-regex: '^\s*import\s+\S+'

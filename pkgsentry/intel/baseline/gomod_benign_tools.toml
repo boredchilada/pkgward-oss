@@ -1,0 +1,80 @@
+# Known-benign tools invoked by `//go:generate` directives.
+# UNION semantics: overlay tools are added.
+#
+# Per CLAUDE.md / detection-rules.md: zero confirmed real-world attacks
+# via go:generate (as of 2026-05) — it requires explicit `go generate`
+# invocation, not part of `go build`. Tools on this list produce no
+# finding; unknown tools produce a low-severity finding via
+# `gomod.go_generate`. Dangerous commands (curl, bash, etc.) remain
+# critical via `gomod.go_generate_exec` regardless of this list.
+
+tools = [
+    # Core
+    "go",
+    "-command",
+    # Code generation (well-known, ecosystem-standard)
+    "stringer",
+    "mockgen",
+    "mockery",
+    "moq",
+    "counterfeiter",
+    "protoc",
+    "protoc-gen-go",
+    "protoc-gen-go-grpc",
+    "wire",
+    "enumer",
+    "genny",
+    "go-bindata",
+    "easyjson",
+    "msgp",
+    "codecgen",
+    "golex",
+    "goyacc",
+    "gotext",
+    "go-localize",
+    "goimports",
+    "gofmt",
+    "gofumpt",
+    "oapi-codegen",
+    "sqlboiler",
+    "buf",
+    "gqlgen",
+    "ent",
+    # OpenAPI / Swagger
+    "swag",
+    "swagger",
+    "go-swagger",
+    # Kubernetes ecosystem
+    "controller-gen",
+    "deepcopy-gen",
+    "client-gen",
+    "lister-gen",
+    "informer-gen",
+    "defaulter-gen",
+    "conversion-gen",
+    "openapi-gen",
+    "register-gen",
+    "applyconfiguration-gen",
+    # Embedding / assets / RPC
+    "fyne",
+    "rice",
+    "statik",
+    "pkger",
+    "embedme",
+    "go-winres",
+    "goversioninfo",
+    "errorgen",
+    "dagnabit",
+    "genxdr",
+    "tscriptify",
+    "pluginrpc-gen",
+    "vprotogen",
+    "togo",
+    "api",
+    "go-enum",
+    "xgettext",
+    # File ops (allow only here; these as standalone exec are blocked elsewhere)
+    "mv",
+    "mkdir",
+    "rm",
+]

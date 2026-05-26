@@ -1,0 +1,877 @@
+<mxfile host="app.diagrams.net" modified="2026-05-22T14:30:00.000Z" agent="Claude Code" version="24.0.0" type="device">
+
+  <!-- PAGE 1: High-Level Architecture -->
+  <diagram id="arch-overview" name="1. Architecture Overview">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title1" value="&lt;b&gt;PyPI Scanner — Architecture Overview&lt;/b&gt;" style="text;html=1;fontSize=20;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="500" y="20" width="600" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== EXTERNAL SOURCES ==================== -->
+        <mxCell id="ext-group" value="External Sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;verticalAlign=top;fontStyle=1;fontSize=13;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="440" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-rss" value="&lt;b&gt;PyPI RSS&lt;/b&gt;&lt;br&gt;updates.xml&lt;br&gt;packages.xml" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="60" y="120" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-xmlrpc" value="&lt;b&gt;PyPI XML-RPC&lt;/b&gt;&lt;br&gt;changelog_since_serial" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="200" y="120" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-hugo" value="&lt;b&gt;hugovk GitHub&lt;/b&gt;&lt;br&gt;top-pypi-packages&lt;br&gt;.min.json" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="120" width="120" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== INGEST LAYER ==================== -->
+        <mxCell id="ingest-group" value="Ingest Layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=0;verticalAlign=top;fontStyle=1;fontSize=13;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="290" width="440" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-feeds" value="&lt;b&gt;poll_feeds_once&lt;/b&gt;&lt;br&gt;every 60s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="60" y="320" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-cursor" value="&lt;b&gt;pull_since&lt;/b&gt;&lt;br&gt;every 120s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="200" y="320" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-watchlist" value="&lt;b&gt;refresh_watchlist&lt;/b&gt;&lt;br&gt;every 7 days" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="320" width="120" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows: External -> Ingest -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="ext-rss" target="ingest-feeds" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="ext-xmlrpc" target="ingest-cursor" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="ext-hugo" target="ingest-watchlist" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== QUEUE ==================== -->
+        <mxCell id="queue-box" value="&lt;b&gt;ScanQueue&lt;/b&gt; (SQLite)&lt;br&gt;&lt;br&gt;Priority: high → normal → low&lt;br&gt;States: pending → claimed → done / failed&lt;br&gt;Dedup: UNIQUE(ecosystem, name, version)&lt;br&gt;Claim token: UUID4 optimistic lock" style="shape=datastore;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="560" y="280" width="260" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows: Ingest -> Queue -->
+        <mxCell id="e4" value="enqueue()" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontStyle=2;fontSize=10;" edge="1" source="ingest-feeds" target="queue-box" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="enqueue()" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontStyle=2;fontSize=10;" edge="1" source="ingest-cursor" target="queue-box" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Watchlist -> DB (separate path) -->
+        <mxCell id="watchlist-db" value="&lt;b&gt;Watchlist&lt;/b&gt;&lt;br&gt;10K packages" style="shape=datastore;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="560" y="140" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="upsert" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontStyle=2;fontSize=10;" edge="1" source="ingest-watchlist" target="watchlist-db" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6b" value="is_watchlist()&lt;br&gt;priority boost" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontStyle=2;fontSize=10;dashed=1;" edge="1" source="watchlist-db" target="queue-box" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== WORKER POOL ==================== -->
+        <mxCell id="worker-group" value="Worker Pool (async)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=0;verticalAlign=top;fontStyle=1;fontSize=13;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="460" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="w1" value="W0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="490" width="55" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="w2" value="W1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="625" y="490" width="55" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="w3" value="W2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="690" y="490" width="55" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="w4" value="W3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="755" y="490" width="55" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: Queue -> Workers -->
+        <mxCell id="e7" value="claim_next()" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontStyle=2;fontSize=10;" edge="1" source="queue-box" target="worker-group" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== PIPELINE ==================== -->
+        <mxCell id="pipeline-group" value="Pipeline — process_one()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;dashed=0;verticalAlign=top;fontStyle=1;fontSize=13;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="920" y="270" width="620" height="310" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p-fetch" value="&lt;b&gt;Phase 1: Fetch&lt;/b&gt;&lt;br&gt;Download sdist + wheel&lt;br&gt;Verify SHA-256&lt;br&gt;Rate limit 10/s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="940" y="310" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p-extract" value="&lt;b&gt;Extract&lt;/b&gt;&lt;br&gt;safe_extract()&lt;br&gt;10K file / 100MB cap&lt;br&gt;Reject symlinks, traversal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="940" y="400" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p-analyze" value="&lt;b&gt;Phase 2: Analyze&lt;/b&gt;&lt;br&gt;Install scripts (AST)&lt;br&gt;Import chains (AST)&lt;br&gt;IOC extraction (regex)&lt;br&gt;Metadata checks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="310" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p-score" value="&lt;b&gt;Score &amp; Verdict&lt;/b&gt;&lt;br&gt;Point system (1/8/25/60)&lt;br&gt;Per-category cap 30&lt;br&gt;Watchlist escalation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="410" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p-llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;(optional, if API key set)&lt;br&gt;OpenRouter → GLM-5.1&lt;br&gt;Budget guard: $20/proc&lt;br&gt;No-downgrade on chains" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="310" width="190" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p-persist" value="&lt;b&gt;Phase 3: Persist&lt;/b&gt;&lt;br&gt;Package / Version / Scan&lt;br&gt;Findings / RuleHits&lt;br&gt;Metadata fields" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="410" width="190" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Pipeline internal edges -->
+        <mxCell id="pe1" style="rounded=1;" edge="1" source="p-fetch" target="p-extract" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe2" style="rounded=1;" edge="1" source="p-extract" target="p-analyze" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe3" style="rounded=1;" edge="1" source="p-analyze" target="p-score" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe4" style="rounded=1;dashed=1;" edge="1" source="p-score" target="p-llm" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe5" style="rounded=1;" edge="1" source="p-score" target="p-persist" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe6" style="rounded=1;dashed=1;" edge="1" source="p-llm" target="p-persist" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: Workers -> Pipeline -->
+        <mxCell id="e8" value="process_one(queue_id, token)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontStyle=2;fontSize=10;" edge="1" source="worker-group" target="pipeline-group" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== DATA STORE ==================== -->
+        <mxCell id="db-group" value="SQLite DB (WAL mode)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=0;verticalAlign=top;fontStyle=1;fontSize=13;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="920" y="640" width="620" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="db-pkg" value="Package" style="shape=table;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;startSize=20;" vertex="1" parent="1">
+          <mxGeometry x="940" y="670" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="db-ver" value="Version" style="shape=table;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;startSize=20;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="670" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="db-scan" value="Scan" style="shape=table;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;startSize=20;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="670" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="db-finding" value="Finding" style="shape=table;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;startSize=20;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="670" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="db-rulehit" value="RuleHit" style="shape=table;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;startSize=20;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="670" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="db-cursor" value="ScanCursor" style="shape=table;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;startSize=20;" vertex="1" parent="1">
+          <mxGeometry x="1390" y="670" width="90" height="40" as="geometry" />
+        </mxCell>
+        <!-- DB relationships -->
+        <mxCell id="db-r1" style="rounded=0;fontSize=9;" edge="1" source="db-pkg" target="db-ver" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="db-r2" style="rounded=0;fontSize=9;" edge="1" source="db-ver" target="db-scan" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="db-r3" style="rounded=0;fontSize=9;" edge="1" source="db-scan" target="db-finding" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Arrow: Pipeline -> DB -->
+        <mxCell id="e9" value="mark_done() / mark_failed()" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontStyle=2;fontSize=10;" edge="1" source="p-persist" target="db-group" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== PYPI FILES (external) ==================== -->
+        <mxCell id="ext-files" value="&lt;b&gt;files.pythonhosted.org&lt;/b&gt;&lt;br&gt;.tar.gz / .whl" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="790" y="100" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="download" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontStyle=2;fontSize=10;" edge="1" source="ext-files" target="p-fetch" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== SCHEDULER ==================== -->
+        <mxCell id="sched-box" value="&lt;b&gt;APScheduler&lt;/b&gt;&lt;br&gt;&lt;br&gt;feeds: 60s&lt;br&gt;cursor: 120s&lt;br&gt;watchlist: 7d&lt;br&gt;orphan sweep: 15m&lt;br&gt;claim sweep: 2m" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D4E1F5;strokeColor=#7EA6E0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="40" y="460" width="140" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="triggers" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontStyle=2;fontSize=10;dashed=1;" edge="1" source="sched-box" target="ingest-group" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="110" y="440" />
+              <mxPoint x="260" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== LLM EXTERNAL ==================== -->
+        <mxCell id="ext-llm" value="&lt;b&gt;OpenRouter&lt;/b&gt;&lt;br&gt;LLM API" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1380" y="200" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;" edge="1" source="ext-llm" target="p-llm" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- PAGE 2: Queue State Machine -->
+  <diagram id="queue-states" name="2. Queue State Machine">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title2" value="&lt;b&gt;ScanQueue — State Machine&lt;/b&gt;" style="text;html=1;fontSize=20;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="350" y="20" width="500" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- States -->
+        <mxCell id="s-new" value="&lt;b&gt;[new item]&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="100" y="200" width="120" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s-pending" value="&lt;b&gt;PENDING&lt;/b&gt;&lt;br&gt;&lt;br&gt;Waiting to be claimed.&lt;br&gt;Ordered by priority&lt;br&gt;then enqueued_at ASC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="340" y="170" width="180" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s-claimed" value="&lt;b&gt;CLAIMED&lt;/b&gt;&lt;br&gt;&lt;br&gt;Owned by a worker.&lt;br&gt;claim_token = UUID4&lt;br&gt;attempts incremented&lt;br&gt;10 min stale timeout" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="640" y="170" width="180" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s-done" value="&lt;b&gt;DONE&lt;/b&gt;&lt;br&gt;&lt;br&gt;Scan completed.&lt;br&gt;Terminal state&lt;br&gt;(unless allow_rescan)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="920" y="100" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s-failed" value="&lt;b&gt;FAILED&lt;/b&gt;&lt;br&gt;&lt;br&gt;Error occurred.&lt;br&gt;Auto-retry if attempts &amp;lt; 3.&lt;br&gt;Permanent if attempts ≥ 3." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="920" y="280" width="180" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Transitions -->
+        <mxCell id="t1" value="&lt;b&gt;enqueue()&lt;/b&gt;&lt;br&gt;Dedup check.&lt;br&gt;UNIQUE(eco, name, ver)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;html=1;" edge="1" source="s-new" target="s-pending" parent="1">
+          <mxGeometry x="0.2" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="t2" value="&lt;b&gt;claim_next()&lt;/b&gt;&lt;br&gt;Optimistic lock:&lt;br&gt;UPDATE WHERE status=pending&lt;br&gt;rowcount == 1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;html=1;" edge="1" source="s-pending" target="s-claimed" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t3" value="&lt;b&gt;mark_done()&lt;/b&gt;&lt;br&gt;Token verified" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;html=1;" edge="1" source="s-claimed" target="s-done" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t4" value="&lt;b&gt;mark_failed()&lt;/b&gt;&lt;br&gt;Token verified&lt;br&gt;last_error stored" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;html=1;" edge="1" source="s-claimed" target="s-failed" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Retry: failed -> pending -->
+        <mxCell id="t5" value="&lt;b&gt;Auto-retry&lt;/b&gt;&lt;br&gt;enqueue() when attempts &amp;lt; 3&lt;br&gt;Resets: last_error=null,&lt;br&gt;claimed_at=null" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;html=1;strokeColor=#b85450;fontColor=#b85450;" edge="1" source="s-failed" target="s-pending" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1010" y="430" />
+              <mxPoint x="430" y="430" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Stale claim sweep -->
+        <mxCell id="t6" value="&lt;b&gt;sweep_stale_claims()&lt;/b&gt;&lt;br&gt;claimed_at &amp;gt; 10 min ago&lt;br&gt;AND attempts &amp;lt; 3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;html=1;dashed=1;strokeColor=#82b366;fontColor=#82b366;" edge="1" source="s-claimed" target="s-pending" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="730" y="120" />
+              <mxPoint x="430" y="120" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="t7" value="&lt;b&gt;sweep_stale → fail&lt;/b&gt;&lt;br&gt;claimed_at &amp;gt; 10 min&lt;br&gt;AND attempts ≥ 3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;html=1;dashed=1;strokeColor=#b85450;fontColor=#b85450;" edge="1" source="s-claimed" target="s-failed" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="870" y="225" />
+              <mxPoint x="870" y="330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- allow_rescan: done -> pending -->
+        <mxCell id="t8" value="&lt;b&gt;allow_rescan=True&lt;/b&gt;&lt;br&gt;(CLI rescan command)&lt;br&gt;Resets existing row" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;html=1;dashed=1;strokeColor=#9673a6;fontColor=#9673a6;" edge="1" source="s-done" target="s-pending" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1010" y="80" />
+              <mxPoint x="430" y="80" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend2" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;Solid = normal flow&lt;br&gt;Dashed green = stale claim sweep (every 2m)&lt;br&gt;Dashed red = auto-retry on re-enqueue&lt;br&gt;Dashed purple = manual rescan&lt;br&gt;&lt;br&gt;MAX_AUTO_ATTEMPTS = 3&lt;br&gt;STALE_CLAIM_TIMEOUT = 600s (10 min)" style="text;html=1;fontSize=11;align=left;verticalAlign=top;rounded=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="100" y="500" width="300" height="140" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- PAGE 3: Pipeline process_one() Detail -->
+  <diagram id="pipeline-detail" name="3. Pipeline — process_one()">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title3" value="&lt;b&gt;Pipeline — process_one(queue_id, claim_token)&lt;/b&gt;" style="text;html=1;fontSize=20;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="300" y="10" width="600" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- START -->
+        <mxCell id="start" value="" style="ellipse;fillColor=#333333;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="570" y="60" width="30" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Phase 0: Load -->
+        <mxCell id="p0" value="&lt;b&gt;Phase 0: Load Queue Item&lt;/b&gt;&lt;br&gt;Open session → read ScanQueue by id&lt;br&gt;Validate status == claimed&lt;br&gt;Validate claim_token matches&lt;br&gt;Extract (ecosystem, name, version)&lt;br&gt;Close session" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="440" y="110" width="290" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="es" edge="1" source="start" target="p0" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Decision: valid claim? -->
+        <mxCell id="d0" value="Valid claim?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="520" y="240" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ep0" edge="1" source="p0" target="d0" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="abort" value="Return early&lt;br&gt;(stolen / missing)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="740" y="248" width="130" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ed0n" value="No" style="fontSize=10;" edge="1" source="d0" target="abort" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Phase 1: Fetch -->
+        <mxCell id="p1-title" value="&lt;b&gt;PHASE 1: FETCH&lt;/b&gt;  (async I/O, no DB session)" style="text;html=1;fontSize=12;align=left;fontColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="160" y="330" width="360" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p1-lookup" value="Lookup adapter&lt;br&gt;adapter_registry[ecosystem]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="490" y="360" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ed0y" value="Yes" style="fontSize=10;" edge="1" source="d0" target="p1-lookup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="p1-fetch" value="&lt;b&gt;adapter.fetch(name, version)&lt;/b&gt;&lt;br&gt;→ download_all()&lt;br&gt;&lt;br&gt;1. GET pypi.org/pypi/{name}/{version}/json&lt;br&gt;2. Pick sdist + wheel URLs&lt;br&gt;3. Download concurrently (asyncio.gather)&lt;br&gt;4. Rate limit: 10 req/s for files.pythonhosted.org&lt;br&gt;5. Verify SHA-256 digests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="430" y="440" width="310" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="ep1l" edge="1" source="p1-lookup" target="p1-fetch" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Fetch error decision -->
+        <mxCell id="d1" value="Fetch OK?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="520" y="600" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ep1f" edge="1" source="p1-fetch" target="d1" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Fetch error branches -->
+        <mxCell id="ferr-box" value="&lt;b&gt;Fetch Error Handling&lt;/b&gt;&lt;br&gt;&lt;br&gt;NoFilesError → Finding:&lt;br&gt;  fetch.no_release_files (MEDIUM)&lt;br&gt;  → mark_failed()&lt;br&gt;&lt;br&gt;IntegrityError → Finding:&lt;br&gt;  fetch.sha256_mismatch (CRITICAL)&lt;br&gt;  → mark_done()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="160" y="580" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ed1n" value="No" style="fontSize=10;" edge="1" source="d1" target="ferr-box" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Phase 1b: Extract -->
+        <mxCell id="p1b-title" value="&lt;b&gt;EXTRACTION&lt;/b&gt;" style="text;html=1;fontSize=12;align=left;fontColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="160" y="720" width="200" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p1b" value="&lt;b&gt;safe_extract(archive, out_dir)&lt;/b&gt;&lt;br&gt;&lt;br&gt;For each archive (sdist, wheel):&lt;br&gt;• Max 10,000 files / 100 MB total&lt;br&gt;• Reject: symlinks, hardlinks, devices&lt;br&gt;• Reject: path traversal (.. or absolute)&lt;br&gt;• Supports: .tar.gz, .whl, .zip, .egg" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="430" y="720" width="310" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="ed1y" value="Yes" style="fontSize=10;" edge="1" source="d1" target="p1b" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Phase 2: Analyze -->
+        <mxCell id="p2-title" value="&lt;b&gt;PHASE 2: ANALYZE&lt;/b&gt;  (CPU-bound, no DB session)" style="text;html=1;fontSize=12;align=left;fontColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="860" width="360" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2a" value="&lt;b&gt;analyze_install_scripts()&lt;/b&gt;&lt;br&gt;(sdist only)&lt;br&gt;&lt;br&gt;AST parse setup.py →&lt;br&gt;• urlopen_exec_chain (CRITICAL)&lt;br&gt;• subprocess_at_install (HIGH)&lt;br&gt;• os_system_at_install (HIGH)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="160" y="900" width="220" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2b" value="&lt;b&gt;analyze_imports()&lt;/b&gt;&lt;br&gt;(all archives)&lt;br&gt;&lt;br&gt;AST walk module-level code →&lt;br&gt;• network_at_import (HIGH)&lt;br&gt;• exec_at_import (HIGH)&lt;br&gt;• subprocess_at_import (MED)&lt;br&gt;• network_subprocess_chain (CRIT)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="400" y="900" width="230" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2c" value="&lt;b&gt;analyze_iocs()&lt;/b&gt;&lt;br&gt;(all text files)&lt;br&gt;&lt;br&gt;Regex scan →&lt;br&gt;• URLs (LOW)&lt;br&gt;• Public IPv4 (LOW)&lt;br&gt;• .onion addresses (HIGH)&lt;br&gt;• Base64 blobs ≥160 chars (MED)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="650" y="900" width="210" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2d" value="&lt;b&gt;analyze_metadata()&lt;/b&gt;&lt;br&gt;&lt;br&gt;• rapid_release (MED)&lt;br&gt;• maintainer_change (MED)&lt;br&gt;• typosquat_candidate (HIGH)&lt;br&gt;• sdist_wheel_mismatch (LOW)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="880" y="900" width="210" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ep1b2a" edge="1" source="p1b" target="p2a" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="585" y="870" /><mxPoint x="270" y="870" /></Array></mxGeometry></mxCell>
+        <mxCell id="ep1b2b" edge="1" source="p1b" target="p2b" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="585" y="870" /><mxPoint x="515" y="870" /></Array></mxGeometry></mxCell>
+        <mxCell id="ep1b2c" edge="1" source="p1b" target="p2c" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="585" y="870" /><mxPoint x="755" y="870" /></Array></mxGeometry></mxCell>
+        <mxCell id="ep1b2d" edge="1" source="p1b" target="p2d" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="585" y="870" /><mxPoint x="985" y="870" /></Array></mxGeometry></mxCell>
+
+        <!-- Score & Verdict -->
+        <mxCell id="p3-title" value="&lt;b&gt;PHASE 3: SCORE, TRIAGE &amp; PERSIST&lt;/b&gt;  (short-lived DB session)" style="text;html=1;fontSize=12;align=left;fontColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="160" y="1050" width="440" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3-score" value="&lt;b&gt;score_and_verdict(findings)&lt;/b&gt;&lt;br&gt;&lt;br&gt;Points: low=1, med=8, high=25, crit=60&lt;br&gt;Per-category cap: 30 pts&lt;br&gt;&lt;br&gt;≥61 OR any critical OR chain → malicious&lt;br&gt;≥20 OR any high → suspicious&lt;br&gt;else → clean&lt;br&gt;&lt;br&gt;Watchlist boost:&lt;br&gt;  any medium+ → suspicious&lt;br&gt;  top-100 + high/crit → malicious + alert_tag" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="160" y="1090" width="280" height="180" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3-llm" value="&lt;b&gt;LLM Triage (optional)&lt;/b&gt;&lt;br&gt;&lt;br&gt;Only if: OPENROUTER_API_KEY set&lt;br&gt;  AND verdict is suspicious/malicious&lt;br&gt;  AND budget not exhausted&lt;br&gt;&lt;br&gt;1. Gather source snippets (≤8KB)&lt;br&gt;2. Build prompt with Spotlighting&lt;br&gt;3. Call LLM (z-ai/glm-5.1)&lt;br&gt;4. Validate IOCs against source&lt;br&gt;5. Enforce no-downgrade on chains&lt;br&gt;6. May override rule verdict" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="1090" width="250" height="180" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3-persist" value="&lt;b&gt;Persist to DB&lt;/b&gt;&lt;br&gt;&lt;br&gt;1. Upsert Package + Version&lt;br&gt;2. Apply metadata fields&lt;br&gt;3. Create Scan row (verdict, score)&lt;br&gt;4. Write Finding rows&lt;br&gt;5. Bump RuleHit counters&lt;br&gt;6. mark_done(row, token)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="770" y="1090" width="220" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows for phase 3 -->
+        <mxCell id="ep3a" edge="1" source="p3-score" target="p3-llm" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep3b" edge="1" source="p3-llm" target="p3-persist" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep3c" style="dashed=1;" edge="1" source="p3-score" target="p3-persist" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="300" y="1290" /><mxPoint x="880" y="1290" /></Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Connect analysis to scoring -->
+        <mxCell id="ep2score" edge="1" source="p2a" target="p3-score" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="1060" /><mxPoint x="300" y="1060" /></Array></mxGeometry>
+        </mxCell>
+
+        <!-- END -->
+        <mxCell id="p-cleanup" value="&lt;b&gt;Finally: Cleanup&lt;/b&gt;&lt;br&gt;rmtree temp dirs&lt;br&gt;(extraction + archives)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="790" y="1260" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="ep3end" edge="1" source="p3-persist" target="p-cleanup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="end" value="" style="ellipse;fillColor=#333333;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="865" y="1340" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="eend" edge="1" source="p-cleanup" target="end" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Error path from any stage -->
+        <mxCell id="err-global" value="&lt;b&gt;Unhandled Exception&lt;/b&gt;&lt;br&gt;(any phase)&lt;br&gt;&lt;br&gt;1. Log pipeline_failed&lt;br&gt;2. Open fresh session&lt;br&gt;3. mark_failed(row, error)&lt;br&gt;4. Cleanup temp dirs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="600" width="200" height="110" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- PAGE 4: Ingest Flow -->
+  <diagram id="ingest-flow" name="4. Ingest Sources">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title4" value="&lt;b&gt;Ingest Sources — How Packages Enter the Queue&lt;/b&gt;" style="text;html=1;fontSize=20;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="350" y="20" width="600" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ========== RSS FEEDS ========== -->
+        <mxCell id="rss-group" value="RSS Feed Poller  (every 60s)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=0;verticalAlign=top;fontStyle=1;fontSize=13;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="400" height="340" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rss1" value="Fetch RSS XML&lt;br&gt;(httpx, follow_redirects)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="120" width="160" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="rss-src1" value="&lt;b&gt;updates.xml&lt;/b&gt;&lt;br&gt;Title: &quot;name version&quot;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="250" y="110" width="140" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="rss-src2" value="&lt;b&gt;packages.xml&lt;/b&gt;&lt;br&gt;Title: &quot;name version&quot; or garbage" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="250" y="150" width="170" height="35" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rss2" value="parse_feed(xml)&lt;br&gt;Regex: &lt;title&gt;([^&lt;]+)&lt;/title&gt;&lt;br&gt;Split last space → (name, version)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="185" width="200" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rss3" value="PEP 440 validation&lt;br&gt;packaging.version.Version()&lt;br&gt;Reject InvalidVersion" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="260" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rss4" value="Dedup via seen set&lt;br&gt;(within single poll)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="325" width="160" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rss5" value="is_watchlist(name)?&lt;br&gt;→ priority = high / normal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="240" y="325" width="180" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="er1" edge="1" source="rss1" target="rss2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er2" edge="1" source="rss2" target="rss3" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er3" edge="1" source="rss3" target="rss4" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er4" edge="1" source="rss4" target="rss5" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- ========== XML-RPC CURSOR ========== -->
+        <mxCell id="cur-group" value="XML-RPC Cursor Poller  (every 120s)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=0;verticalAlign=top;fontStyle=1;fontSize=13;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="480" y="80" width="400" height="340" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cur1" value="&lt;b&gt;Bootstrap (first run)&lt;/b&gt;&lt;br&gt;get_last_serial() → None&lt;br&gt;→ changelog_last_serial()&lt;br&gt;→ store current PyPI serial&lt;br&gt;(skips historical backlog)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="500" y="120" width="210" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cur2" value="changelog_since_serial(last)&lt;br&gt;→ list of (name, version,&lt;br&gt;   timestamp, action, serial)&lt;br&gt;Cap: max_items=2000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="500" y="220" width="210" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cur3" value="Filter:&lt;br&gt;• Skip if no version&lt;br&gt;• Skip &quot;remove&quot; actions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="500" y="310" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cur4" value="is_watchlist(name)?&lt;br&gt;→ priority = high / normal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="690" y="310" width="170" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cur5" value="set_last_serial(max_serial)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="690" y="365" width="170" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ec1" edge="1" source="cur1" target="cur2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ec2" edge="1" source="cur2" target="cur3" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ec3" edge="1" source="cur3" target="cur4" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ec4" edge="1" source="cur4" target="cur5" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- ========== WATCHLIST ========== -->
+        <mxCell id="wl-group" value="Watchlist Refresh  (every 7 days)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=0;verticalAlign=top;fontStyle=1;fontSize=13;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="920" y="80" width="400" height="340" as="geometry" />
+        </mxCell>
+
+        <mxCell id="wl1" value="GET hugovk.dev/top-pypi-packages/&lt;br&gt;top-pypi-packages.min.json&lt;br&gt;(follows 301 redirect)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="940" y="120" width="220" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="wl2" value="Parse top_n=10,000 packages&lt;br&gt;Extract: name, download_count" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="940" y="195" width="220" height="45" as="geometry" />
+        </mxCell>
+
+        <mxCell id="wl3" value="Upsert Watchlist table&lt;br&gt;(rank, downloads_last_30d,&lt;br&gt; refreshed_at)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="940" y="260" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="wl4" value="Delete packages no longer&lt;br&gt;in top N" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="940" y="330" width="220" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ew1" edge="1" source="wl1" target="wl2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ew2" edge="1" source="wl2" target="wl3" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ew3" edge="1" source="wl3" target="wl4" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Used-by note -->
+        <mxCell id="wl-note" value="&lt;i&gt;Watchlist is not an ingest source itself —&lt;br&gt;it enriches other ingest sources with&lt;br&gt;priority information via is_watchlist()&lt;/i&gt;" style="text;html=1;fontSize=10;align=center;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="220" width="240" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ========== QUEUE (common target) ========== -->
+        <mxCell id="q-target" value="&lt;b&gt;enqueue(session, ecosystem, name, version, priority)&lt;/b&gt;&lt;br&gt;&lt;br&gt;• Check existing row (UNIQUE constraint)&lt;br&gt;• Skip if already pending / claimed / done&lt;br&gt;• Re-promote failed rows (attempts &amp;lt; 3)&lt;br&gt;• Insert via begin_nested() savepoint&lt;br&gt;• Returns ScanQueue row or None" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="340" y="500" width="380" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows to queue -->
+        <mxCell id="eq1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="rss5" target="q-target" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="330" y="460" /><mxPoint x="420" y="460" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="eq2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="cur4" target="q-target" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="775" y="460" /><mxPoint x="620" y="460" /></Array></mxGeometry>
+        </mxCell>
+
+        <!-- ScanQueue result -->
+        <mxCell id="q-result" value="→ ScanQueue row&lt;br&gt;[status=pending]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="470" y="650" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="eq3" edge="1" source="q-target" target="q-result" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Boot sequence note -->
+        <mxCell id="boot-note" value="&lt;b&gt;Boot Sequence (one-shot):&lt;/b&gt;&lt;br&gt;1. refresh_watchlist() — if table empty&lt;br&gt;2. poll_feeds_once()&lt;br&gt;3. pull_since() — in thread&lt;br&gt;&lt;br&gt;Then scheduler takes over at intervals above." style="text;html=1;fontSize=11;align=left;fillColor=#D4E1F5;strokeColor=#7EA6E0;rounded=1;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="500" width="260" height="110" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- PAGE 5: Runtime Orchestration -->
+  <diagram id="runtime" name="5. Runtime Orchestration">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title5" value="&lt;b&gt;Runtime Orchestration — _async_run()&lt;/b&gt;" style="text;html=1;fontSize=20;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="300" y="20" width="600" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Start -->
+        <mxCell id="r-start" value="" style="ellipse;fillColor=#333333;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="575" y="70" width="30" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- CLI -->
+        <mxCell id="r-cli" value="&lt;b&gt;CLI: pypi-scanner run&lt;/b&gt;&lt;br&gt;--workers N --duration N" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="480" y="120" width="220" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ers" edge="1" source="r-start" target="r-cli" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Init DB -->
+        <mxCell id="r-init" value="init_db()&lt;br&gt;CREATE all tables" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="190" width="180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="er-ci" edge="1" source="r-cli" target="r-init" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Signal handlers -->
+        <mxCell id="r-sig" value="Register signal handlers&lt;br&gt;SIGINT / SIGTERM → stop_event.set()&lt;br&gt;(Windows: KeyboardInterrupt fallback)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="470" y="255" width="240" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="er-is" edge="1" source="r-init" target="r-sig" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Sweep orphans -->
+        <mxCell id="r-sweep" value="sweep_orphans(max_age=0)&lt;br&gt;Clean ALL stale download dirs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="485" y="335" width="210" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="er-ss" edge="1" source="r-sig" target="r-sweep" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Configure scheduler -->
+        <mxCell id="r-sched" value="&lt;b&gt;Configure APScheduler&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D4E1F5;strokeColor=#7EA6E0;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="490" y="400" width="200" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="er-sws" edge="1" source="r-sweep" target="r-sched" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Scheduler jobs table -->
+        <mxCell id="r-jobs" value="" style="shape=table;startSize=0;container=1;collapsible=0;childLayout=tableLayout;fillColor=#D4E1F5;strokeColor=#7EA6E0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="140" y="390" width="300" height="155" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-h1" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;top=0;left=0;bottom=0;right=0;fillColor=#7EA6E0;fontColor=#FFFFFF;fontStyle=1;fontSize=10;" vertex="1" parent="r-jobs">
+          <mxGeometry width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-h1a" value="Job" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;fillColor=#7EA6E0;top=0;left=0;bottom=0;right=0;fontColor=#FFFFFF;fontStyle=1;fontSize=10;" vertex="1" parent="rj-h1">
+          <mxGeometry width="120" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-h1b" value="Interval" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;fillColor=#7EA6E0;top=0;left=0;bottom=0;right=0;fontColor=#FFFFFF;fontStyle=1;fontSize=10;" vertex="1" parent="rj-h1">
+          <mxGeometry x="120" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-h1c" value="Target" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;fillColor=#7EA6E0;top=0;left=0;bottom=0;right=0;fontColor=#FFFFFF;fontStyle=1;fontSize=10;" vertex="1" parent="rj-h1">
+          <mxGeometry x="200" width="100" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rj-r1" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="r-jobs">
+          <mxGeometry y="25" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r1a" value="feeds" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r1">
+          <mxGeometry width="120" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r1b" value="60 sec" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r1">
+          <mxGeometry x="120" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r1c" value="poll_feeds_once" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r1">
+          <mxGeometry x="200" width="100" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rj-r2" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="r-jobs">
+          <mxGeometry y="50" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r2a" value="cursor" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r2">
+          <mxGeometry width="120" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r2b" value="120 sec" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r2">
+          <mxGeometry x="120" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r2c" value="pull_since" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r2">
+          <mxGeometry x="200" width="100" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rj-r3" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="r-jobs">
+          <mxGeometry y="75" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r3a" value="watchlist_refresh" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r3">
+          <mxGeometry width="120" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r3b" value="7 days" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r3">
+          <mxGeometry x="120" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r3c" value="refresh_watchlist" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r3">
+          <mxGeometry x="200" width="100" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rj-r4" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="r-jobs">
+          <mxGeometry y="100" width="300" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r4a" value="workroot_sweep" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r4">
+          <mxGeometry width="120" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r4b" value="15 min" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r4">
+          <mxGeometry x="120" width="80" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r4c" value="sweep_orphans" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r4">
+          <mxGeometry x="200" width="100" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rj-r5" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="r-jobs">
+          <mxGeometry y="125" width="300" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r5a" value="claim_sweep" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r5">
+          <mxGeometry width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r5b" value="2 min" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r5">
+          <mxGeometry x="120" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="rj-r5c" value="sweep_stale_claims" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;top=0;left=0;bottom=0;right=0;fontSize=10;" vertex="1" parent="rj-r5">
+          <mxGeometry x="200" width="100" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="er-sj" edge="1" source="r-sched" target="r-jobs" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Boot ingest -->
+        <mxCell id="r-boot" value="&lt;b&gt;Boot-time One-shot Ingest&lt;/b&gt;&lt;br&gt;(non-fatal if fails)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="490" y="460" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="er-schb" edge="1" source="r-sched" target="r-boot" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="r-b1" value="1. refresh_watchlist()&lt;br&gt;(if table empty)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="740" y="440" width="170" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="r-b2" value="2. poll_feeds_once()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="740" y="490" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="r-b3" value="3. pull_since()&lt;br&gt;(in asyncio.to_thread)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="740" y="530" width="170" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="er-bb1" edge="1" source="r-boot" target="r-b1" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er-b12" edge="1" source="r-b1" target="r-b2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er-b23" edge="1" source="r-b2" target="r-b3" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Start worker pool -->
+        <mxCell id="r-pool" value="&lt;b&gt;Start Worker Pool&lt;/b&gt;&lt;br&gt;run_pool(num_workers, stop_event)&lt;br&gt;N concurrent asyncio tasks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="460" y="530" width="230" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="er-bp" edge="1" source="r-boot" target="r-pool" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Main wait loop -->
+        <mxCell id="r-wait" value="&lt;b&gt;Wait for shutdown signal&lt;/b&gt;&lt;br&gt;&lt;br&gt;duration &amp;gt; 0 → asyncio.wait_for(stop, timeout=duration)&lt;br&gt;duration == 0 → await stop_event.wait()&lt;br&gt;KeyboardInterrupt → stop_event.set()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="410" y="620" width="340" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="er-pw" edge="1" source="r-pool" target="r-wait" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Shutdown -->
+        <mxCell id="r-shut" value="&lt;b&gt;Graceful Shutdown&lt;/b&gt;&lt;br&gt;1. scheduler.shutdown(wait=False)&lt;br&gt;2. await pool_task (workers drain)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="450" y="730" width="260" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="er-ws" edge="1" source="r-wait" target="r-shut" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- End -->
+        <mxCell id="r-end" value="" style="ellipse;fillColor=#333333;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="570" y="810" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="er-se" edge="1" source="r-shut" target="r-end" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Concurrent note -->
+        <mxCell id="r-note" value="&lt;b&gt;Concurrency Model&lt;/b&gt;&lt;br&gt;&lt;br&gt;Single asyncio event loop:&lt;br&gt;• APScheduler fires ingest jobs&lt;br&gt;• N worker tasks poll queue&lt;br&gt;• httpx async for all HTTP I/O&lt;br&gt;• DB sessions are short-lived&lt;br&gt;  (never held across await)&lt;br&gt;&lt;br&gt;SQLite WAL mode allows concurrent&lt;br&gt;reads during writes. busy_timeout=10s." style="text;html=1;fontSize=10;align=left;fillColor=#D4E1F5;strokeColor=#7EA6E0;rounded=1;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="820" y="620" width="250" height="170" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- PAGE 6: Scoring & Verdict -->
+  <diagram id="scoring" name="6. Scoring &amp; Verdict">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title6" value="&lt;b&gt;Scoring &amp; Verdict Decision Flow&lt;/b&gt;" style="text;html=1;fontSize=20;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="350" y="20" width="500" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Input -->
+        <mxCell id="sc-in" value="&lt;b&gt;Input: list[Finding]&lt;/b&gt;&lt;br&gt;Each has: rule_id, severity,&lt;br&gt;category, confidence" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="90" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Point calculation -->
+        <mxCell id="sc-points" value="&lt;b&gt;Calculate Points&lt;/b&gt;&lt;br&gt;&lt;br&gt;low = 1 pt&lt;br&gt;medium = 8 pts&lt;br&gt;high = 25 pts&lt;br&gt;critical = 60 pts&lt;br&gt;&lt;br&gt;Per-category cap: 30 pts max&lt;br&gt;(prevents IOC spam from dominating)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="80" y="180" width="230" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="esc1" edge="1" source="sc-in" target="sc-points" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Decision chain -->
+        <mxCell id="sc-d1" value="score ≥ 61&lt;br&gt;OR critical finding&lt;br&gt;OR chain rule?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="400" y="100" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="esc2" edge="1" source="sc-points" target="sc-d1" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="sc-mal" value="&lt;b&gt;MALICIOUS&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="110" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="esc3" value="Yes" style="fontSize=10;" edge="1" source="sc-d1" target="sc-mal" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="sc-d2" value="score ≥ 20&lt;br&gt;OR high finding?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="400" y="230" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="esc4" value="No" style="fontSize=10;" edge="1" source="sc-d1" target="sc-d2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="sc-sus" value="&lt;b&gt;SUSPICIOUS&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="240" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="esc5" value="Yes" style="fontSize=10;" edge="1" source="sc-d2" target="sc-sus" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="sc-clean" value="&lt;b&gt;CLEAN&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="340" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="esc6" value="No" style="fontSize=10;" edge="1" source="sc-d2" target="sc-clean" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Watchlist Escalation -->
+        <mxCell id="sc-wl-title" value="&lt;b&gt;Watchlist Escalation&lt;/b&gt;" style="text;html=1;fontSize=14;align=left;" vertex="1" parent="1">
+          <mxGeometry x="80" y="400" width="250" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="sc-wl1" value="is_watchlist(name)?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="80" y="440" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="sc-wl2" value="Has medium+&lt;br&gt;findings?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="310" y="440" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="esc-w1" value="Yes" style="fontSize=10;" edge="1" source="sc-wl1" target="sc-wl2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="sc-wl-esc1" value="clean → &lt;b&gt;SUSPICIOUS&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="510" y="450" width="180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="esc-w2" value="Yes" style="fontSize=10;" edge="1" source="sc-wl2" target="sc-wl-esc1" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="sc-wl3" value="Rank ≤ 100 AND&lt;br&gt;high/crit findings?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="310" y="540" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="esc-w3" value="Also check" style="fontSize=10;dashed=1;" edge="1" source="sc-wl2" target="sc-wl3" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="sc-wl-esc2" value="→ &lt;b&gt;MALICIOUS&lt;/b&gt;&lt;br&gt;alert_tag=watchlist_top100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="520" y="545" width="200" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="esc-w4" value="Yes" style="fontSize=10;" edge="1" source="sc-wl3" target="sc-wl-esc2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- LLM Override -->
+        <mxCell id="sc-llm-title" value="&lt;b&gt;LLM Override Rules&lt;/b&gt;" style="text;html=1;fontSize=14;align=left;" vertex="1" parent="1">
+          <mxGeometry x="80" y="640" width="250" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="sc-llm-box" value="If LLM triage returns a verdict:&lt;br&gt;&lt;br&gt;• LLM verdict &lt;b&gt;overrides&lt;/b&gt; rule verdict on the Scan row&lt;br&gt;• EXCEPT: if rules triggered a behavioral chain rule&lt;br&gt;  (urlopen_exec_chain or network_subprocess_chain)&lt;br&gt;  → verdict stays MALICIOUS regardless of LLM opinion&lt;br&gt;&lt;br&gt;• LLM-reported IOCs are post-validated against source&lt;br&gt;  (hallucinated IOCs are dropped)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="80" y="680" width="420" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Chain rules box -->
+        <mxCell id="sc-chains" value="&lt;b&gt;Behavioral Chain Rules&lt;/b&gt;&lt;br&gt;(always → MALICIOUS, no override)&lt;br&gt;&lt;br&gt;• installer.urlopen_exec_chain&lt;br&gt;  (setup.py: network → exec)&lt;br&gt;&lt;br&gt;• imports.network_subprocess_chain&lt;br&gt;  (__init__.py: network + subprocess)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="880" y="440" width="260" height="130" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+</mxfile>

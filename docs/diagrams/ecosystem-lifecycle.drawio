@@ -1,0 +1,293 @@
+<mxfile host="draw.io" modified="2026-05-23T00:00:00.000Z" agent="Claude" version="24.0.0" type="device">
+  <diagram id="ecosystem-lifecycle" name="Ecosystem Lifecycle">
+    <mxGraphModel dx="1800" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="&lt;b&gt;Ecosystem Lifecycle&lt;/b&gt;&lt;br&gt;From empty database to fully operational code-diff scanning" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="500" y="20" width="600" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- PHASE 1: Seed Watchlist                      -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="phase1-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="320" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="phase1-header" value="&lt;b&gt;Phase 1: Seed Watchlist&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontColor=#1a3a5c;" vertex="1" parent="1">
+          <mxGeometry x="80" y="110" width="240" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="phase1-trigger" value="&lt;i&gt;Trigger: first boot (watchlist empty)&lt;br&gt;or CLI &lt;code&gt;seed-watchlist&lt;/code&gt;&lt;/i&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="70" y="140" width="260" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- PyPI sub-step -->
+        <mxCell id="phase1-pypi" value="&lt;b&gt;PyPI&lt;/b&gt;&lt;br&gt;Fetch hugovk/top-pypi-packages&lt;br&gt;(10K packages)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b3d1f7;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="60" y="180" width="280" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Crates sub-step -->
+        <mxCell id="phase1-crates" value="&lt;b&gt;Crates.io&lt;/b&gt;&lt;br&gt;Paginate API sorted by downloads&lt;br&gt;(5K crates, 100/page, 1 req/s rate limit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b3d1f7;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="60" y="250" width="280" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Store result -->
+        <mxCell id="phase1-store" value="&lt;b&gt;watchlist&lt;/b&gt; table&lt;br&gt;&lt;code&gt;(ecosystem, name, rank, downloads)&lt;/code&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#e6eef7;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="110" y="330" width="180" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Internal arrows phase 1 -->
+        <mxCell id="p1-arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;" edge="1" source="phase1-pypi" target="phase1-store" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;" edge="1" source="phase1-crates" target="phase1-store" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- PHASE 2: Baseline Scan                       -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="phase2-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="430" y="100" width="320" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="phase2-header" value="&lt;b&gt;Phase 2: Baseline Scan&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontColor=#2d5016;" vertex="1" parent="1">
+          <mxGeometry x="470" y="110" width="240" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="phase2-trigger" value="&lt;i&gt;Trigger: automatic on first boot&lt;br&gt;or CLI &lt;code&gt;baseline&lt;/code&gt;&lt;/i&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="460" y="140" width="260" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Fetch latest -->
+        <mxCell id="phase2-fetch" value="For each watchlist entry:&lt;br&gt;fetch latest version from upstream API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b8dba8;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="450" y="180" width="280" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Enqueue -->
+        <mxCell id="phase2-enqueue" value="Enqueue at &lt;b&gt;high priority&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b8dba8;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="450" y="235" width="280" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- Worker pipeline -->
+        <mxCell id="phase2-pipeline" value="download → extract → hash every file&lt;br&gt;→ analyze → score → persist" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b8dba8;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="450" y="282" width="280" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- file_hash result -->
+        <mxCell id="phase2-result" value="&lt;b&gt;file_hash&lt;/b&gt; rows&lt;br&gt;&lt;code&gt;(pkg, version, path, sha256)&lt;/code&gt;&lt;br&gt;&lt;i&gt;This is the &quot;get to code-diff&quot; step&lt;/i&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#e2f0d9;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="345" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Internal arrows phase 2 -->
+        <mxCell id="p2-arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;" edge="1" source="phase2-fetch" target="phase2-enqueue" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;" edge="1" source="phase2-enqueue" target="phase2-pipeline" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-arrow3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;" edge="1" source="phase2-pipeline" target="phase2-result" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- PHASE 3: Workers Drain                       -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="phase3-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="820" y="100" width="280" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-header" value="&lt;b&gt;Phase 3: Workers Drain&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontColor=#7a6200;" vertex="1" parent="1">
+          <mxGeometry x="850" y="110" width="220" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-trigger" value="&lt;i&gt;Automatic — workers start before boot&lt;/i&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="840" y="140" width="240" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- 6 workers -->
+        <mxCell id="phase3-workers" value="&lt;b&gt;6 workers&lt;/b&gt; process the baseline queue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe599;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="840" y="180" width="240" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Worker icons (stylized) -->
+        <mxCell id="phase3-w1" value="W1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f9e79f;strokeColor=#d6b656;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="240" width="35" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-w2" value="W2" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f9e79f;strokeColor=#d6b656;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="893" y="240" width="35" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-w3" value="W3" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f9e79f;strokeColor=#d6b656;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="936" y="240" width="35" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-w4" value="W4" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f9e79f;strokeColor=#d6b656;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="979" y="240" width="35" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-w5" value="W5" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f9e79f;strokeColor=#d6b656;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1022" y="240" width="35" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-w6" value="W6" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f9e79f;strokeColor=#d6b656;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="240" width="35" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- Drain condition -->
+        <mxCell id="phase3-condition" value="Once a package has &lt;b&gt;file_hash&lt;/b&gt; rows&lt;br&gt;from its scan, the next version will&lt;br&gt;automatically diff against it" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe599;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="840" y="300" width="240" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- Progress bar metaphor -->
+        <mxCell id="phase3-bar-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="855" y="385" width="210" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-bar-fill" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f4b400;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="855" y="385" width="145" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-bar-label" value="baseline queue draining..." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=9;fontColor=#7a6200;" vertex="1" parent="1">
+          <mxGeometry x="855" y="405" width="210" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- PHASE 4: Incremental Mode                    -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="phase4-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6d0de;strokeColor=#9673a6;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="100" width="380" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="phase4-header" value="&lt;b&gt;Phase 4: Incremental Mode&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontColor=#5b3a6b;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="110" width="260" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="phase4-trigger" value="&lt;i&gt;Automatic — once file_hash rows exist,&lt;br&gt;code-diff engages&lt;/i&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="140" width="280" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- RSS feeds -->
+        <mxCell id="phase4-rss" value="&lt;b&gt;RSS feeds&lt;/b&gt; poll every 60s&lt;br&gt;(both ecosystems)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4b8cc;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="180" width="160" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Cursor poll -->
+        <mxCell id="phase4-cursor" value="&lt;b&gt;PyPI cursor&lt;/b&gt; polls&lt;br&gt;every 120s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4b8cc;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="180" width="160" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Watchlist filter -->
+        <mxCell id="phase4-filter" value="Only enqueue &lt;b&gt;watchlist&lt;/b&gt; packages" style="rhombus;whiteSpace=wrap;html=1;fillColor=#d4b8cc;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="240" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Code-diff -->
+        <mxCell id="phase4-diff" value="New version arrives →&lt;br&gt;&lt;b&gt;code-diff&lt;/b&gt; kicks in automatically&lt;br&gt;Only changed files analyzed&lt;br&gt;→ &lt;b&gt;much faster scans&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c9a3bb;strokeColor=#9673a6;fontSize=11;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="320" width="280" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Cycle arrow (self-loop) -->
+        <mxCell id="phase4-loop" value="ongoing" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9673a6;curved=1;fontSize=10;fontStyle=2;" edge="1" source="phase4-diff" target="phase4-rss" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1180" y="355" />
+              <mxPoint x="1180" y="203" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Internal arrows phase 4 -->
+        <mxCell id="p4-arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9673a6;" edge="1" source="phase4-rss" target="phase4-filter" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9673a6;" edge="1" source="phase4-cursor" target="phase4-filter" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-arrow3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9673a6;" edge="1" source="phase4-filter" target="phase4-diff" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- PHASE TRANSITION ARROWS                      -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="trans-1-2" value="&lt;b&gt;automatic&lt;/b&gt;&lt;br&gt;&lt;i&gt;if watchlist table&lt;br&gt;empty for ecosystem&lt;/i&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333;strokeWidth=2;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" source="phase1-box" target="phase2-box" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="trans-2-3" value="&lt;b&gt;automatic&lt;/b&gt;&lt;br&gt;&lt;i&gt;workers start&lt;br&gt;before boot&lt;/i&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333;strokeWidth=2;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" source="phase2-box" target="phase3-box" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="trans-3-4" value="&lt;b&gt;automatic&lt;/b&gt;&lt;br&gt;&lt;i&gt;once file_hash&lt;br&gt;rows exist&lt;/i&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333;strokeWidth=2;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" source="phase3-box" target="phase4-box" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- CURRENT STATE ANNOTATION                     -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="state-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;arcSize=6;dashed=1;dashPattern=5 3;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="490" width="700" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="state-title" value="&lt;b&gt;Current State (2026-05-23)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="55" y="495" width="300" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- PyPI status -->
+        <mxCell id="state-pypi-icon" value="" style="shape=mxgraph.signs.transportation.cargo_ship;fillColor=#6c8ebf;strokeColor=none;sketch=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="530" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="state-pypi" value="&lt;b&gt;PyPI:&lt;/b&gt; Phase 4 (incremental) — 10K watchlist, ~10K baseline done, 2.1M file hashes" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="100" y="530" width="620" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Crates status -->
+        <mxCell id="state-crates-icon" value="" style="shape=mxgraph.signs.transportation.cargo_ship;fillColor=#d6b656;strokeColor=none;sketch=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="565" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="state-crates" value="&lt;b&gt;Crates.io:&lt;/b&gt; Phase 2→3 (baseline in progress) — 5K watchlist, ~466 pending" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="100" y="565" width="620" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- ENVIRONMENT CONTROLS                         -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="env-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999;arcSize=6;dashed=1;dashPattern=5 3;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="780" y="490" width="530" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="env-title" value="&lt;b&gt;Environment Controls&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=13;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="800" y="495" width="300" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="env-ingest" value="&lt;code&gt;SCANNER_INGEST=0|1&lt;/code&gt;&lt;br&gt;Global kill switch for all ingest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#999;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="525" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="env-ecosystems" value="&lt;code&gt;SCANNER_ECOSYSTEMS&lt;/code&gt; &lt;i&gt;(planned)&lt;/i&gt;&lt;br&gt;Comma-separated filter&lt;br&gt;e.g. &lt;code&gt;&quot;crates&quot;&lt;/code&gt; to run only crates baseline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#999;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="570" width="300" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- Kill switch arrow to phase 1 -->
+        <mxCell id="env-arrow" value="gates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#b85450;strokeWidth=1;dashed=1;fontSize=9;fontStyle=2;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="env-ingest" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="460" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="770" y="545" />
+              <mxPoint x="770" y="460" />
+              <mxPoint x="200" y="460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- PHASE NUMBER BADGES (intensity color coding) -->
+        <!-- ═══════════════════════════════════════════ -->
+        <mxCell id="badge1" value="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#6c8ebf;strokeColor=#3a5d8c;fontColor=#fff;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="105" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="badge2" value="2" style="ellipse;whiteSpace=wrap;html=1;fillColor=#82b366;strokeColor=#4d7a2e;fontColor=#fff;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="105" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="badge3" value="3" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d6b656;strokeColor=#a08623;fontColor=#fff;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="830" y="105" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="badge4" value="4" style="ellipse;whiteSpace=wrap;html=1;fillColor=#9673a6;strokeColor=#6a4c7a;fontColor=#fff;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="105" width="30" height="30" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

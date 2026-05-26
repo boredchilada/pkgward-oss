@@ -1,0 +1,26 @@
+name: Baseline intel
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    # Runs the full test suite with no PKGSENTRY_INTEL_PATH set, exercising
+    # the public baseline pack only — no private overlay.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: pytest (baseline-only)
+        env:
+          PKGSENTRY_INTEL_PATH: ""
+        run: pytest tests/ -x -q

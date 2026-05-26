@@ -1,0 +1,30 @@
+rules:
+  - id: buildrs_net_to_exec
+    mode: taint
+    message: >-
+      Network response is tainted into std::process::Command in build.rs.
+      Direct supply-chain attack pattern (mistralai-style malicious build).
+    languages: [rust]
+    severity: ERROR
+    paths:
+      include:
+        - "**/build.rs"
+    metadata:
+      severity: critical
+      confidence: high
+      category: installer
+      pkgsentry_layer: opengrep
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: reqwest::get($URL)
+              - pattern: reqwest::blocking::get($URL)
+              - pattern: ureq::get($URL).call()
+              - pattern: attohttpc::get($URL).send()
+              - pattern: minreq::get($URL).send()
+              - pattern: isahc::get($URL)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: std::process::Command::new($X)
+              - pattern: Command::new($X)

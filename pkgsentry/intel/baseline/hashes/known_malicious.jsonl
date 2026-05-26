@@ -1,0 +1,14 @@
+# Known-malicious file fingerprints. One JSON object per line.
+# Schema (fields):
+#   sha256       (required) — hex sha256
+#   ssdeep       (optional) — ppdeep fuzzy hash
+#   tlsh         (optional) — TLSH hash
+#   campaign     (optional) — campaign label
+#   label        (optional) — usually "malicious"
+#   file_pattern (optional) — file name this hash typically appears at
+#   description  (optional) — analyst notes
+#   source       (optional) — provenance
+#
+# Baseline ships empty — operators seed their own via the private overlay
+# or via `python -m pkgsentry.store.seed_intel` after publishing their
+# overlay pack at PKGSENTRY_INTEL_PATH.
