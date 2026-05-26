@@ -47,22 +47,8 @@ func TestCratesProfile(t *testing.T) {
 		t.Fatal("crates profile not found")
 	}
 	install := p.InstallCmd("evil-crate", "1.0.0", "/sandbox/evil-crate-1.0.0.crate")
-	if install[0] != "sh" {
-		t.Errorf("install cmd[0] = %q, want sh", install[0])
-	}
-	joined := strings.Join(install, " ")
-	if !strings.Contains(joined, "tar -xzf") {
-		t.Error("crates install must extract .crate tarball")
-	}
-	if !strings.Contains(joined, "cargo build") {
-		t.Error("crates install must run cargo build")
-	}
-	if !strings.Contains(joined, "evil-crate-1.0.0") {
-		t.Error("crates install must cd into extracted crate dir")
-	}
-	imp := p.ImportCmd("evil-crate")
-	if imp != nil {
-		t.Error("crates should have no import phase")
+	if install[0] != "cargo" {
+		t.Errorf("install cmd[0] = %q, want cargo", install[0])
 	}
 }
 
@@ -74,25 +60,17 @@ func TestGomodProfile(t *testing.T) {
 	if p.BaseImage != "golang:1.22-alpine" {
 		t.Errorf("base image = %q", p.BaseImage)
 	}
-	install := p.InstallCmd("github.com/foo/bar", "v1.0.0", "/sandbox/bar-v1.0.0.zip")
-	if install[0] != "sh" {
-		t.Errorf("install cmd[0] = %q, want sh", install[0])
+	install := p.InstallCmd("github.com/foo/bar", "v1.2.3", "/sandbox/github.com_foo_bar-v1.2.3.zip")
+	if len(install) != 3 || install[0] != "sh" || install[1] != "-c" {
+		t.Fatalf("install cmd = %v, want [sh -c <script>]", install)
 	}
-	joined := strings.Join(install, " ")
-	if !strings.Contains(joined, "unzip") {
-		t.Error("gomod install must extract zip")
+	for _, want := range []string{"unzip -q '/sandbox/github.com_foo_bar-v1.2.3.zip'", "go generate ./...", "go build ./..."} {
+		if !strings.Contains(install[2], want) {
+			t.Errorf("install script missing %q", want)
+		}
 	}
-	if !strings.Contains(joined, "go build") {
-		t.Error("gomod install must run go build")
-	}
-
-	imp := p.ImportCmd("github.com/foo/bar")
-	if imp == nil {
-		t.Fatal("gomod should have import phase")
-	}
-	impJoined := strings.Join(imp, " ")
-	if !strings.Contains(impJoined, "go test") {
-		t.Error("gomod import must run go test to trigger init()")
+	if p.ImportCmd("github.com/foo/bar") != nil {
+		t.Error("gomod import cmd should be nil (no import phase)")
 	}
 }
 

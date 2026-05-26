@@ -279,7 +279,7 @@ def _compute_file_hashes(
         rel = p.relative_to(root)
         real = rel.as_posix()
         parts = rel.parts
-        if archive_kind in ("sdist", "crate", "gomod_zip") and len(parts) > 1:
+        if archive_kind in ("sdist", "crate", "gomod_zip", "npm_tarball") and len(parts) > 1:
             normalized = "/".join(parts[1:])
         else:
             normalized = real
@@ -495,8 +495,11 @@ def _persist_and_finalize(
         _persist_file_hashes(s, scan.id, all_file_hashes)
 
         # --- Detonation (best-effort, sync) ---
-        _DETONATION_ECOSYSTEMS = {"pypi", "crates", "gomod"}
-        _PREFERRED_ARCHIVE = {"pypi": "sdist", "crates": "crate", "gomod": "gomod_zip"}
+        # npm detonation re-enabled: the detonation noise baseline now whitelists
+        # .npmrc reads (npm_file_noise) and registry connections (npm_net_allow),
+        # so normal `npm install` traffic no longer false-positives as malicious.
+        _DETONATION_ECOSYSTEMS = {"pypi", "crates", "gomod", "npm"}
+        _PREFERRED_ARCHIVE = {"pypi": "sdist", "crates": "crate", "gomod": "gomod_zip", "npm": "npm_tarball"}
         is_first_version = prev is None
         det_client = get_detonation_client()
         if ecosystem in _DETONATION_ECOSYSTEMS and det_client.is_enabled() and should_detonate(

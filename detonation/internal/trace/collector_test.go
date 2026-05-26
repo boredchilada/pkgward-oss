@@ -92,17 +92,3 @@ func TestCollectFromReader(t *testing.T) {
 		t.Errorf("expected 2 events (filtered by ns), got %d", len(events))
 	}
 }
-
-func TestTargetNSZeroSkipsFiltering(t *testing.T) {
-	// targetNS=0 means "accept all namespaces" — used when the host is
-	// dedicated to detonation and the noise filter handles separation.
-	lines := strings.NewReader(
-		`{"process_exec":{"process":{"pid":1,"binary":"/usr/bin/python3","ns":{"pid_for_children":99}}},"time":"2024-01-01T00:00:00Z"}` + "\n" +
-			`{"process_exec":{"process":{"pid":2,"binary":"/usr/bin/curl","ns":{"pid_for_children":88}}},"time":"2024-01-01T00:00:01Z"}` + "\n" +
-			`{"process_exec":{"process":{"pid":3,"binary":"/usr/bin/ls","ns":{"pid_for_children":77}}},"time":"2024-01-01T00:00:02Z"}` + "\n",
-	)
-	events := CollectFromReader(lines, 0)
-	if len(events) != 3 {
-		t.Errorf("expected 3 events (no ns filtering), got %d", len(events))
-	}
-}

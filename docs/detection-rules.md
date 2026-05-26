@@ -135,6 +135,28 @@ Rules analyze Go source files and go.mod. The `init_*` rules extract the actual 
 | `gomod.replace_local_path` | high | high | `go.mod` replace pointing to local filesystem |
 | `gomod.replace_directive` | medium | high | `go.mod` replace pointing to remote target |
 
+## Layer 6c: npm lifecycle scripts
+
+Source: `ecosystems/npm/installer.py`
+
+Parses the root `package.json` (never bundled `node_modules` manifests) and inspects the
+lifecycle scripts that run automatically on `npm install` (`preinstall`/`install`/
+`postinstall`/`prepare`). A script whose every command-chain segment leads with a
+known-benign build tool (node-gyp, tsc, webpack, …; intel `npm_benign_tools.toml`)
+produces no finding. Local `.js` files invoked by a script (e.g. `node scripts/x.js`) are
+followed and scanned for network + `child_process`/eval.
+
+| rule_id | Sev | Conf | What it detects |
+|---------|-----|------|-----------------|
+| `installer.npm_lifecycle_net_exec` | critical | high | Lifecycle script chains a network fetch + shell/eval/decode |
+| `installer.npm_lifecycle_network` | high | medium | Lifecycle script makes a network call (curl/wget/https/…) |
+| `installer.npm_lifecycle_subprocess` | medium | medium | Lifecycle script runs a shell/eval/base64-decode |
+| `installer.npm_install_script_net_exec` | critical | high | Referenced install `.js` has both network and child_process/eval |
+| `installer.npm_install_script_network` | high | medium | Referenced install `.js` makes a network call |
+| `installer.npm_install_script_decode_exec` | high | medium | Referenced install `.js` base64-decodes then executes |
+| `installer.npm_install_script_encoded_payload` | medium | medium | Large encoded payload in referenced install `.js` |
+| `installer.npm_suspicious_bin` | low | low | `bin` entry points to a `.sh`/`.ps1`/`.exe`/… script |
+
 ## Layer 7: YARA signature matching (all ecosystems)
 
 Source: `analyze/yara_scan.py` + rules in `yara_rules/`
@@ -222,11 +244,12 @@ that the regex-based `crates/build_rs.py` and AST-based
 * `OPENGREP_SHADOW=0` — findings emit as `opengrep.<id>` and enter scoring.
   The legacy install-time analyzers for PyPI and Crates are skipped.
 
-Rules ship in `pkgsentry/intel/baseline/opengrep/{python,rust,go}/`. Operators
+Rules ship in `pkgsentry/intel/baseline/opengrep/{python,rust,go,javascript}/`. Operators
 add private rules via `$PKGSENTRY_INTEL_PATH/opengrep/<lang>/*.yaml`. UNION
-merge semantics, identical to YARA dirs.
+merge semantics, identical to YARA dirs. Each rule directory ships co-located
+`opengrep --test` fixtures (`<id>.{py,rs,go,js}`); run `tools/test_opengrep_rules.sh`.
 
-Baseline rule set (8 rules, deliberately small):
+Baseline rule set (11 rules, deliberately small):
 
 | rule_id | Sev | Conf | What it detects |
 |---------|-----|------|-----------------|
@@ -238,23 +261,29 @@ Baseline rule set (8 rules, deliberately small):
 | `opengrep.buildrs_include_executable` | high | medium | Rust: `include_bytes!` of .exe/.dll/.so/.sh/.ps1/.bat |
 | `opengrep.init_net_to_exec` | critical | high | Go: net response inside init() tainted into exec.Command |
 | `opengrep.init_env_to_net` | high | high | Go: sensitive env var inside init() tainted into network |
+| `opengrep.js_net_to_exec` | critical | high | JS/TS: net response tainted into child_process/eval/Function |
+| `opengrep.js_decode_to_exec` | high | high | JS/TS: base64-decoded data tainted into eval/Function/exec |
+| `opengrep.js_env_to_net` | high | medium | JS/TS: `process.env` secrets tainted into a network call |
 
-## Layer 10: Dynamic analysis / detonation (PyPI only)
+## Layer 10: Dynamic analysis / detonation (all ecosystems)
 
 Source: `detonation/internal/rules/definitions.go` (Go sandbox service)
 
-Package is installed in a gVisor sandbox with Tetragon eBPF tracing. The sandbox captures syscalls and the Go rules engine evaluates them in real-time.
+Package is installed/imported in a rootless-Docker sandbox with Tetragon eBPF tracing on the host. The collector (`internal/trace/collector.go`) parses the Tetragon JSONL log into `TraceEvent`s, tags them with the install/import phase by time window (`AssignPhase`), and the Go rules engine evaluates them. Tetragon policy: `detonation/deploy/tetragon-policy.yaml`. Detonation now runs for PyPI, Crates, and Go modules.
 
 | rule_id | Sev | Conf | What it detects |
 |---------|-----|------|-----------------|
-| `dyn_install_exfil` | critical | high | Network connect() during install phase. **Behavioral chain** |
+| `dyn_install_exfil` | critical | high | Network connect() during install phase. **DEFERRED — not in `AllRules()`**: fires on any install-phase connect, but sdists fetch build deps from registries → FPs. Re-enable with offline install or a destination allowlist. |
 | `dyn_import_exfil` | high | high | Network connect() during import phase |
-| `dyn_credential_read` | high | high | Read of sensitive file (SSH keys, browser creds, wallet paths) |
-| `dyn_reverse_shell` | critical | high | Shell spawned with open socket. **Behavioral chain** |
-| `dyn_proc_inject` | critical | high | ptrace/process_vm_writev (process injection). **Behavioral chain** |
-| `dyn_dns_exfil` | high | medium | High-entropy DNS query (subdomain entropy >= 4.0) |
-| `dyn_env_harvest` | high | high | Read of sensitive env var (AWS_*, GITHUB_*, etc.) |
-| `dyn_suspicious_write` | critical | high | Write to persistence path (crontab, .bashrc, .profile) |
+| `dyn_credential_read` | high | high | Read of sensitive file (SSH keys, cloud creds, /etc/shadow) via openat path-prefix hook |
+| `dyn_reverse_shell` | critical | high | Shell spawned with open socket. **Behavioral chain.** Dormant — needs socket-fd tracking on exec (not yet wired) |
+| `dyn_proc_inject` | critical | high | ptrace (PTRACE_ATTACH/SEIZE/POKE) or process_vm_writev injection. **Behavioral chain** |
+| `dyn_dns_exfil` | high | medium | High-entropy DNS query. Dormant — needs UDP payload capture + DNS parsing (Tetragon gives only dest IP:port) |
+| `dyn_env_harvest` | high | high | Read of another process's environment via `/proc/<pid>/environ` (excludes /proc/self) |
+| `dyn_suspicious_write` | critical | high | Write to persistence path (crontab, /etc/systemd, .bashrc, authorized_keys) via `security_file_permission` MAY_WRITE hook |
+| `dyn_fileless_exec` | critical / medium | high / medium | `execveat(AT_EMPTY_PATH)` fileless execution (critical); `memfd_create` anonymous executable memory (medium) |
+
+All non-network kprobe hooks are namespace-filtered (`matchNamespaces Pid NotIn [host]`) so host activity is not misattributed to a detonation. Note: Tetragon `matchArgs` has no `In` operator — use `Equal` with multiple values (OR-matched).
 
 ## Fetch-level findings
 
@@ -317,7 +346,7 @@ These rule IDs auto-escalate the verdict to malicious regardless of score. Defin
 | `binary.*` | Yes | Yes | Yes |
 | `version_diff.*` | Yes | Yes | Yes |
 | `intel.*` | Yes | Yes | Yes |
-| `dyn_*` | Yes | Planned | - |
+| `dyn_*` | Yes | Yes | Yes |
 | `opengrep.*` | Yes | Yes | Yes |
 | `fetch.*` | Yes | Yes | Yes |
 

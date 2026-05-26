@@ -40,6 +40,15 @@ type NoiseFilters struct {
 	NpmExecNoise    []string `toml:"npm_exec_noise"`
 	CratesFileNoise []string `toml:"crates_file_noise"`
 	CratesExecNoise []string `toml:"crates_exec_noise"`
+
+	// Per-ecosystem network destination allowlist. Entries are hostnames
+	// (resolved to IPs at filter time) or literal IPs. Connections to these
+	// destinations are expected registry/CDN traffic and are dropped before
+	// the network exfil rules run.
+	PypiNetAllow   []string `toml:"pypi_net_allow"`
+	NpmNetAllow    []string `toml:"npm_net_allow"`
+	CratesNetAllow []string `toml:"crates_net_allow"`
+	GomodNetAllow  []string `toml:"gomod_net_allow"`
 }
 
 // Pack holds everything intel.Load() returns.
@@ -157,6 +166,10 @@ func mergeNoise(base, overlay NoiseFilters) NoiseFilters {
 		NpmExecNoise:    unionStrings(base.NpmExecNoise, overlay.NpmExecNoise),
 		CratesFileNoise: unionStrings(base.CratesFileNoise, overlay.CratesFileNoise),
 		CratesExecNoise: unionStrings(base.CratesExecNoise, overlay.CratesExecNoise),
+		PypiNetAllow:    unionStrings(base.PypiNetAllow, overlay.PypiNetAllow),
+		NpmNetAllow:     unionStrings(base.NpmNetAllow, overlay.NpmNetAllow),
+		CratesNetAllow:  unionStrings(base.CratesNetAllow, overlay.CratesNetAllow),
+		GomodNetAllow:   unionStrings(base.GomodNetAllow, overlay.GomodNetAllow),
 	}
 }
 

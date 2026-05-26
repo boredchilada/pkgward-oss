@@ -72,8 +72,45 @@ if [ ! -f /sys/kernel/btf/vmlinux ]; then
 fi
 
 # 6. Tetragon systemd service — Tetragon's install.sh already drops a unit at
-# /usr/lib/systemd/system/tetragon.service. We just need export dirs + enable.
+# /usr/lib/systemd/system/tetragon.service and the baseline tetragon.conf.d
+# files (bpf-lib, log-format, log-level, verbose, server-address,
+# export-filename, export-file-compress). We add export dirs, prod tuning,
+# memory hardening, and enable.
 mkdir -p /var/log/tetragon /var/lib/tetragon
+
+# Prod daemon tuning — one file per flag in /etc/tetragon/tetragon.conf.d/.
+# These layer on top of the baseline files written by Tetragon's install.sh.
+#
+#   export-file-perm=0644 is THE fix for log readability by the `detonation`
+#   user (the detonation-svc reads /var/log/tetragon/tetragon.log). Tetragon
+#   RECREATES the log file on every rotation at this mode, so a one-off
+#   chmod/setfacl on the file — or a default ACL on the dir — does NOT survive
+#   a rotation. Setting export-file-perm is the only durable fix.
+#
+#   rb-size / rb-queue-size enlarge the per-CPU ring buffer and Go-side channel
+#   so execve storms (e.g. a fork-bomb sample) don't drop events.
+mkdir -p /etc/tetragon/tetragon.conf.d
+printf '0644\n'             > /etc/tetragon/tetragon.conf.d/export-file-perm
+printf '4M\n'               > /etc/tetragon/tetragon.conf.d/rb-size
+printf '262144\n'           > /etc/tetragon/tetragon.conf.d/rb-queue-size
+printf '200\n'              > /etc/tetragon/tetragon.conf.d/export-file-max-size-mb
+printf '20\n'               > /etc/tetragon/tetragon.conf.d/export-file-max-backups
+printf '1h\n'               > /etc/tetragon/tetragon.conf.d/export-file-rotation-interval
+printf '127.0.0.1:2112\n'   > /etc/tetragon/tetragon.conf.d/metrics-server
+printf '127.0.0.1:8118\n'   > /etc/tetragon/tetragon.conf.d/gops-address
+
+# Memory hardening drop-in — bound Tetragon's memory so a fork-bomb /
+# execve-storm sample cannot OOM the tracer before the sandbox container dies.
+# OOMScoreAdjust biases the kernel OOM killer toward the workload, not the
+# observer.
+mkdir -p /etc/systemd/system/tetragon.service.d
+cat > /etc/systemd/system/tetragon.service.d/hardening.conf <<'HARDEN'
+[Service]
+MemoryHigh=1G
+MemoryMax=2G
+OOMScoreAdjust=-500
+HARDEN
+
 systemctl daemon-reload
 systemctl enable tetragon
 
@@ -182,9 +219,13 @@ su - detonation -c "XDG_RUNTIME_DIR=$DET_RUNTIME_DIR systemctl --user enable doc
 su - detonation -c "XDG_RUNTIME_DIR=$DET_RUNTIME_DIR systemctl --user start docker" 2>/dev/null || true
 
 # Environment file consumed by detonation-svc.service — tells it where the
-# rootless Docker socket is.  UID-dependent, so generated at setup time.
+# rootless Docker socket is (UID-dependent, generated at setup time) and where
+# to find the optional private intel overlay (extra noise filters + network
+# allowlists, merged UNION over the embedded baseline).
+INTEL_OVERLAY="/home/pkgsentry/intel/private"
 cat > /etc/default/detonation-svc <<ENVEOF
 DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock
+PKGSENTRY_INTEL_PATH=$INTEL_OVERLAY
 ENVEOF
 
 # Systemd drop-in: grant detonation-svc access to rootless Docker's runtime dir.
@@ -199,15 +240,46 @@ echo "Rootless Docker configured for detonation user (UID $DET_UID)"
 
 # 11. Pre-pull base images into rootless Docker (NOT system Docker)
 echo "Pre-pulling base images into rootless Docker..."
-for img in python:3.11-slim node:20-slim rust:1-slim; do
+for img in python:3.11-slim node:20-slim rust:1-slim golang:1.22-alpine; do
     su - detonation -c "DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock docker pull $img" 2>/dev/null || true
 done
 
-# 12. Apply Tetragon tracing policy
-if command -v tetra &>/dev/null; then
-    mkdir -p /etc/tetragon/tetragon.tp.d/
-    cp /home/detonation/deploy/tetragon-policy.yaml /etc/tetragon/tetragon.tp.d/detonation-monitor.yaml
-    echo "Tetragon policy installed"
+# 12. Apply Tetragon tracing policy. Tetragon loads /etc/tetragon/tetragon.tp.d/
+# at startup, so this does not depend on the `tetra` CLI being present. The
+# policy is kprobes-only (a TracingPolicy cannot mix kprobes + tracepoints):
+# 7 namespace-filtered kprobes covering connect, credential/environ reads,
+# persistence writes, ptrace/process_vm_writev injection, memfd_create +
+# execveat(AT_EMPTY_PATH) fileless exec. Pid-namespace 4026531836 (host) is
+# excluded so only container syscalls are traced.
+mkdir -p /etc/tetragon/tetragon.tp.d/
+cp /home/detonation/deploy/tetragon-policy.yaml /etc/tetragon/tetragon.tp.d/detonation-monitor.yaml
+echo "Tetragon policy installed"
+
+# 13. SELinux: let detonation-svc (init_t) read the private intel overlay.
+# The overlay lives under /home/pkgsentry (user_home_t); SELinux denies system
+# services reading user-home content, so the overlay silently fails to load
+# (intel_loaded source=baseline instead of baseline+overlay) under Enforcing.
+# Fix = relabel the tree to public_content_t (shared read-only content) + a
+# minimal policy letting init_t read public_content_t (NOT user_home_t).
+if command -v getenforce &>/dev/null && [ "$(getenforce)" != "Disabled" ]; then
+    echo "Configuring SELinux for the intel overlay..."
+    command -v semanage &>/dev/null || dnf install -y -q policycoreutils-python-utils 2>/dev/null || true
+    if [ -d "$INTEL_OVERLAY" ]; then
+        semanage fcontext -a -t public_content_t "${INTEL_OVERLAY}(/.*)?" 2>/dev/null \
+            || semanage fcontext -m -t public_content_t "${INTEL_OVERLAY}(/.*)?" 2>/dev/null || true
+        restorecon -R "$INTEL_OVERLAY" 2>/dev/null || true
+    fi
+    # Install the policy module (prebuilt .pp if present, else compile the .te).
+    SEL_DIR="/home/detonation/deploy/selinux"
+    if [ -f "$SEL_DIR/detonation_intel_read.pp" ]; then
+        semodule -i "$SEL_DIR/detonation_intel_read.pp" 2>/dev/null || true
+    elif [ -f "$SEL_DIR/detonation_intel_read.te" ] && command -v checkmodule &>/dev/null; then
+        ( cd "$SEL_DIR" \
+          && checkmodule -M -m -o detonation_intel_read.mod detonation_intel_read.te \
+          && semodule_package -o detonation_intel_read.pp -m detonation_intel_read.mod \
+          && semodule -i detonation_intel_read.pp ) 2>/dev/null || true
+    fi
+    echo "SELinux intel-overlay access configured (verify: intel_loaded source=baseline+overlay)"
 fi
 
 echo ""

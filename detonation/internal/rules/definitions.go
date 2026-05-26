@@ -31,7 +31,12 @@ func shellBinaries() []string {
 
 func AllRules() []Rule {
 	return []Rule{
-		installExfil(),
+		// installExfil() is intentionally NOT active: it fires on any
+		// install-phase network connect, but sdists legitimately fetch build
+		// deps from registries, so it would false-positive on most packages.
+		// Deferred until it can distinguish registry traffic from real exfil
+		// (offline install or destination allowlist). The rule + its tests are
+		// retained so re-enabling is a one-line change.
 		importExfil(),
 		credentialRead(),
 		reverseShell(),
@@ -39,6 +44,7 @@ func AllRules() []Rule {
 		dnsExfil(),
 		envHarvest(),
 		suspiciousWrite(),
+		filelessExec(),
 	}
 }
 
@@ -182,19 +188,56 @@ func envHarvest() Rule {
 	return Rule{
 		ID: "dyn_env_harvest",
 		Evaluate: func(evt trace.TraceEvent) *trace.DynFinding {
-			if evt.Category != "process" || evt.Operation != "readenv" {
+			if evt.Category != "file" || evt.Operation != "open" {
 				return nil
 			}
-			name, _ := evt.Detail["name"].(string)
-			for _, prefix := range sensitiveEnvPrefixes() {
-				if strings.HasPrefix(strings.ToUpper(name), prefix) {
-					return &trace.DynFinding{
-						RuleID:     "dyn_env_harvest",
-						Category:   "dynamic",
-						Severity:   "high",
-						Confidence: "high",
-						Evidence:   fmt.Sprintf("read sensitive env var: %s during %s phase", name, evt.Phase),
-					}
+			path, _ := evt.Detail["path"].(string)
+			// Reading /proc/<pid>/environ exposes another process's full
+			// environment (tokens, keys, CI secrets). Tetragon surfaces the
+			// file path, not individual variables, so we flag the act of
+			// reading environ rather than matching specific var names.
+			if !strings.HasPrefix(path, "/proc/") || !strings.HasSuffix(path, "/environ") {
+				return nil
+			}
+			// Reading one's own environment is benign (many libs do it).
+			if path == "/proc/self/environ" {
+				return nil
+			}
+			return &trace.DynFinding{
+				RuleID:     "dyn_env_harvest",
+				Category:   "dynamic",
+				Severity:   "high",
+				Confidence: "high",
+				Evidence:   fmt.Sprintf("read process environment via %s during %s phase", path, evt.Phase),
+			}
+		},
+	}
+}
+
+func filelessExec() Rule {
+	return Rule{
+		ID: "dyn_fileless_exec",
+		Evaluate: func(evt trace.TraceEvent) *trace.DynFinding {
+			if evt.Category != "process" {
+				return nil
+			}
+			switch evt.Operation {
+			case "fileless_exec":
+				return &trace.DynFinding{
+					RuleID:     "dyn_fileless_exec",
+					Category:   "dynamic",
+					Severity:   "critical",
+					Confidence: "high",
+					Evidence:   fmt.Sprintf("execve from anonymous fd (AT_EMPTY_PATH) during %s phase", evt.Phase),
+				}
+			case "memfd_create":
+				name, _ := evt.Detail["name"].(string)
+				return &trace.DynFinding{
+					RuleID:     "dyn_fileless_exec",
+					Category:   "dynamic",
+					Severity:   "medium",
+					Confidence: "medium",
+					Evidence:   fmt.Sprintf("anonymous executable memory created (memfd_create %q) during %s phase", name, evt.Phase),
 				}
 			}
 			return nil

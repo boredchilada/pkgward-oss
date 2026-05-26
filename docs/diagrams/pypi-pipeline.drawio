@@ -65,7 +65,7 @@
         <mxCell id="bg_p7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="2560" width="860" height="420" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation&lt;/b&gt;  (PyPI only &amp;mdash; differentiator)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
+        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation&lt;/b&gt;  (rootless Docker + Tetragon)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
           <mxGeometry x="230" y="2565" width="380" height="24" as="geometry"/>
         </mxCell>
 
@@ -452,8 +452,8 @@
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <!-- gVisor sandbox -->
-        <mxCell id="n_sandbox" value="&lt;b&gt;Send sdist to gVisor sandbox&lt;/b&gt;&lt;br&gt;via UNIX socket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+        <!-- rootless-Docker sandbox -->
+        <mxCell id="n_sandbox" value="&lt;b&gt;Send sdist to rootless-Docker sandbox&lt;/b&gt;&lt;br&gt;via UNIX socket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
           <mxGeometry x="480" y="2760" width="240" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="e_det_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_detonate" target="n_sandbox" parent="1">

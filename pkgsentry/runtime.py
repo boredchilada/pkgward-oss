@@ -22,6 +22,38 @@ import pkgsentry.ecosystems  # noqa: F401  -- triggers auto-registration
 log = get_logger("runtime")
 
 
+def sync_focus_file(focus_file: str) -> None:
+    """Authoritatively sync a combined focus file into FocusList and enqueue any
+    pinned versions. Used by `run -f <file>` (focused mode). Logs and returns on
+    a missing/malformed file rather than crashing the scanner."""
+    from pathlib import Path
+    from pkgsentry import focus as focus_mod
+    try:
+        text = Path(focus_file).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        log.error("focus_file_missing", path=focus_file)
+        return
+    try:
+        with sess.session_scope() as s:
+            sections = focus_mod.apply_focus_file(s, text)
+            pinned = 0
+            for eco, entries in sections.items():
+                for e in entries:
+                    if e.pinned_version and enqueue(
+                        s, ecosystem=eco, name=e.name,
+                        version=e.pinned_version, priority="high",
+                    ):
+                        pinned += 1
+        log.info(
+            "focus_file_loaded",
+            path=focus_file,
+            ecosystems={k: len(v) for k, v in sections.items()},
+            pinned_enqueued=pinned,
+        )
+    except Exception as e:
+        log.error("focus_file_load_failed", path=focus_file, error=str(e))
+
+
 def enqueue_one(ecosystem: str, name: str, version: str, priority: str = "normal") -> None:
     with sess.session_scope() as s:
         enqueue(
@@ -83,12 +115,21 @@ def show_findings(ecosystem: str, name: str, version: str) -> None:
             print(f"  [{f.severity}/{f.confidence}] {f.rule_id} {loc} :: {f.evidence}")
 
 
-async def _async_run(workers: int, duration: int) -> None:
+async def _async_run(workers: int, duration: int, focus_file: Optional[str] = None) -> None:
     from pkgsentry.adapter import adapter_registry
     from pkgsentry.workers import run_pool
 
+    # Focused mode (`run -f <file>`): force exclusive ingest BEFORE adapters read
+    # focus_exclusive() in schedule_jobs/boot, then sync the combined file.
+    if focus_file:
+        os.environ["PKGSENTRY_FOCUS_EXCLUSIVE"] = "1"
+
     sess.init_db()
     intel.load()
+
+    if focus_file:
+        sync_focus_file(focus_file)
+
     stop_event = asyncio.Event()
 
     def _request_stop(*_):
@@ -156,5 +197,5 @@ async def _async_run(workers: int, duration: int) -> None:
         await pool_task
 
 
-def run_forever(workers: int = 4, duration: int = 0) -> None:
-    asyncio.run(_async_run(workers=workers, duration=duration))
+def run_forever(workers: int = 4, duration: int = 0, focus_file: Optional[str] = None) -> None:
+    asyncio.run(_async_run(workers=workers, duration=duration, focus_file=focus_file))

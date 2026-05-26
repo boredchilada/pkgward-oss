@@ -1,0 +1,632 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-05-26T00:00:00.000Z" agent="Claude" version="26.0.0" type="device">
+  <diagram id="npm-pipeline" name="npm Ecosystem Pipeline (PLANNED)">
+    <mxGraphModel dx="1800" dy="4500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="4600" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ===== TITLE ===== -->
+        <mxCell id="title" value="&lt;b&gt;npm (JavaScript) Ecosystem Pipeline &amp;mdash; PLANNED&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=20;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="380" y="20" width="620" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="pkgsentry &amp;mdash; npm package ingest, analysis, and triage (NOT YET IMPLEMENTED)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=13;fontStyle=2;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="380" y="55" width="620" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PLANNED BANNER ===== -->
+        <mxCell id="planned_banner" value="&lt;b&gt;PLANNED &amp;mdash; not yet implemented.&lt;/b&gt; npm is the next ecosystem after PyPI, crates.io, and Go modules. All boxes below are dashed/greyed to mark unbuilt work. Endpoints and attack-surface facts are real; pipeline wiring maps onto pkgsentry's universal flow." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;strokeWidth=2;dashed=1;dashPattern=8 4;fontColor=#757575;fontSize=11;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="380" y="92" width="620" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== LEGEND ===== -->
+        <mxCell id="legend_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#cccccc;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="20" y="80" width="220" height="370" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend_title" value="&lt;b&gt;Legend (all PLANNED)&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="50" y="85" width="160" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="118" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1t" value="Phase 1 &amp;mdash; Ingest (_changes cursor)" style="text;html=1;align=left;fontSize=10;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="62" y="113" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="148" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2t" value="Phase 2 &amp;mdash; Watchlist (downloads)" style="text;html=1;align=left;fontSize=10;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="62" y="143" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="178" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3t" value="Phase 3 &amp;mdash; Fetch (.tgz + integrity)" style="text;html=1;align=left;fontSize=10;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="62" y="173" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="208" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg4t" value="Phase 4 &amp;mdash; Extract + Hash" style="text;html=1;align=left;fontSize=10;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="62" y="203" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="238" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg5t" value="Phase 5 &amp;mdash; Install-time (scripts)" style="text;html=1;align=left;fontSize=10;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="62" y="233" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="268" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg6t" value="Phase 6 &amp;mdash; Universal analysis" style="text;html=1;align=left;fontSize=10;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="62" y="263" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="298" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg7t" value="Phase 7 &amp;mdash; Detonation (npm install)" style="text;html=1;align=left;fontSize=10;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="62" y="293" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg8" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="328" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg8t" value="Phase 8 &amp;mdash; Score + LLM + Alert" style="text;html=1;align=left;fontSize=10;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="62" y="323" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg9" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="358" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg9t" value="Log events" style="text;html=1;align=left;fontSize=10;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="62" y="353" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg10" value="" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="35" y="386" width="20" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg10t" value="Decision" style="text;html=1;align=left;fontSize=10;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="62" y="383" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg_note" value="&lt;i&gt;Dashed grey = unbuilt&lt;/i&gt;" style="text;html=1;align=center;fontSize=9;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="35" y="415" width="190" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== NPM SPECIFICS CALLOUT ===== -->
+        <mxCell id="diff_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;strokeWidth=2;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="92" width="380" height="320" as="geometry"/>
+        </mxCell>
+        <mxCell id="diff_title" value="&lt;b&gt;npm specifics (planned design)&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="100" width="260" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="diff_items" value="&lt;div style=&quot;text-align:left;font-size:11px;line-height:1.6;color:#757575;&quot;&gt;&lt;b&gt;1.&lt;/b&gt; Ingest via CouchDB &lt;font face=&quot;Courier New&quot;&gt;_changes&lt;/font&gt; feed&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;cursor (seq) &amp;mdash; not RSS&lt;br&gt;&lt;b&gt;2.&lt;/b&gt; &lt;font face=&quot;Courier New&quot;&gt;since&lt;/font&gt; seq NOT guaranteed monotonic&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;(reset on CouchDB upgrades)&lt;br&gt;&lt;b&gt;3.&lt;/b&gt; Single .tgz archive (gzip tar, &lt;font face=&quot;Courier New&quot;&gt;package/&lt;/font&gt;)&lt;br&gt;&lt;b&gt;4.&lt;/b&gt; Integrity = SRI &lt;font face=&quot;Courier New&quot;&gt;sha512&lt;/font&gt; from dist (+shasum)&lt;br&gt;&lt;b&gt;5.&lt;/b&gt; Scoped names &lt;font face=&quot;Courier New&quot;&gt;@scope/name&lt;/font&gt; in URL path&lt;br&gt;&lt;b&gt;6.&lt;/b&gt; Primary RCE = package.json lifecycle&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;scripts (preinstall/install/postinstall)&lt;br&gt;&lt;b&gt;7.&lt;/b&gt; Detonation runs &lt;font face=&quot;Courier New&quot;&gt;npm install&lt;/font&gt; with&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;scripts ENABLED in rootless Docker&lt;br&gt;&lt;b&gt;8.&lt;/b&gt; Watchlist from npm downloads API&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1015" y="130" width="350" height="270" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== START ===== -->
+        <mxCell id="start" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#9e9e9e;strokeColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="630" y="170" width="40" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 1 - INGEST                                                 -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="240" width="740" height="500" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p1_label" value="&lt;b&gt;Phase 1 &amp;mdash; Ingest&lt;/b&gt;  (CouchDB _changes feed, cursor-based)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="250" y="245" width="420" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- _changes feed -->
+        <mxCell id="n_changes" value="&lt;b&gt;Poll _changes feed&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;replicate.npmjs.com/_changes?since={seq}&lt;/font&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;&amp;feed=continuous (or longpoll)&lt;/font&gt;&lt;br&gt;Each row: {seq, id (pkg name), changes}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="380" y="290" width="460" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_start_changes" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="start" target="n_changes" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- cursor -->
+        <mxCell id="n_cursor" value="&lt;b&gt;Track seq in ScanCursor&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;seq NOT guaranteed monotonic&lt;br&gt;(reset on CouchDB upgrades) &amp;mdash; treat as opaque&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="260" y="300" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_changes_cursor" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_changes" target="n_cursor" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- fetch metadata -->
+        <mxCell id="n_meta" value="&lt;b&gt;Fetch package metadata&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;GET registry.npmjs.org/{pkg}&lt;/font&gt;&lt;br&gt;&amp;rarr; dist-tags, versions{}, time{}, maintainers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="420" y="400" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_changes_meta" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_changes" target="n_meta" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Ingest gate decision -->
+        <mxCell id="d_gate" value="&lt;b&gt;Ingest gate:&lt;br&gt;watchlist OR&lt;br&gt;brand-new pkg?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="540" y="500" width="140" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_meta_gate" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_meta" target="d_gate" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- skip -->
+        <mxCell id="n_skip_ingest" value="&lt;font color=&quot;#9e9e9e&quot;&gt;Existing non-watchlist&lt;br&gt;version update &amp;rarr; SKIP&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="780" y="515" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_gate_skip" value="No" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;fontColor=#9e9e9e;" edge="1" source="d_gate" target="n_skip_ingest" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- enqueue -->
+        <mxCell id="n_enqueue" value="&lt;b&gt;Enqueue to scan_queue&lt;/b&gt;&lt;br&gt;(name, version, ecosystem=&quot;npm&quot;)&lt;br&gt;watchlist &amp;rarr; high  |  brand-new &amp;rarr; normal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="450" y="620" width="320" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_gate_enqueue" value="Yes" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;fontColor=#757575;" edge="1" source="d_gate" target="n_enqueue" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- log ingest -->
+        <mxCell id="n_log_ingest" value="log: &lt;b&gt;changes_polled&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;(last_seq, new_items)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="800" y="630" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_enqueue_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_enqueue" target="n_log_ingest" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 2 - WATCHLIST                                              -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="770" width="740" height="270" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p2_label" value="&lt;b&gt;Phase 2 &amp;mdash; Watchlist&lt;/b&gt;  (top packages by downloads, weekly refresh)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="250" y="775" width="420" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- watchlist source -->
+        <mxCell id="n_wl_source" value="&lt;b&gt;Build top ~10K npm watchlist&lt;/b&gt;&lt;br&gt;Source: top-packages list + npm downloads API&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;api.npmjs.org/downloads/point/last-week/{pkg}&lt;/font&gt;&lt;br&gt;(bulk: comma-separated, scoped pkgs excluded from bulk)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="400" y="810" width="420" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_enqueue_wl" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_enqueue" target="n_wl_source" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- delete-reinsert -->
+        <mxCell id="n_wl_reinsert" value="&lt;b&gt;Delete-and-reinsert&lt;/b&gt;&lt;br&gt;on weekly refresh; matched against _changes ids&lt;br&gt;(protects high-blast-radius packages)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="430" y="920" width="360" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_wl_reinsert" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_wl_source" target="n_wl_reinsert" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- UA note -->
+        <mxCell id="n_wl_ua" value="User-Agent:&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;pkgsentry/${VERSION} (+${CONTACT})&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="260" y="925" width="150" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_wl_ua" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_wl_reinsert" target="n_wl_ua" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- log watchlist -->
+        <mxCell id="n_log_wl" value="log: &lt;b&gt;watchlist_refreshed&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;(count=10000, duration_s)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="800" y="930" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_wl_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_wl_reinsert" target="n_log_wl" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 3 - FETCH                                                  -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="1070" width="740" height="430" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p3_label" value="&lt;b&gt;Phase 3 &amp;mdash; Fetch&lt;/b&gt;  (async I/O, integrity verify)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1075" width="360" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- step 1: integrity from dist -->
+        <mxCell id="n_fetch_int" value="&lt;b&gt;Step 1: read dist.integrity + dist.shasum&lt;/b&gt;&lt;br&gt;from version metadata (versions[v].dist)&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;integrity = sha512-&amp;lt;base64&amp;gt; (SRI), shasum = sha1&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="400" y="1115" width="420" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_wl_int" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_wl_reinsert" target="n_fetch_int" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- step 2: download tgz -->
+        <mxCell id="n_fetch_tgz" value="&lt;b&gt;Step 2: download .tgz&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;registry.npmjs.org/{pkg}/-/{pkg}-{version}.tgz&lt;/font&gt;&lt;br&gt;scoped: &lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;/@{scope}/{name}/-/{name}-{version}.tgz&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;gzip tarball, single archive (no wheel equivalent)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="380" y="1215" width="460" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_int_tgz" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_fetch_int" target="n_fetch_tgz" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- verify integrity -->
+        <mxCell id="n_verify" value="&lt;b&gt;Verify integrity (sha512 SRI)&lt;/b&gt;&lt;br&gt;post-download against dist.integrity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="450" y="1325" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_tgz_verify" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_fetch_tgz" target="n_verify" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- fetch ok? -->
+        <mxCell id="d_fetch_ok" value="&lt;b&gt;Fetch OK?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="550" y="1410" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_verify_ok" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_verify" target="d_fetch_ok" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_fetchok_fail" value="No" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;fontColor=#9e9e9e;" edge="1" source="d_fetch_ok" target="n_error" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1100" y="1440"/>
+              <mxPoint x="1100" y="4290"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- log downloaded -->
+        <mxCell id="n_log_dl" value="log: &lt;b&gt;downloaded&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;(archive=1, total_mb)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1420" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_fetchok_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="d_fetch_ok" target="n_log_dl" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 4 - EXTRACT + HASH                                         -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="1530" width="740" height="260" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p4_label" value="&lt;b&gt;Phase 4 &amp;mdash; Extract + Hash&lt;/b&gt;  (asyncio.to_thread)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1535" width="360" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- extract -->
+        <mxCell id="n_extract" value="&lt;b&gt;safe_extract()&lt;/b&gt;&lt;br&gt;Single .tgz (gzip tarball), strip &lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;package/&lt;/font&gt; prefix&lt;br&gt;25K file cap; reject symlinks / path traversal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1570" width="380" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_fetchok_extract" value="Yes" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;fontColor=#757575;" edge="1" source="d_fetch_ok" target="n_extract" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- hash -->
+        <mxCell id="n_hash" value="&lt;b&gt;Compute per-file hashes&lt;/b&gt;&lt;br&gt;SHA256 + entropy + ssdeep (ppdeep)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="450" y="1680" width="320" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_extract_hash" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_extract" target="n_hash" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- log extracted -->
+        <mxCell id="n_log_extract" value="log: &lt;b&gt;extracted&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;(kind=tgz, files, duration_s)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1690" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_hash_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_hash" target="n_log_extract" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 5 - INSTALL-TIME ANALYSIS                                  -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="1820" width="740" height="540" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p5_label" value="&lt;b&gt;Phase 5 &amp;mdash; Install-time Analysis&lt;/b&gt;  (package.json lifecycle scripts)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1825" width="420" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- parse package.json -->
+        <mxCell id="n_pkgjson" value="&lt;b&gt;Parse package.json&lt;/b&gt;&lt;br&gt;Extract &lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;scripts{}&lt;/font&gt;, &lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;bin{}&lt;/font&gt;, &lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;dependencies&lt;/font&gt;&lt;br&gt;Lifecycle hooks: preinstall / install / postinstall / prepare" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="410" y="1860" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_hash_pkgjson" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_hash" target="n_pkgjson" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- analysis approach note -->
+        <mxCell id="n_approach" value="&lt;font color=&quot;#9e9e9e&quot;&gt;Planned: opengrep JS/TS rules&lt;br&gt;(layer 12) over scripts &amp;amp; bin targets&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="260" y="1865" width="190" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_pkgjson_approach" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_pkgjson" target="n_approach" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- rules box -->
+        <mxCell id="n_rules_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;opacity=80;" vertex="1" parent="1">
+          <mxGeometry x="290" y="1965" width="640" height="370" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_rules_title" value="&lt;b&gt;Planned npm install-time detection rules&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1970" width="380" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- rule 1 -->
+        <mxCell id="r1_name" value="npm.lifecycle_net_exec_chain" style="label;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2003" width="230" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1_sev" value="CRITICAL" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="550" y="2003" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1_desc" value="install script does network fetch + child_process exec / eval" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="615" y="2003" width="300" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- rule 2 -->
+        <mxCell id="r2_name" value="npm.install_script_present" style="label;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2035" width="230" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r2_sev" value="MEDIUM" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="550" y="2035" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r2_desc" value="preinstall / install / postinstall hook present at all" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="615" y="2035" width="300" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- rule 3 -->
+        <mxCell id="r3_name" value="npm.install_script_exec" style="label;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2067" width="230" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r3_sev" value="HIGH" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="550" y="2067" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r3_desc" value="lifecycle script spawns shell / curl / node -e / powershell" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="615" y="2067" width="300" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- rule 4 -->
+        <mxCell id="r4_name" value="npm.suspicious_bin_entry" style="label;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2099" width="230" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r4_sev" value="MEDIUM" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="550" y="2099" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r4_desc" value="bin{} points to obfuscated / non-source target" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="615" y="2099" width="300" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- rule 5 -->
+        <mxCell id="r5_name" value="npm.obfuscated_payload" style="label;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2131" width="230" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r5_sev" value="HIGH" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="550" y="2131" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r5_desc" value="minified/packed .js, large base64/hex blobs, hex-escaped strings" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="615" y="2131" width="300" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- rule 6 -->
+        <mxCell id="r6_name" value="npm.ioc_network_chain" style="label;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2163" width="230" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r6_sev" value="HIGH" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="550" y="2163" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r6_desc" value="hardcoded IP/onion/exfil URL reached from install code" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="615" y="2163" width="300" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- rule 7 -->
+        <mxCell id="r7_name" value="npm.typosquat_name" style="label;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontSize=10;rounded=1;arcSize=20;spacingLeft=4;spacingRight=4;align=center;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="310" y="2195" width="230" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r7_sev" value="HIGH" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="550" y="2195" width="60" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="r7_desc" value="name within edit-distance of top-10K (typosquat / dependency confusion)" style="text;html=1;align=left;fontSize=9;fontColor=#9e9e9e;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="615" y="2195" width="300" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- sev legend -->
+        <mxCell id="sev_legend" value="&lt;font size=&quot;1&quot;&gt;&lt;b&gt;Severity (planned scoring):&lt;/b&gt; CRITICAL (60pt) | HIGH (25pt) | MEDIUM (8pt) | LOW (1pt) &amp;mdash; shared with all ecosystems&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="320" y="2240" width="580" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="sev_note2" value="&lt;font size=&quot;1&quot; color=&quot;#9e9e9e&quot;&gt;&lt;i&gt;Rule IDs illustrative &amp;mdash; final set defined when the adapter ships.&lt;/i&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="320" y="2270" width="580" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_pkgjson_rules" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_pkgjson" target="n_rules_box" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 6 - UNIVERSAL ANALYSIS                                     -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="2390" width="740" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p6_label" value="&lt;b&gt;Phase 6 &amp;mdash; Universal Analysis&lt;/b&gt;  (shared layers, same as PyPI/crates/Go)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="250" y="2395" width="430" height="24" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n_universal" value="&lt;b&gt;Universal Analyzers&lt;/b&gt;&lt;br&gt;analyze_iocs, analyze_malware_patterns, analyze_metadata,&lt;br&gt;analyze_entropy, analyze_binary_artifacts, analyze_yara,&lt;br&gt;opengrep (JS/TS taint), threat_intel (SHA256/ssdeep/TLSH), version_diff" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="340" y="2430" width="540" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rules_universal" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_rules_box" target="n_universal" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n_log_analyzed" value="log: &lt;b&gt;analyzed&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;(kind, findings, duration_s)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="280" y="2440" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_univ_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_universal" target="n_log_analyzed" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 7 - DETONATION                                             -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="2620" width="740" height="280" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation&lt;/b&gt;  (rootless Docker + Tetragon eBPF)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="250" y="2625" width="420" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- detonate -->
+        <mxCell id="n_detonate" value="&lt;b&gt;Detonate in rootless-Docker sandbox&lt;/b&gt;&lt;br&gt;Run &lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;npm install&lt;/font&gt; with lifecycle scripts ENABLED&lt;br&gt;(scripts run preinstall &amp;rarr; install &amp;rarr; postinstall)&lt;br&gt;Tetragon traces exec / network / file syscalls" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="400" y="2660" width="420" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_univ_detonate" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_universal" target="n_detonate" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- detonation notes -->
+        <mxCell id="n_det_note" value="&lt;font color=&quot;#9e9e9e&quot;&gt;Sandbox = runc / rootless Docker&lt;br&gt;(NOT system Docker; isolated daemon).&lt;br&gt;Same model as PyPI detonation.&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="260" y="2665" width="190" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_detonate_note" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_detonate" target="n_det_note" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- re-score -->
+        <mxCell id="n_rescore" value="&lt;b&gt;Re-score with behavioral findings&lt;/b&gt;&lt;br&gt;Merge Tetragon trace rules into findings, then re-score" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="430" y="2790" width="360" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_detonate_rescore" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_detonate" target="n_rescore" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- log detonation -->
+        <mxCell id="n_log_det" value="log: &lt;b&gt;detonated&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;(events, rule_hits, duration_s)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="280" y="2800" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rescore_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_rescore" target="n_log_det" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================================================ -->
+        <!-- PHASE 8 - SCORE + LLM + ALERT                                    -->
+        <!-- ================================================================ -->
+        <mxCell id="bg_p8" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="2930" width="740" height="540" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_p8_label" value="&lt;b&gt;Phase 8 &amp;mdash; Score + LLM Triage + Alert&lt;/b&gt;  (if verdict == malicious)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="250" y="2935" width="430" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- score -->
+        <mxCell id="n_score" value="&lt;b&gt;score_and_verdict()&lt;/b&gt;&lt;br&gt;Points: low=1, med=8, high=25, crit=60&lt;br&gt;suspicious &amp;ge; 20, malicious &amp;ge; 61 (shared)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="430" y="2970" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_rescore_score" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_rescore" target="n_score" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- verdict -->
+        <mxCell id="d_verdict" value="&lt;b&gt;verdict ==&lt;br&gt;malicious?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="545" y="3070" width="130" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_score_verdict" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_score" target="d_verdict" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- skip llm -->
+        <mxCell id="n_skip_llm" value="&lt;font color=&quot;#9e9e9e&quot;&gt;Skip LLM triage&lt;br&gt;Persist scan results&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontStyle=2;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="780" y="3085" width="170" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_verdict_no" value="No" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;fontColor=#9e9e9e;" edge="1" source="d_verdict" target="n_skip_llm" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- llm -->
+        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;OpenRouter &amp;rarr; GLM-5.1 (cost-gated)&lt;br&gt;Spotlighting anti-injection&lt;br&gt;Can override: malicious &amp;rarr; benign" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="440" y="3190" width="340" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_verdict_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;fontColor=#757575;" edge="1" source="d_verdict" target="n_llm" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- llm confirm -->
+        <mxCell id="d_llm_confirm" value="&lt;b&gt;LLM confirms&lt;br&gt;malicious?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="545" y="3310" width="130" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llm_confirm" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_llm" target="d_llm_confirm" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- benign override -->
+        <mxCell id="n_llm_benign" value="&lt;font color=&quot;#9e9e9e&quot;&gt;Override to benign&lt;br&gt;Persist results&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontStyle=2;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="780" y="3325" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llm_no" value="No" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;fontColor=#9e9e9e;" edge="1" source="d_llm_confirm" target="n_llm_benign" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- discord -->
+        <mxCell id="n_discord" value="&lt;b&gt;Discord webhook&lt;/b&gt;&lt;br&gt;alert notification" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="510" y="3420" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llm_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;fontColor=#757575;" edge="1" source="d_llm_confirm" target="n_discord" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- log llm -->
+        <mxCell id="n_log_llm" value="log: &lt;b&gt;llm_triage_done&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;(cost, latency, verdict)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="280" y="3205" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_llm_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_llm" target="n_log_llm" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- cleanup -->
+        <mxCell id="n_cleanup" value="&lt;b&gt;Persist + Cleanup&lt;/b&gt;&lt;br&gt;Upsert Package/Version, Scan, Findings, FileHash&lt;br&gt;Bump RuleHit counters&lt;br&gt;Remove temp dirs (pkgsentry_npm)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+          <mxGeometry x="400" y="3520" width="420" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_discord_cleanup" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_discord" target="n_cleanup" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_skipllm_cleanup" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_skip_llm" target="n_cleanup" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="865" y="3500"/>
+              <mxPoint x="610" y="3500"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_llmbenign_cleanup" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_llm_benign" target="n_cleanup" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="860" y="3495"/>
+              <mxPoint x="610" y="3495"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- log done -->
+        <mxCell id="n_log_done" value="log: &lt;b&gt;scan_done&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;(verdict, score, n_findings)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="280" y="3535" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_cleanup_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_cleanup" target="n_log_done" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- end -->
+        <mxCell id="end" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#9e9e9e;strokeColor=#9e9e9e;" vertex="1" parent="1">
+          <mxGeometry x="590" y="3640" width="40" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_cleanup_end" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_cleanup" target="end" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== ERROR PATH ===== -->
+        <mxCell id="n_error" value="&lt;b&gt;ERROR PATH&lt;/b&gt;&lt;br&gt;&lt;br&gt;Any unhandled exception &amp;rarr;&lt;br&gt;log: &lt;b&gt;pipeline_failed&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9e9e9e&quot;&gt;(error_type, error)&lt;/font&gt;&lt;br&gt;&amp;rarr; mark_failed(row, token)&lt;br&gt;&amp;rarr; cleanup temp dirs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;fontColor=#9e9e9e;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="960" y="4230" width="260" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="n_error_label" value="&lt;font color=&quot;#9e9e9e&quot;&gt;&lt;i&gt;Any step can reach&lt;br&gt;error path on exception&lt;/i&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="4180" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_error_end" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#bdbdbd;dashed=1;" edge="1" source="n_error" target="end" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1090" y="4400"/>
+              <mxPoint x="610" y="4400"/>
+              <mxPoint x="610" y="3680"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

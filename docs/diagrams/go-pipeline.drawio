@@ -1,42 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="app.diagrams.net" modified="2026-05-23T00:00:00.000Z" agent="draw.io" version="24.0.0" type="device">
-  <diagram id="go-pipeline" name="Go Modules Ecosystem Pipeline (PLANNED)">
+  <diagram id="go-pipeline" name="Go Modules Ecosystem Pipeline">
     <mxGraphModel dx="1800" dy="2400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="4200" math="0" shadow="0">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
 
         <!-- ===== TITLE ===== -->
-        <mxCell id="title" value="&lt;b&gt;Go Modules Ecosystem Pipeline (PLANNED)&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=20;" vertex="1" parent="1">
+        <mxCell id="title" value="&lt;b&gt;Go Modules Ecosystem Pipeline&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=20;" vertex="1" parent="1">
           <mxGeometry x="370" y="20" width="520" height="40" as="geometry"/>
         </mxCell>
 
         <!-- ===== STATUS BANNER ===== -->
-        <mxCell id="status_banner" value="&lt;b&gt;Status: DEFERRED&lt;/b&gt;&lt;br&gt;&lt;br&gt;Go is largely GitHub-based with no official download counts for watchlist prioritization.&lt;br&gt;Watchlist source is the primary blocker &amp;mdash; no equivalent of PyPI stats or crates.io download sort.&lt;br&gt;&lt;br&gt;&lt;i&gt;Reference: docs/ecosystems-reference.md for research notes&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#7f1d1d;fontSize=12;dashed=1;dashPattern=8 4;shadow=1;spacingLeft=12;spacingRight=12;" vertex="1" parent="1">
+        <mxCell id="status_banner" value="&lt;b&gt;Status: ACTIVE in production&lt;/b&gt;&lt;br&gt;&lt;br&gt;Ingest, watchlist, fetch, extract, static analysis, and detonation all run for Go modules.&lt;br&gt;Watchlist (~9K) is built from GitHub stars + awesome-go + critical-infrastructure modules &amp;mdash; no official download API needed.&lt;br&gt;&lt;br&gt;&lt;i&gt;Reference: docs/ecosystems-reference.md (Go modules &amp;mdash; ACTIVE)&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#2d5016;fontSize=12;shadow=1;spacingLeft=12;spacingRight=12;" vertex="1" parent="1">
           <mxGeometry x="310" y="70" width="640" height="100" as="geometry"/>
         </mxCell>
 
         <!-- ===== PHASE 1 — INGEST ===== -->
-        <!-- Phase background (dashed = planned) -->
-        <mxCell id="bg_p1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=30;arcSize=4;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+        <!-- Phase background -->
+        <mxCell id="bg_p1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="200" width="860" height="340" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p1_label" value="&lt;b&gt;Phase 1 &amp;mdash; Ingest&lt;/b&gt;  [PLANNED]" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#1a3a6b;" vertex="1" parent="1">
-          <mxGeometry x="230" y="205" width="250" height="24" as="geometry"/>
+        <mxCell id="bg_p1_label" value="&lt;b&gt;Phase 1 &amp;mdash; Ingest&lt;/b&gt;  (NDJSON index cursor, every 60s)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#1a3a6b;" vertex="1" parent="1">
+          <mxGeometry x="230" y="205" width="400" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_ndjson" value="&lt;b&gt;NDJSON feed&lt;/b&gt;&lt;br&gt;&lt;code&gt;index.golang.org/index?since=&amp;lt;timestamp&amp;gt;&lt;/code&gt;&lt;br&gt;&lt;br&gt;Returns lines of:&lt;br&gt;&lt;code&gt;{&amp;quot;Path&amp;quot;:&amp;quot;...&amp;quot;,&amp;quot;Version&amp;quot;:&amp;quot;...&amp;quot;,&amp;quot;Timestamp&amp;quot;:&amp;quot;...&amp;quot;}&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_ndjson" value="&lt;b&gt;NDJSON index feed&lt;/b&gt;&lt;br&gt;&lt;code&gt;index.golang.org/index?since=&amp;lt;timestamp&amp;gt;&lt;/code&gt;&lt;br&gt;&lt;br&gt;Returns lines of:&lt;br&gt;&lt;code&gt;{&amp;quot;Path&amp;quot;:&amp;quot;...&amp;quot;,&amp;quot;Version&amp;quot;:&amp;quot;...&amp;quot;,&amp;quot;Timestamp&amp;quot;:&amp;quot;...&amp;quot;}&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="430" y="240" width="400" height="90" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_poll" value="&lt;b&gt;Continuous streaming&lt;/b&gt;&lt;br&gt;Poll with last-seen timestamp&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;No RSS feeds, no XML-RPC&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_poll" value="&lt;b&gt;Cursor-based polling&lt;/b&gt;&lt;br&gt;Page with last-seen timestamp, persisted in ScanCursor&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Pseudo-versions skipped (GOMOD_SCAN_PSEUDO=0)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="460" y="350" width="340" height="60" as="geometry"/>
         </mxCell>
         <mxCell id="e_ndjson_poll" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_ndjson" target="n_poll" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_watchlist_q" value="&lt;b&gt;?&lt;/b&gt; Watchlist source TBD&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;No official download counts&lt;/font&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;dashPattern=5 3;fontColor=#cc0000;" vertex="1" parent="1">
+        <mxCell id="n_watchlist_q" value="&lt;b&gt;On watchlist&lt;br&gt;or brand-new?&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;watchlist=high, new=normal&lt;/font&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="480" y="430" width="300" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="e_poll_wq" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_poll" target="n_watchlist_q" parent="1">
@@ -44,24 +44,24 @@
         </mxCell>
 
         <!-- ===== PHASE 2 — WATCHLIST ===== -->
-        <mxCell id="bg_p2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=30;arcSize=4;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+        <mxCell id="bg_p2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="570" width="860" height="340" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p2_label" value="&lt;b&gt;Phase 2 &amp;mdash; Watchlist&lt;/b&gt;  [PLANNED &amp;mdash; PRIMARY BLOCKER]" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#2d5016;" vertex="1" parent="1">
+        <mxCell id="bg_p2_label" value="&lt;b&gt;Phase 2 &amp;mdash; Watchlist&lt;/b&gt;  (~9K modules, weekly refresh)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#2d5016;" vertex="1" parent="1">
           <mxGeometry x="230" y="575" width="400" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_problem" value="&lt;b&gt;PROBLEM:&lt;/b&gt; Go has no equivalent of PyPI download&lt;br&gt;stats or crates.io download sort API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;dashPattern=5 3;fontColor=#7f1d1d;" vertex="1" parent="1">
+        <mxCell id="n_problem" value="&lt;b&gt;Watchlist built from three sources&lt;/b&gt; &amp;mdash; combined &amp;amp; ranked&lt;br&gt;by star count; ~9K module paths total" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#2d5016;" vertex="1" parent="1">
           <mxGeometry x="400" y="610" width="460" height="50" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_src1" value="&lt;b&gt;pkg.go.dev popularity&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;TBD &amp;mdash; no public API&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_src1" value="&lt;b&gt;GitHub stars&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;language:go, bucketed star queries&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="280" y="690" width="220" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="n_src2" value="&lt;b&gt;GitHub stars as proxy&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;TBD &amp;mdash; noisy, not authoritative&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_src2" value="&lt;b&gt;awesome-go&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;curated module paths from README&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="540" y="690" width="220" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="n_src3" value="&lt;b&gt;Manual curation&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;TBD &amp;mdash; labor-intensive&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_src3" value="&lt;b&gt;Critical infrastructure&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;k8s.io, golang.org/x, etc.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="800" y="690" width="200" height="50" as="geometry"/>
         </mxCell>
 
@@ -75,7 +75,7 @@
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_target_size" value="&lt;b&gt;Target watchlist size: TBD&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Depends on chosen source&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_target_size" value="&lt;b&gt;~9K watchlist &amp;rarr; resolve @latest via GOPROXY&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;proxy.golang.org/{module}/@latest, concurrency=20&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="460" y="780" width="340" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="e_src1_target" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_src1" target="n_target_size" parent="1">
@@ -88,26 +88,26 @@
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_wq_to_p2" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#999999;" edge="1" source="n_watchlist_q" target="n_problem" parent="1">
+        <mxCell id="n_wq_to_p2" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_watchlist_q" target="n_problem" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
         <!-- ===== PHASE 3 — FETCH ===== -->
-        <mxCell id="bg_p3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=30;arcSize=4;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+        <mxCell id="bg_p3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="940" width="860" height="370" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p3_label" value="&lt;b&gt;Phase 3 &amp;mdash; Fetch&lt;/b&gt;  [PLANNED]" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b5900;" vertex="1" parent="1">
-          <mxGeometry x="230" y="945" width="250" height="24" as="geometry"/>
+        <mxCell id="bg_p3_label" value="&lt;b&gt;Phase 3 &amp;mdash; Fetch&lt;/b&gt;  (GOPROXY protocol, async I/O)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b5900;" vertex="1" parent="1">
+          <mxGeometry x="230" y="945" width="340" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_proxy" value="&lt;b&gt;Module proxy download&lt;/b&gt;&lt;br&gt;&lt;code&gt;proxy.golang.org/{module}/@v/{version}.zip&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_proxy" value="&lt;b&gt;GOPROXY zip download&lt;/b&gt;&lt;br&gt;&lt;code&gt;proxy.golang.org/{module}/@v/{version}.zip&lt;/code&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;case-encoded path (Burnt&amp;rarr;!burnt); 404/410 &amp;rarr; NoFilesError&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="420" y="980" width="420" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="e_target_proxy" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_target_size" target="n_proxy" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_meta" value="&lt;b&gt;Also fetch:&lt;/b&gt;&lt;br&gt;&lt;code&gt;.info&lt;/code&gt; (metadata JSON) + &lt;code&gt;.mod&lt;/code&gt; (go.mod file)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_meta" value="&lt;b&gt;Also fetch:&lt;/b&gt;&lt;br&gt;&lt;code&gt;.info&lt;/code&gt; metadata JSON &amp;rarr; pkg.go.dev home_page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="300" y="1050" width="280" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="e_proxy_meta" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_proxy" target="n_meta" parent="1">
@@ -121,7 +121,7 @@
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_sumdb" value="&lt;b&gt;Verify via sum.golang.org&lt;/b&gt;&lt;br&gt;Transparency log checksums (go.sum format)&lt;br&gt;SHA256 verification" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_sumdb" value="&lt;b&gt;SHA256 hash of downloaded zip&lt;/b&gt;&lt;br&gt;recorded on the ArchivePath&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(GOPROXY content already integrity-backed by the module proxy)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="400" y="1120" width="460" height="60" as="geometry"/>
         </mxCell>
         <mxCell id="e_meta_sumdb" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_meta" target="n_sumdb" parent="1">
@@ -137,21 +137,21 @@
         </mxCell>
 
         <!-- ===== PHASE 4 — EXTRACT + HASH ===== -->
-        <mxCell id="bg_p4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=30;arcSize=4;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+        <mxCell id="bg_p4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="1340" width="860" height="240" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p4_label" value="&lt;b&gt;Phase 4 &amp;mdash; Extract + Hash&lt;/b&gt;  [PLANNED]" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#2d5016;" vertex="1" parent="1">
-          <mxGeometry x="230" y="1345" width="300" height="24" as="geometry"/>
+        <mxCell id="bg_p4_label" value="&lt;b&gt;Phase 4 &amp;mdash; Extract + Hash&lt;/b&gt;  (asyncio.to_thread)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#2d5016;" vertex="1" parent="1">
+          <mxGeometry x="230" y="1345" width="340" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_extract" value="&lt;b&gt;safe_extract()&lt;/b&gt;&lt;br&gt;Same as other ecosystems&lt;br&gt;10K file cap, 500MB cap, reject symlinks/path traversal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_extract" value="&lt;b&gt;safe_extract()&lt;/b&gt;&lt;br&gt;Same as other ecosystems (strips_top_dir)&lt;br&gt;file cap, size cap, reject symlinks/path traversal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="430" y="1380" width="400" height="60" as="geometry"/>
         </mxCell>
         <mxCell id="e_sumdb_extract" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_sumdb" target="n_extract" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_hash" value="&lt;b&gt;SHA256 + entropy + ssdeep&lt;/b&gt;&lt;br&gt;per-file hashing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_hash" value="&lt;b&gt;SHA256 + entropy + ssdeep&lt;/b&gt;&lt;br&gt;per-file hashing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="470" y="1460" width="320" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="e_extract_hash" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_extract" target="n_hash" parent="1">
@@ -163,30 +163,30 @@
         </mxCell>
 
         <!-- ===== PHASE 5 — INSTALL-TIME ANALYSIS ===== -->
-        <mxCell id="bg_p5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=30;arcSize=4;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+        <mxCell id="bg_p5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="1610" width="860" height="380" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p5_label" value="&lt;b&gt;Phase 5 &amp;mdash; Install-time Analysis&lt;/b&gt;  [PLANNED &amp;mdash; RULE DESIGN TBD]" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#4a2d6b;" vertex="1" parent="1">
-          <mxGeometry x="230" y="1615" width="420" height="24" as="geometry"/>
+        <mxCell id="bg_p5_label" value="&lt;b&gt;Phase 5 &amp;mdash; Install-time Analysis&lt;/b&gt;  (go_directives.py, regex + brace-matching)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#4a2d6b;" vertex="1" parent="1">
+          <mxGeometry x="230" y="1615" width="500" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_install_note" value="&lt;b&gt;Go has no direct equivalent of setup.py or build.rs&lt;/b&gt;&lt;br&gt;Target: TBD &amp;mdash; possible attack surfaces below" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;dashPattern=5 3;fontColor=#4a2d6b;" vertex="1" parent="1">
+        <mxCell id="n_install_note" value="&lt;b&gt;analyze_go_directives()&lt;/b&gt; &amp;mdash; Go has no setup.py/build.rs;&lt;br&gt;scans .go + go.mod for auto-executing &amp;amp; build-time attack surfaces" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#4a2d6b;" vertex="1" parent="1">
           <mxGeometry x="370" y="1650" width="520" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="e_hash_install" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_hash" target="n_install_note" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_gogen" value="&lt;b&gt;go:generate directives&lt;/b&gt;&lt;br&gt;Can run arbitrary commands at build time&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;TBD&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_gogen" value="&lt;b&gt;//go:generate&lt;/b&gt;&lt;br&gt;&lt;code&gt;go_generate_exec&lt;/code&gt; (CRIT) / &lt;code&gt;go_generate&lt;/code&gt; (low)&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;benign-tool whitelist from intel pack&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="250" y="1730" width="240" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="n_init" value="&lt;b&gt;init() functions&lt;/b&gt;&lt;br&gt;Run on import &amp;mdash; could be weaponized&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;TBD&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_init" value="&lt;b&gt;init() body analysis&lt;/b&gt;&lt;br&gt;&lt;code&gt;init_exec_chain&lt;/code&gt; (CRIT), &lt;code&gt;init_net_chain&lt;/code&gt;,&lt;br&gt;&lt;code&gt;init_env_harvest&lt;/code&gt; + coexist fallbacks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="520" y="1730" width="220" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="n_cgo" value="&lt;b&gt;CGO code&lt;/b&gt;&lt;br&gt;&lt;code&gt;import &amp;quot;C&amp;quot;&lt;/code&gt; blocks can embed&lt;br&gt;arbitrary C code&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;TBD&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_cgo" value="&lt;b&gt;CGo&lt;/b&gt;&lt;br&gt;&lt;code&gt;import &amp;quot;C&amp;quot;&lt;/code&gt; blocks embed C code&lt;br&gt;&lt;code&gt;cgo_exec_chain&lt;/code&gt; (CRIT) /&lt;br&gt;&lt;code&gt;cgo_import&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="770" y="1730" width="220" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="n_plugin" value="&lt;b&gt;Plugin loading&lt;/b&gt;&lt;br&gt;&lt;code&gt;plugin.Open()&lt;/code&gt; for dynamic code&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;TBD&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_plugin" value="&lt;b&gt;replace + unsafe + encoded&lt;/b&gt;&lt;br&gt;&lt;code&gt;replace_local_path&lt;/code&gt; / &lt;code&gt;replace_directive&lt;/code&gt; hijack,&lt;br&gt;&lt;code&gt;unsafe_import&lt;/code&gt;, &lt;code&gt;encoded_payload&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="380" y="1830" width="220" height="60" as="geometry"/>
         </mxCell>
 
@@ -203,7 +203,7 @@
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_rule_design" value="&lt;b&gt;Rule design: TBD&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Need Go-specific heuristics for each surface&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;dashPattern=5 3;fontColor=#4a2d6b;" vertex="1" parent="1">
+        <mxCell id="n_rule_design" value="&lt;b&gt;Collect install-time findings&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;13 Go-specific rules, scoped to changed files on version diff&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#4a2d6b;" vertex="1" parent="1">
           <mxGeometry x="430" y="1920" width="400" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="e_gogen_rule" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_gogen" target="n_rule_design" parent="1">
@@ -220,14 +220,14 @@
         </mxCell>
 
         <!-- ===== PHASE 6 — UNIVERSAL ANALYSIS ===== -->
-        <mxCell id="bg_p6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=30;arcSize=4;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+        <mxCell id="bg_p6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="2020" width="860" height="240" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p6_label" value="&lt;b&gt;Phase 6 &amp;mdash; Universal Analysis&lt;/b&gt;  [PLANNED]" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#4a2d6b;" vertex="1" parent="1">
-          <mxGeometry x="230" y="2025" width="350" height="24" as="geometry"/>
+        <mxCell id="bg_p6_label" value="&lt;b&gt;Phase 6 &amp;mdash; Universal Analysis&lt;/b&gt;  (same as PyPI/Crates)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#4a2d6b;" vertex="1" parent="1">
+          <mxGeometry x="230" y="2025" width="380" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_universal" value="&lt;b&gt;Universal Analyzers&lt;/b&gt; (same as PyPI/Crates)&lt;br&gt;analyze_imports, analyze_iocs, analyze_entropy,&lt;br&gt;analyze_entropy_delta, analyze_binary_artifacts, analyze_yara,&lt;br&gt;version_diff" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_universal" value="&lt;b&gt;Universal Analyzers&lt;/b&gt; (same as PyPI/Crates)&lt;br&gt;analyze_imports, analyze_iocs, analyze_entropy,&lt;br&gt;analyze_entropy_delta, analyze_binary_artifacts, analyze_yara,&lt;br&gt;version_diff" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="370" y="2060" width="520" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="e_rule_univ" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_rule_design" target="n_universal" parent="1">
@@ -239,28 +239,28 @@
         </mxCell>
 
         <!-- ===== PHASE 7 — DETONATION ===== -->
-        <mxCell id="bg_p7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;opacity=30;arcSize=4;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+        <mxCell id="bg_p7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="2290" width="860" height="310" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation&lt;/b&gt;  [PLANNED]" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
-          <mxGeometry x="230" y="2295" width="300" height="24" as="geometry"/>
+        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation&lt;/b&gt;  (rootless Docker + Tetragon)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
+          <mxGeometry x="230" y="2295" width="380" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_gvisor" value="&lt;b&gt;gVisor sandbox&lt;/b&gt;&lt;br&gt;&lt;code&gt;go build&lt;/code&gt; + &lt;code&gt;go test&lt;/code&gt; profiles&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Sandbox profiles already defined in&lt;br&gt;detonation/internal/sandbox/ (Go profile exists)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_sandbox" value="&lt;b&gt;Rootless-Docker sandbox&lt;/b&gt; (runc runtime)&lt;br&gt;Go profile in &lt;code&gt;detonation/internal/sandbox/&lt;/code&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Build is best-effort; install/import behavior is what matters&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
           <mxGeometry x="400" y="2330" width="460" height="80" as="geometry"/>
         </mxCell>
-        <mxCell id="e_univ_gvisor" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_universal" target="n_gvisor" parent="1">
+        <mxCell id="e_univ_sandbox" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_universal" target="n_sandbox" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_tetragon" value="&lt;b&gt;Tetragon eBPF behavioral rules&lt;/b&gt;&lt;br&gt;Same as PyPI: exfil, creds, reverse shell, etc." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_tetragon" value="&lt;b&gt;Tetragon eBPF behavioral rules&lt;/b&gt;&lt;br&gt;Same as PyPI: exfil, creds, reverse shell, etc." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
           <mxGeometry x="420" y="2430" width="420" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="e_gvisor_tetragon" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_gvisor" target="n_tetragon" parent="1">
+        <mxCell id="e_sandbox_tetragon" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_sandbox" target="n_tetragon" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_rescore" value="&lt;b&gt;Re-score&lt;/b&gt; with dynamic findings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_rescore" value="&lt;b&gt;Re-score&lt;/b&gt; with dynamic findings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
           <mxGeometry x="470" y="2510" width="320" height="40" as="geometry"/>
         </mxCell>
         <mxCell id="e_tetragon_rescore" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_tetragon" target="n_rescore" parent="1">
@@ -268,35 +268,35 @@
         </mxCell>
 
         <!-- ===== PHASE 8 — LLM TRIAGE + ALERT ===== -->
-        <mxCell id="bg_p8" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;opacity=30;arcSize=4;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+        <mxCell id="bg_p8" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="2630" width="860" height="230" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p8_label" value="&lt;b&gt;Phase 8 &amp;mdash; LLM Triage + Alert&lt;/b&gt;  [PLANNED]" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#7f1d1d;" vertex="1" parent="1">
+        <mxCell id="bg_p8_label" value="&lt;b&gt;Phase 8 &amp;mdash; LLM Triage + Alert&lt;/b&gt;  (cost-gated)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#7f1d1d;" vertex="1" parent="1">
           <mxGeometry x="230" y="2635" width="350" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="d_verdict" value="&lt;b&gt;verdict ==&lt;br&gt;malicious?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="d_verdict" value="&lt;b&gt;verdict ==&lt;br&gt;malicious?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
           <mxGeometry x="570" y="2670" width="120" height="70" as="geometry"/>
         </mxCell>
         <mxCell id="e_rescore_verdict" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_rescore" target="d_verdict" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;Same as PyPI/Crates when implemented" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;Same as PyPI/Crates (OpenRouter, cost-gated)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
           <mxGeometry x="420" y="2770" width="260" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="e_verdict_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_verdict" target="n_llm" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_discord" value="&lt;b&gt;Discord alert&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_discord" value="&lt;b&gt;Discord alert&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
           <mxGeometry x="720" y="2780" width="140" height="40" as="geometry"/>
         </mxCell>
         <mxCell id="e_llm_discord" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_llm" target="n_discord" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_skip_llm" value="&lt;font color=&quot;#888888&quot;&gt;Skip LLM&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontStyle=2;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="n_skip_llm" value="&lt;font color=&quot;#888888&quot;&gt;Skip LLM&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontStyle=2;" vertex="1" parent="1">
           <mxGeometry x="770" y="2690" width="100" height="30" as="geometry"/>
         </mxCell>
         <mxCell id="e_verdict_no" value="No" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_verdict" target="n_skip_llm" parent="1">
@@ -334,7 +334,7 @@
         <mxCell id="th_crates" value="&lt;b&gt;Crates.io&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#333333;fontColor=#ffffff;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="560" y="3000" width="220" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="th_go" value="&lt;b&gt;Go (Planned)&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#7f1d1d;fontColor=#ffffff;fontSize=11;align=center;" vertex="1" parent="1">
+        <mxCell id="th_go" value="&lt;b&gt;Go (Active)&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#333333;fontColor=#ffffff;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="780" y="3000" width="220" height="35" as="geometry"/>
         </mxCell>
 
@@ -348,7 +348,7 @@
         <mxCell id="r1_crates" value="RSS (XML)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="560" y="3035" width="220" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="r1_go" value="NDJSON feed" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#cccccc;fontSize=11;align=center;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="r1_go" value="NDJSON index cursor" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="780" y="3035" width="220" height="35" as="geometry"/>
         </mxCell>
 
@@ -362,7 +362,7 @@
         <mxCell id="r2_crates" value="crates.io API" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="560" y="3070" width="220" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="r2_go" value="&lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;TBD&lt;/b&gt;&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#cccccc;fontSize=11;align=center;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="r2_go" value="GitHub stars + awesome-go&lt;br&gt;+ critical infra" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="780" y="3070" width="220" height="35" as="geometry"/>
         </mxCell>
 
@@ -376,7 +376,7 @@
         <mxCell id="r3_crates" value="5,000" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="560" y="3105" width="220" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="r3_go" value="&lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;TBD&lt;/b&gt;&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#cccccc;fontSize=11;align=center;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="r3_go" value="~9,000" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="780" y="3105" width="220" height="35" as="geometry"/>
         </mxCell>
 
@@ -390,7 +390,7 @@
         <mxCell id="r4_crates" value=".crate" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="560" y="3140" width="220" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="r4_go" value=".zip" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#cccccc;fontSize=11;align=center;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="r4_go" value=".zip (GOPROXY)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="780" y="3140" width="220" height="35" as="geometry"/>
         </mxCell>
 
@@ -404,7 +404,7 @@
         <mxCell id="r5_crates" value="build.rs (regex)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="560" y="3175" width="220" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="r5_go" value="go:generate / init() / CGO&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;(TBD)&lt;/b&gt;&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#cccccc;fontSize=11;align=center;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="r5_go" value="go_directives.py (13 rules)&lt;br&gt;init()/CGo/go:generate/replace" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="780" y="3175" width="220" height="40" as="geometry"/>
         </mxCell>
 
@@ -412,13 +412,13 @@
         <mxCell id="r6_dim" value="Detonation" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#cccccc;fontSize=11;align=center;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="180" y="3215" width="160" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="r6_pypi" value="Yes (gVisor)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
+        <mxCell id="r6_pypi" value="Yes (rootless Docker)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="340" y="3215" width="220" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="r6_crates" value="Not yet" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
+        <mxCell id="r6_crates" value="Yes (build best-effort)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="560" y="3215" width="220" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="r6_go" value="Planned (gVisor)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#cccccc;fontSize=11;align=center;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="r6_go" value="Yes (build best-effort)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#cccccc;fontSize=11;align=center;" vertex="1" parent="1">
           <mxGeometry x="780" y="3215" width="220" height="35" as="geometry"/>
         </mxCell>
 
@@ -430,56 +430,56 @@
           <mxGeometry x="90" y="85" width="80" height="25" as="geometry"/>
         </mxCell>
 
-        <mxCell id="leg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="leg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="45" y="120" width="20" height="14" as="geometry"/>
         </mxCell>
         <mxCell id="leg1t" value="Phase 1 &amp;mdash; Ingest" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="72" y="115" width="150" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="leg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="leg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="45" y="150" width="20" height="14" as="geometry"/>
         </mxCell>
         <mxCell id="leg2t" value="Phase 2 &amp;mdash; Watchlist" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="72" y="145" width="150" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="leg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="leg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="45" y="180" width="20" height="14" as="geometry"/>
         </mxCell>
         <mxCell id="leg3t" value="Phase 3 &amp;mdash; Fetch" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="72" y="175" width="150" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="leg4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="leg4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="45" y="210" width="20" height="14" as="geometry"/>
         </mxCell>
         <mxCell id="leg4t" value="Phase 4 &amp;mdash; Extract+Hash" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="72" y="205" width="150" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="leg5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="leg5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="45" y="240" width="20" height="14" as="geometry"/>
         </mxCell>
         <mxCell id="leg5t" value="Phase 5 &amp;mdash; Install-time" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="72" y="235" width="150" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="leg6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="leg6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="45" y="270" width="20" height="14" as="geometry"/>
         </mxCell>
         <mxCell id="leg6t" value="Phase 6 &amp;mdash; Universal" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="72" y="265" width="150" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="leg7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="leg7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
           <mxGeometry x="45" y="300" width="20" height="14" as="geometry"/>
         </mxCell>
         <mxCell id="leg7t" value="Phase 7 &amp;mdash; Detonation" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="72" y="295" width="150" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="leg8" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="leg8" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
           <mxGeometry x="45" y="330" width="20" height="14" as="geometry"/>
         </mxCell>
         <mxCell id="leg8t" value="Phase 8 &amp;mdash; LLM+Alert" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
@@ -490,32 +490,18 @@
           <mxGeometry x="45" y="355" width="160" height="5" as="geometry"/>
         </mxCell>
 
-        <mxCell id="leg9" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
+        <mxCell id="leg9" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;" vertex="1" parent="1">
           <mxGeometry x="45" y="370" width="20" height="14" as="geometry"/>
         </mxCell>
-        <mxCell id="leg9t" value="Dashed = PLANNED" style="text;html=1;align=left;fontSize=10;fontStyle=1;fontColor=#cc0000;" vertex="1" parent="1">
+        <mxCell id="leg9t" value="Notes / annotations" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="72" y="365" width="150" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="leg10" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;" vertex="1" parent="1">
-          <mxGeometry x="45" y="400" width="20" height="14" as="geometry"/>
+        <mxCell id="leg10" value="" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="45" y="400" width="20" height="16" as="geometry"/>
         </mxCell>
-        <mxCell id="leg10t" value="Notes / annotations" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="72" y="395" width="150" height="24" as="geometry"/>
-        </mxCell>
-
-        <mxCell id="leg11" value="?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="45" y="425" width="20" height="20" as="geometry"/>
-        </mxCell>
-        <mxCell id="leg11t" value="Open question / blocker" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="72" y="425" width="150" height="24" as="geometry"/>
-        </mxCell>
-
-        <mxCell id="leg12" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;" vertex="1" parent="1">
-          <mxGeometry x="45" y="455" width="20" height="14" as="geometry"/>
-        </mxCell>
-        <mxCell id="leg12t" value="&lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;TBD&lt;/b&gt;&lt;/font&gt; = not yet decided" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="72" y="450" width="150" height="24" as="geometry"/>
+        <mxCell id="leg10t" value="Decision" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="72" y="397" width="150" height="24" as="geometry"/>
         </mxCell>
 
       </root>

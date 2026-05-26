@@ -34,30 +34,47 @@ class GoModAdapter(EcosystemAdapter):
 
     def schedule_jobs(self, scheduler) -> None:
         from pkgsentry.ecosystems.gomod.ingest import cursor, watchlist
+        from pkgsentry.ecosystems.gomod.ingest import focus as gf
+        from pkgsentry.focus import focus_exclusive
         scheduler.add_job(
             cursor.poll_index_once, "interval", seconds=60, id="gomod_index",
         )
         scheduler.add_job(
-            watchlist.refresh_watchlist, "interval", weeks=1, id="gomod_watchlist_refresh",
+            gf.poll_focus_releases, "interval", seconds=300, id="gomod_focus",
         )
+        if not focus_exclusive():
+            scheduler.add_job(
+                watchlist.refresh_watchlist, "interval", weeks=1, id="gomod_watchlist_refresh",
+            )
 
     async def boot(self) -> None:
         from pkgsentry.ecosystems.gomod.ingest import cursor, watchlist
+        from pkgsentry.ecosystems.gomod.ingest import focus as gf
+        from pkgsentry.focus import focus_exclusive
+        from pkgsentry.logging_setup import get_logger
         from pkgsentry.store import session as sess
-        from pkgsentry.store.models import Watchlist as WatchlistModel
+        from pkgsentry.store.models import FocusList, Watchlist as WatchlistModel
         from sqlalchemy import select
 
-        with sess.session_scope() as s:
-            has_gomod_wl = s.scalars(
-                select(WatchlistModel).where(WatchlistModel.ecosystem == "gomod").limit(1)
-            ).first() is not None
-
-        if not has_gomod_wl:
-            await watchlist.refresh_watchlist()
-            await watchlist.seed_watchlist_queue()
+        if not focus_exclusive():
+            with sess.session_scope() as s:
+                has_gomod_wl = s.scalars(
+                    select(WatchlistModel).where(WatchlistModel.ecosystem == "gomod").limit(1)
+                ).first() is not None
+            if not has_gomod_wl:
+                await watchlist.refresh_watchlist()
+                await watchlist.seed_watchlist_queue()
+            else:
+                await watchlist.seed_missing_watchlist()
         else:
-            await watchlist.seed_missing_watchlist()
-
+            with sess.session_scope() as s:
+                has_focus = s.scalars(
+                    select(FocusList).where(FocusList.ecosystem == "gomod").limit(1)
+                ).first() is not None
+            if not has_focus:
+                get_logger("gomod.adapter").warning("focus_exclusive_empty", ecosystem="gomod")
+        # Focus packages — seed latest versions (both modes).
+        await gf.poll_focus_releases()
         await cursor.poll_index_once()
 
     def sweep(self) -> None:

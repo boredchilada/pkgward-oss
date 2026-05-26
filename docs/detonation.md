@@ -4,7 +4,9 @@ The detonation service runs package install phases inside isolated Docker contai
 observes behavior via Tetragon eBPF tracing. It is a separate Go binary (`detonation-svc`)
 that the scanner communicates with over a UNIX socket.
 
-Currently PyPI-only. Crates.io and Go modules detonation is planned.
+Runs for PyPI, Crates, and Go modules (max-concurrent 6). The pipeline reads
+Tetragon's JSONL log per detonation, tags events with the install/import phase
+by time window, filters host/build noise, then evaluates the Go behavioral rules.
 
 ## Architecture
 
@@ -114,12 +116,17 @@ make build    # outputs detonation-svc
 make deploy   # uses rsync over SSH; configure DEPLOY_HOST in Makefile or env
 ```
 
-Or build directly on the Linux host if Go is installed there:
+Or build directly on the Linux host (requires **Go 1.22+**; `go.mod` declares `go 1.22`).
+On AlmaLinux: `dnf install -y golang`. Go is a build-time dependency only — it is not
+needed at runtime, so `deploy/setup.sh` (which provisions the runtime host) does not
+install it.
 
 ```bash
 cd detonation && go build -o detonation-svc ./cmd/detonation-svc/
-sudo cp detonation-svc /home/detonation/bin/
-sudo systemctl restart detonation-svc
+sudo systemctl stop detonation-svc          # avoid ETXTBSY on the running binary
+sudo cp -f detonation-svc /home/detonation/bin/
+sudo chown detonation:detonation /home/detonation/bin/detonation-svc
+sudo systemctl start detonation-svc
 ```
 
 ## Starting services
@@ -159,34 +166,77 @@ findings and a non-zero trace event count.
 
 ## Intel pack data in the Go service
 
-`detonation-svc` embeds baseline TOMLs at build time from `pkgsentry/intel/baseline/detonation/`:
+`detonation-svc` embeds baseline TOMLs at build time from `pkgsentry/intel/baseline/detonation/`
+(the embedded copies live at `detonation/internal/intel/baseline/` — keep both in sync):
 
 - `rules_data.toml` — sensitive path/env/shell lists used by behavioral rules
-- `noise_baseline.toml` — per-ecosystem noise filters (known-benign pip/npm syscalls)
+- `noise_baseline.toml` — per-ecosystem noise filters, two kinds:
+  - **file/exec noise** (`{eco}_file_noise`, `{eco}_exec_noise`) — known-benign syscalls
+    dropped before rules run (e.g. `/.npm/_cacache/`, `.npmrc`, `/node`).
+  - **network allowlist** (`{eco}_net_allow`) — registry/CDN destinations that legitimate
+    dependency fetches reach. Entries are hostnames (resolved to IPs at detonation time via
+    DNS) or literal IPs. `Filter()` drops `network`/`connect` events to these, so normal
+    registry traffic does not false-positive as `dyn_import_exfil` / `dyn_install_exfil`.
+    Baseline covers the canonical registries (`registry.npmjs.org`, `files.pythonhosted.org`,
+    `static.crates.io`, `proxy.golang.org`, …). **Do not add broad CDN CIDRs** (e.g. all of
+    Cloudflare) — that would mask real exfil. Never allowlist internal infra.
 
-A private overlay can be mounted and pointed to via the `--intel-path` flag:
+A private overlay extends the baseline (UNION merge) — point the service at it with the
+`PKGSENTRY_INTEL_PATH` env var (set in `/etc/default/detonation-svc`):
 
-```bash
-detonation-svc --intel-path /home/pkgsentry/intel/private
+```
+PKGSENTRY_INTEL_PATH=/home/pkgsentry/intel/private
 ```
 
-Overlay TOMLs are merged over the baseline using the same UNION/REPLACE semantics as the Python
-side.
+The service reads `$PKGSENTRY_INTEL_PATH/detonation/{rules_data,noise_baseline}.toml`. Operators
+pin extra/private domains and observed registry IPs there (the npm/pypi/crates/gomod CDN IPs can
+be mined from the `trace_event` table — see `docs/operations.md`). Successful load logs
+`intel_loaded source=baseline+overlay`.
+
+### SELinux gotcha (prod, Enforcing)
+
+`detonation-svc` runs as `init_t`; files under `/home/pkgsentry/intel/private` are `user_home_t`.
+SELinux **denies a system service reading user-home content**, so the overlay silently fails to
+load (`permission denied` → `source=baseline`) even though Unix perms and a `sudo -u detonation`
+read both succeed. Diagnose with `ausearch -m avc -ts recent | grep detonation-svc`.
+
+The fix applied in prod (keeps a single private-intel source of truth):
+
+```bash
+# 1. relabel the private intel tree to shared-read content
+semanage fcontext -a -t public_content_t "/home/pkgsentry/intel/private(/.*)?"
+restorecon -Rv /home/pkgsentry/intel/private
+# 2. allow init_t to read public_content_t (minimal, scoped — NOT user_home_t)
+semodule -i detonation/deploy/selinux/detonation_intel_read.pp
+systemctl restart detonation-svc   # expect: intel_loaded source=baseline+overlay
+```
+
+The policy source is `detonation/deploy/selinux/detonation_intel_read.te` (build with
+`checkmodule -M -m -o x.mod x.te && semodule_package -o x.pp -m x.mod`).
 
 ## Behavioral rules
 
-Eight rules evaluated against Tetragon trace events:
+Rules in `internal/rules/definitions.go`, evaluated against phase-tagged Tetragon trace
+events (see `docs/detection-rules.md` Layer 10 for severity/confidence):
 
 | Rule ID | Signal |
 |---------|--------|
-| `exfil_http` | HTTP/HTTPS connection to external host during install |
-| `credential_access` | Read of credential files (`~/.ssh/`, `~/.aws/`, keychain paths) |
-| `reverse_shell` | Outbound TCP connection with shell invocation |
-| `process_injection` | ptrace or `/proc/<pid>/mem` write to a foreign PID |
-| `dns_exfil` | Unusually long DNS query (potential data-in-subdomain) |
-| `env_harvest` | Read of sensitive environment variables |
-| `suspicious_write` | Write to system directories or PATH locations |
-| `net_beacon` | Repeated outbound connection at fixed intervals |
+| `dyn_import_exfil` | network connect() during the import phase |
+| `dyn_credential_read` | read of a sensitive file (`/root/.ssh`, cloud creds, `/etc/shadow`) |
+| `dyn_reverse_shell` | shell spawned with an open socket (dormant — needs socket-fd tracking) |
+| `dyn_proc_inject` | `ptrace` (ATTACH/SEIZE/POKE) or `process_vm_writev` injection |
+| `dyn_dns_exfil` | high-entropy DNS query (dormant — needs UDP-payload parsing) |
+| `dyn_env_harvest` | read of another process's environment via `/proc/<pid>/environ` |
+| `dyn_suspicious_write` | write to a persistence path (`/etc/cron`, `.bashrc`, authorized_keys) |
+| `dyn_fileless_exec` | `execveat(AT_EMPTY_PATH)` / `memfd_create` |
+
+`dyn_install_exfil` (network connect during install) is **deferred** — it fires on any
+install-phase connect, but sdists legitimately fetch build deps from registries, so it needs
+a registry-aware design before it can be enabled. `dyn_import_exfil` (import-phase connect) is
+active but the **`{eco}_net_allow` allowlist** (see above) drops connections to known registry
+CDNs first, so normal dependency fetches no longer false-positive — this also resolved a
+pre-existing pypi FP (packages flagged for connecting to `files.pythonhosted.org`). Non-network
+hooks are namespace-filtered to the sandbox container.
 
 Findings from the detonation layer are returned to the scanner, merged into the package's
 finding set, and feed the re-scoring step before LLM triage.
@@ -270,7 +320,42 @@ Behavioral rule hits are stored as regular `Finding` rows with `category = 'dyna
 and rule IDs like `dyn_install_exfil`, `dyn_reverse_shell`, `dyn_proc_inject`. They sit
 alongside static analysis findings in the same table, queryable the same way.
 
+## Tetragon configuration (prod)
+
+Daemon options live in `/etc/tetragon/tetragon.conf.d/` (one file per flag) and a
+systemd drop-in. Current prod tuning:
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `rb-size` | `4M` | per-CPU ring buffer; default 65K drops events under execve storms |
+| `rb-queue-size` | `262144` | Go-side channel; prevents downstream drops |
+| `export-file-perm` | `0644` | log readable by the `detonation` user **across rotations** (rotation recreates the file at this mode; a one-off `chmod`/ACL does not survive) |
+| `export-file-max-size-mb` / `-backups` / `rotation-interval` | `200` / `20` / `1h` | retention |
+| `metrics-server` | `127.0.0.1:2112` | event-loss metrics; alert on `rate(tetragon_observer_ringbuf_events_lost_total[5m]) > 0` |
+| systemd drop-in | `MemoryHigh=1G MemoryMax=2G OOMScoreAdjust=-500` | a fork-bomb sample must not OOM the tracer before the sandbox |
+
+**Do not set `enable-process-ns`** — the collector's `targetNS=0` filter drops any
+event carrying a non-zero `ns.pid_for_children`; turning ns on without a collector
+change kills all events. (Reserved for future cgroup-id correlation work.)
+
+The tracing policy is loaded from `/etc/tetragon/tetragon.tp.d/` **at startup only** —
+dropping a file in after Tetragon is running does nothing until reload. Hot-reload with
+`tetra tracingpolicy delete/add`. Validate a new policy under a temporary
+`metadata.name` first: a single bad hook makes the **whole** policy `load_error` →
+zero events. A `TracingPolicy` cannot mix `kprobes` and `tracepoints` sections.
+`matchArgs` has no `In` operator — use `Equal` with multiple values.
+
 ## Troubleshooting
+
+**Detonations error with `NanoCPUs can not be set`:** rootless Docker here has no CPU
+CFS controller, so `--cpus` makes `docker run` fail. The sandbox omits `--cpus`
+(`internal/sandbox/gvisor.go`); keep it omitted.
+
+**Detonations stop after restarting `detonation-svc`** (`[Errno 111] Connection
+refused` in the scanner): the service recreated the socket inode, but the `pkgsentry`
+container bind-mounts the socket *file*, so it holds the dead inode. Run
+`docker restart pkgsentry` (single container — never `docker compose up -d`). Durable
+fix: bind-mount the parent directory instead of the socket file.
 
 **detonation-svc fails to start:**
 

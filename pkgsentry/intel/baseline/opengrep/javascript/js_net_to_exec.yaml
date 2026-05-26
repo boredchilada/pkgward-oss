@@ -1,0 +1,37 @@
+rules:
+  - id: js_net_to_exec
+    mode: taint
+    message: >-
+      Network response is tainted into child_process exec / eval / Function in
+      JavaScript. The canonical npm "fetch then run remote code" supply-chain
+      shape — most dangerous inside a lifecycle (postinstall) script.
+    languages: [js, ts]
+    severity: ERROR
+    metadata:
+      severity: critical
+      confidence: high
+      category: installer
+      pkgsentry_layer: opengrep
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: fetch(...)
+              - pattern: $H.get(...)
+              - pattern: $H.request(...)
+              - pattern: axios(...)
+              - pattern: axios.get(...)
+              - pattern: axios.post(...)
+              - pattern: require('http').get(...)
+              - pattern: require('https').get(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: eval(...)
+              - pattern: Function(...)
+              - pattern: new Function(...)
+              - pattern: $CP.exec(...)
+              - pattern: $CP.execSync(...)
+              - pattern: $CP.spawn(...)
+              - pattern: $CP.spawnSync(...)
+              - pattern: exec(...)
+              - pattern: execSync(...)

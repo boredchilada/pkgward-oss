@@ -142,11 +142,15 @@ func (s *Server) runDetonation(ctx context.Context, req DetonateRequest) Detonat
 			TraceSummary: map[string]interface{}{"error": "install failed: " + err.Error()},
 		}
 	}
+	// Boundary between the install and import phases — events on or before this
+	// instant are attributed to install, later events to import.
+	installEnd := time.Now().UTC()
 
 	importResult, err := sb.RunImport(ctx, req.Name)
 	if err != nil {
 		importResult = &sandbox.PhaseResult{ExitCode: -1, Duration: 0, TimedOut: false}
 	}
+	importEnd := time.Now().UTC()
 
 	// Trace events: read Tetragon's JSONL log filtered to the install/import
 	// time window. targetNS=0 skips PID-namespace filtering — the noise
@@ -154,9 +158,13 @@ func (s *Server) runDetonation(ctx context.Context, req DetonateRequest) Detonat
 	rawEvents := trace.CollectFromTetragonLog(
 		s.config.TetragonLogPath,
 		traceStart,
-		time.Now().UTC(),
+		importEnd,
 		0,
 	)
+	// Tag each event with its phase before rule evaluation — dyn_install_exfil
+	// and dyn_import_exfil key off TraceEvent.Phase, which the collector leaves
+	// empty.
+	trace.AssignPhase(rawEvents, installEnd)
 	filtered := baseline.Filter(req.Ecosystem, rawEvents)
 	findings := s.engine.Evaluate(filtered)
 	if findings == nil {

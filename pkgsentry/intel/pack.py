@@ -47,6 +47,7 @@ class IntelPack:
     ioc_whitelist: set[bytes] = field(default_factory=set)
     malware_pattern_strings: dict[str, list[str]] = field(default_factory=dict)
     gomod_benign_tools: list[str] = field(default_factory=list)
+    npm_benign_tools: list[str] = field(default_factory=list)
 
     detonation_rules_data: dict[str, list[str]] = field(default_factory=dict)
     detonation_noise: dict[str, list[str]] = field(default_factory=dict)
@@ -114,6 +115,11 @@ class IntelPack:
             if t not in merged_gomod:
                 merged_gomod.append(t)
 
+        merged_npm = list(self.npm_benign_tools)
+        for t in overlay.npm_benign_tools:
+            if t not in merged_npm:
+                merged_npm.append(t)
+
         merged_det_rules: dict[str, list[str]] = {}
         for k, lst in self.detonation_rules_data.items():
             merged_det_rules[k] = list(lst)
@@ -145,6 +151,7 @@ class IntelPack:
             ioc_whitelist=merged_iocs,
             malware_pattern_strings=merged_malware,
             gomod_benign_tools=merged_gomod,
+            npm_benign_tools=merged_npm,
             detonation_rules_data=merged_det_rules,
             detonation_noise=merged_det_noise,
         )
@@ -229,6 +236,9 @@ def load_pack(root: Path, *, source_label: Optional[str] = None) -> IntelPack:
     gomod_raw = _load_toml(root / "gomod_benign_tools.toml")
     gomod_benign_tools = [str(t) for t in (gomod_raw.get("tools") or [])]
 
+    npm_raw = _load_toml(root / "npm_benign_tools.toml")
+    npm_benign_tools = [str(t) for t in (npm_raw.get("tools") or [])]
+
     det_rules_raw = _load_toml(root / "detonation" / "rules_data.toml")
     detonation_rules_data: dict[str, list[str]] = {}
     for k, v in det_rules_raw.items():
@@ -254,6 +264,7 @@ def load_pack(root: Path, *, source_label: Optional[str] = None) -> IntelPack:
         ioc_whitelist=ioc_whitelist,
         malware_pattern_strings=malware_pattern_strings,
         gomod_benign_tools=gomod_benign_tools,
+        npm_benign_tools=npm_benign_tools,
         detonation_rules_data=detonation_rules_data,
         detonation_noise=detonation_noise,
     )

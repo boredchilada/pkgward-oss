@@ -22,6 +22,7 @@ npm_file_noise = [
     "/.npm/_logs/",
     "/node_modules/",
     "/tmp/npm-",
+    "/.npmrc",
 ]
 
 npm_exec_noise = [
@@ -40,4 +41,30 @@ crates_exec_noise = [
     "/rustc",
     "/cargo",
     "/rustup",
+]
+
+# Per-ecosystem network destination allowlist (hostnames resolved to IPs at
+# detonation time, or literal IPs). Connections to these expected registry /
+# CDN endpoints are dropped before the network exfil rules run, so normal
+# dependency fetches don't false-positive as dyn_install_exfil/dyn_import_exfil.
+pypi_net_allow = [
+    "pypi.org",
+    "files.pythonhosted.org",
+]
+
+npm_net_allow = [
+    "registry.npmjs.org",
+    "registry.yarnpkg.com",
+]
+
+crates_net_allow = [
+    "crates.io",
+    "static.crates.io",
+    "index.crates.io",
+]
+
+gomod_net_allow = [
+    "proxy.golang.org",
+    "sum.golang.org",
+    "storage.googleapis.com",
 ]

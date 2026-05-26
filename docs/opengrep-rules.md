@@ -144,16 +144,43 @@ Exits 0 if the YAML parses and the patterns compile, non-zero otherwise.
 
 `tests/analyze/test_opengrep_rules_compile.py` runs `--validate` against every baseline rule. Tests skip cleanly when opengrep isn't on PATH (dev machines without the binary), and run in the Docker container / CI where the binary is installed. Drop a new rule into `pkgsentry/intel/baseline/opengrep/<lang>/` and the test picks it up automatically — no test changes required.
 
-### Test the rule fires (recommended for non-trivial rules)
+### Unit tests — `--test` fixtures (recommended for every rule)
 
-Write a small fixture package that should trigger the rule, run it through opengrep manually:
+opengrep has a built-in unit-test runner. Co-locate a fixture file with the rule, sharing
+its basename and using the target language's extension
+(`<id>.yaml` → `<id>.{py,rs,go,js}`). Annotate lines with comments:
+
+- `// ruleid: <rule-id>` (or `# ruleid:` for Python) on the line **immediately before** a line
+  that **must** match,
+- `// ok: <rule-id>` before a line that **must not** match.
+
+Run the whole baseline (or one language) via the harness:
+
+```bash
+tools/test_opengrep_rules.sh            # all languages
+tools/test_opengrep_rules.sh javascript # one dir
+```
+
+It runs `opengrep --test --config <dir> <dir>` per language, skips cleanly when the binary
+is absent, and exits non-zero if any rule misses an expected line or matches an `ok:` line.
+Run it in the scanner image where the binary lives (opengrep is not on dev hosts):
+
+```bash
+docker run --rm --entrypoint bash -v "$PWD:/src" -w /src pkgsentry-scanner \
+  tools/test_opengrep_rules.sh javascript
+```
+
+**Coverage status:** the `javascript/` rules ship `--test` fixtures (3/3 passing). The
+`python/`, `rust/`, and `go/` rule dirs do **not** yet have fixtures (`opengrep --test`
+reports "No unit tests found" for them — non-fatal). Backfilling fixtures for those is a
+good follow-up so every rule is self-verified, not just compile-checked.
+
+For a quick one-off check, you can still run a rule against an ad-hoc fixture manually:
 
 ```bash
 mkdir /tmp/fixture && echo '<minimal triggering source>' > /tmp/fixture/setup.py
 opengrep scan --json --quiet -f pkgsentry/intel/baseline/opengrep/python/your_rule.yaml /tmp/fixture | jq .results
 ```
-
-If `.results` is empty, the rule isn't matching what you think it is — iterate on the pattern.
 
 ## Shadow mode vs cutover
 

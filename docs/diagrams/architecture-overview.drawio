@@ -165,7 +165,7 @@
         <mxCell id="openrouter" value="&lt;b&gt;OpenRouter&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;LLM triage (GLM-5.1)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="1200" y="630" width="150" height="45" as="geometry" />
         </mxCell>
-        <mxCell id="sandbox" value="&lt;b&gt;Detonation Sandbox&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;gVisor + Tetragon (Go)&lt;br&gt;UNIX socket&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+        <mxCell id="sandbox" value="&lt;b&gt;Detonation Sandbox&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;rootless Docker + Tetragon (Go)&lt;br&gt;UNIX socket&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="1200" y="695" width="150" height="50" as="geometry" />
         </mxCell>
         <mxCell id="discord" value="&lt;b&gt;Discord Webhook&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;malicious alerts&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">

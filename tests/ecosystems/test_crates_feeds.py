@@ -123,3 +123,21 @@ def test_parse_rss_items_empty_titles_skipped():
     </rss>"""
     items = parse_rss_items(xml)
     assert items == []
+
+
+def test_dedup_new_items_resolves_drops_and_keeps():
+    from pkgsentry.ecosystems.crates.ingest.feeds import _dedup_new_items
+    new_items = [
+        ("already-concrete", "1.0.0"),  # untouched
+        ("known-crate", "latest"),       # already queued -> dropped
+        ("fresh-crate", "latest"),       # resolved -> concrete
+        ("unresolved", "latest"),        # resolution failed -> placeholder kept
+    ]
+    known = {"known-crate"}
+    resolved = {"fresh-crate": "0.2.1"}
+    out = _dedup_new_items(new_items, known, resolved)
+    assert out == [
+        ("already-concrete", "1.0.0"),
+        ("fresh-crate", "0.2.1"),
+        ("unresolved", "latest"),
+    ]

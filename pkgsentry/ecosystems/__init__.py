@@ -3,3 +3,4 @@
 import pkgsentry.ecosystems.pypi    # noqa: F401
 import pkgsentry.ecosystems.crates  # noqa: F401
 import pkgsentry.ecosystems.gomod   # noqa: F401
+import pkgsentry.ecosystems.npm     # noqa: F401

@@ -1,0 +1,17 @@
+# Example focus list — your own dependencies to monitor.
+# One combined file with per-ecosystem sections. Load with:
+#   pkgsentry focus load focus.example.txt          (additive, keep watchlist)
+#   pkgsentry run -f focus.example.txt              (focused mode: ONLY these)
+#
+# Lines: `name` (monitor every new release) or `name==version` (also scan that
+# version now). gomod uses `name [version]`, matched case-insensitively.
+
+[pypi]
+requests==2.31.0
+rich
+
+[crates]
+serde
+
+[gomod]
+github.com/gin-gonic/gin v1.9.1

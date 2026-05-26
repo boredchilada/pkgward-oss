@@ -16,12 +16,15 @@ func TestEngineNoEvents(t *testing.T) {
 }
 
 func TestEngineMultipleMatches(t *testing.T) {
+	// Network connect in the import phase fires dyn_import_exfil (install_exfil
+	// is deferred); the .ssh read fires dyn_credential_read; the stdlib open
+	// matches nothing.
 	events := []trace.TraceEvent{
-		{Phase: "install", Category: "network", Operation: "connect",
+		{Phase: "import", Category: "network", Operation: "connect",
 			Detail: map[string]interface{}{"addr": "10.0.0.1", "port": float64(80)}},
-		{Phase: "install", Category: "file", Operation: "open",
+		{Phase: "import", Category: "file", Operation: "open",
 			Detail: map[string]interface{}{"path": "/root/.ssh/id_rsa"}},
-		{Phase: "install", Category: "file", Operation: "open",
+		{Phase: "import", Category: "file", Operation: "open",
 			Detail: map[string]interface{}{"path": "/usr/lib/python3.11/os.py"}},
 	}
 
@@ -33,8 +36,8 @@ func TestEngineMultipleMatches(t *testing.T) {
 		ruleIDs[f.RuleID] = true
 	}
 
-	if !ruleIDs["dyn_install_exfil"] {
-		t.Error("expected dyn_install_exfil")
+	if !ruleIDs["dyn_import_exfil"] {
+		t.Error("expected dyn_import_exfil")
 	}
 	if !ruleIDs["dyn_credential_read"] {
 		t.Error("expected dyn_credential_read")
@@ -46,9 +49,9 @@ func TestEngineMultipleMatches(t *testing.T) {
 
 func TestEngineDeduplicates(t *testing.T) {
 	events := []trace.TraceEvent{
-		{Phase: "install", Category: "network", Operation: "connect",
+		{Phase: "import", Category: "network", Operation: "connect",
 			Detail: map[string]interface{}{"addr": "10.0.0.1", "port": float64(80)}},
-		{Phase: "install", Category: "network", Operation: "connect",
+		{Phase: "import", Category: "network", Operation: "connect",
 			Detail: map[string]interface{}{"addr": "10.0.0.2", "port": float64(443)}},
 	}
 
@@ -57,11 +60,11 @@ func TestEngineDeduplicates(t *testing.T) {
 
 	exfilCount := 0
 	for _, f := range findings {
-		if f.RuleID == "dyn_install_exfil" {
+		if f.RuleID == "dyn_import_exfil" {
 			exfilCount++
 		}
 	}
 	if exfilCount != 1 {
-		t.Errorf("expected 1 deduplicated dyn_install_exfil finding, got %d", exfilCount)
+		t.Errorf("expected 1 deduplicated dyn_import_exfil finding, got %d", exfilCount)
 	}
 }

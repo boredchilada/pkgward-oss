@@ -164,3 +164,79 @@ Reference for implementing and maintaining ecosystem adapters.
 - No popularity API for watchlist prioritization
 - Module paths are URLs, not simple names — typosquat detection is more complex
 - Volume is massive — every tagged version of every Go repo
+
+## npm (JavaScript) — ACTIVE
+
+Implemented in `pkgsentry/ecosystems/npm/` (diagram: `diagrams/npm-pipeline.drawio`).
+Plugs into the same ingest → analyze → score → detonate → triage pipeline. Notes below
+document the registry APIs the adapter uses.
+
+**Implementation notes:** the `_changes` feed carries only the package name (not the
+version), so `ingest/cursor.py` gates on the name first, then resolves `dist-tags.latest`
+for gated packages before enqueuing (one registry call per gated package). The seq cursor
+is stored in `ScanCursor.last_serial` and treated as opaque/forward-only; first boot
+bootstraps from the current `update_seq` (no historical backfill — the feed isn't
+time-addressable). Install analysis is a native `package.json` lifecycle-script analyzer
+(`installer.py`) plus shadow-mode opengrep `opengrep/javascript/` rules. The watchlist
+combines registry-search popularity + awesome-nodejs + a hardcoded `CRITICAL_INFRA` list.
+
+### Discovery (Real-time)
+- The npm registry is a CouchDB. New/changed packages stream from the public replica's
+  changes feed: `https://replicate.npmjs.com/_changes?since={seq}&feed=continuous` (or
+  `feed=longpoll`). Each row carries a `seq` and the package `id`.
+- **Gotcha:** the `seq` sequence numbers are **not guaranteed monotonic** — they were reset
+  during a past CouchDB upgrade. Treat the `since` cursor as an **opaque token**, not an
+  ever-increasing integer (don't compare/order by it like the PyPI XML-RPC serial).
+- Source: https://github.blog/changelog/2021-09-08-npm-couchdb-upgrade-will-reset-sequence-number/
+
+### Metadata & Download
+- Package metadata: `GET https://registry.npmjs.org/{pkg}` → `dist-tags`, `versions{}`,
+  `time{}`, `maintainers`. (`docs/responses/package-metadata.md` in `npm/registry`.)
+- Tarball: `https://registry.npmjs.org/{pkg}/-/{pkg}-{version}.tgz`; scoped:
+  `https://registry.npmjs.org/@{scope}/{name}/-/{name}-{version}.tgz`. It's a gzip tarball
+  with a `package/` prefix (strip it on extract).
+- Integrity: the version's `dist` object has `integrity` (SRI, `sha512-<base64>`, since
+  Apr 2017) and a legacy `shasum` (SHA-1). Verify SRI on download.
+
+### Watchlist (Top packages)
+- Download counts: `https://api.npmjs.org/downloads/point/{last-day|last-week|last-month|last-year}/{pkg}`
+  (bulk via comma-separated names; scoped packages excluded from bulk; ~18-month history cap).
+  Source: https://github.com/npm/download-counts
+
+### Attack Surface
+| Vector | Where | Risk | Detection |
+|--------|-------|------|-----------|
+| Lifecycle scripts | `package.json` `preinstall`/`install`/`postinstall`/`prepare` | Critical — arbitrary code runs automatically on `npm install` (`postinstall` most-abused) | Parse `package.json` scripts; detonation runs `npm install` with scripts ENABLED, Tetragon-traced |
+| `bin` entries | `package.json` `bin` | Medium — installed onto PATH | Flag unexpected bin shims |
+| Obfuscation | minified/encoded JS | High — hide payload | opengrep JS/TS + entropy + IOC extraction |
+| Typosquatting | package name | High — `expres` vs `express` | name-similarity matching |
+| Dependency confusion | scope/name vs internal pkgs | High — internal-name hijack | name + registry-source checks |
+
+### Detonation angle
+`npm install` (scripts enabled) inside the rootless-Docker sandbox executes the lifecycle
+scripts; Tetragon traces the resulting process/file/network behavior (same model as the
+other ecosystems — runc runtime, not gVisor).
+
+### Notes / sources
+- Registry API docs: https://github.com/npm/registry/blob/main/docs/responses/package-metadata.md , https://api-docs.npmjs.com/
+- Lifecycle-script abuse background: https://docs.npmjs.com/misc/scripts ; recent campaigns (e.g. 36-package postinstall campaign, 2026-04).
+
+## Focus list — file syntax per ecosystem
+
+Operator-supplied dependency lists (`pkgsentry focus load <file> -e <eco>`; see
+`docs/operations.md`). One entry per line; `#` comments and blank lines ignored. Names are
+stored verbatim (no normalization) and matched against the ingest feeds.
+
+Entry syntax is lenient: a package **name** optionally followed by a version in any common
+form (`==`, `>=`, `~=`, `^`, range, or gomod space-separated) — paste-compatible with
+dependency files.
+
+| Ecosystem | Line syntax | Matching |
+|-----------|-------------|----------|
+| pypi | `name`, `name==1.2.3`, `name>=1.2.3`, `name~=1.2`, … | exact name |
+| crates | `name`, `name==1.2.3`, `name^1.0`, `name~1.2`, … | exact name |
+| gomod | `name` or `name v1.2.3` (space-separated) | **case-insensitive** module path (matches `is_watchlist`) |
+
+The **name** is monitored — every new release is scanned at high priority. Any version
+present is scanned once at load (for a range, its lower bound); a wildcard like `2.*` is
+treated as no concrete pin.

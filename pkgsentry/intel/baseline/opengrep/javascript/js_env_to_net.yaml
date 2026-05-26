@@ -1,0 +1,29 @@
+rules:
+  - id: js_env_to_net
+    mode: taint
+    message: >-
+      Environment variables / process secrets are tainted into a network call.
+      Credential and token exfiltration (npm tokens, CI secrets, cloud keys)
+      from inside package code — frequently from an install script.
+    languages: [js, ts]
+    severity: ERROR
+    metadata:
+      severity: high
+      confidence: medium
+      category: installer
+      pkgsentry_layer: opengrep
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: process.env
+              - pattern: process.env.$K
+              - pattern: process.env[$K]
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: fetch($URL, ...)
+              - pattern: $H.request(...)
+              - pattern: $H.get($URL, ...)
+              - pattern: axios.post(...)
+              - pattern: axios($CFG)
+              - pattern: require('https').request(...)

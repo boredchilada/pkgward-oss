@@ -26,10 +26,20 @@ def init_db_cmd() -> None:
 def run_cmd(
     workers: int = typer.Option(4, "--workers", "-w"),
     duration: int = typer.Option(0, "--duration", help="Stop after N seconds (0 = forever)."),
+    focus: str = typer.Option(
+        None, "--focus", "-f",
+        help="Focused mode: load this combined focus file ([pypi]/[crates]/[gomod] "
+             "sections) and scan ONLY focus packages. Omit for normal mode.",
+    ),
 ) -> None:
-    """Start ingest + worker pool + scheduler."""
+    """Start ingest + worker pool + scheduler.
+
+    With -f/--focus the scanner runs in exclusive focused mode against the given
+    combined file (authoritative — the file defines the focus list). Without it,
+    the usual watchlist + brand-new ingest runs.
+    """
     from pkgsentry.runtime import run_forever  # late import to keep CLI fast
-    run_forever(workers=workers, duration=duration)
+    run_forever(workers=workers, duration=duration, focus_file=focus)
 
 
 @app.command("backfill")
@@ -86,3 +96,112 @@ def show_cmd(
     """Print latest scan + findings for a package version."""
     from pkgsentry.runtime import show_findings
     show_findings(ecosystem=ecosystem, name=package, version=version)
+
+
+focus_app = typer.Typer(
+    no_args_is_help=True,
+    help="Manage focus packages — a per-ecosystem personal watchlist.",
+)
+app.add_typer(focus_app, name="focus")
+
+_ECOSYSTEMS = ("pypi", "crates", "gomod", "npm")
+
+
+def _check_ecosystem(ecosystem: str) -> None:
+    if ecosystem not in _ECOSYSTEMS:
+        raise typer.BadParameter(f"ecosystem must be one of {_ECOSYSTEMS}")
+
+
+@focus_app.command("load")
+def focus_load_cmd(
+    file: str = typer.Argument(..., help="Path to focus list file."),
+    ecosystem: str = typer.Option(
+        None, "--ecosystem", "-e",
+        help="pypi|crates|gomod for a flat file. Omit for a combined file with "
+             "[pypi]/[crates]/[gomod] sections (covers all ecosystems at once).",
+    ),
+    enqueue_pinned: bool = typer.Option(
+        True, "--enqueue-pinned/--no-enqueue-pinned",
+        help="Enqueue any pinned versions for immediate scanning.",
+    ),
+) -> None:
+    """Load focus packages from a file.
+
+    Flat file with -e: additive upsert for that ecosystem (one `name` or
+    `name==version` per line). Combined file without -e: each `[ecosystem]`
+    section authoritatively replaces that ecosystem's focus list.
+    """
+    from pathlib import Path
+    from pkgsentry import focus
+    from pkgsentry.queue import enqueue
+
+    sess.init_db()
+    text = Path(file).read_text(encoding="utf-8")
+
+    if ecosystem:
+        _check_ecosystem(ecosystem)
+        sections = {ecosystem: focus.parse_focus_file(text, ecosystem)}
+        authoritative = False  # flat single-ecosystem load is additive
+    else:
+        sections = focus.parse_combined_focus_file(text)
+        if not sections:
+            raise typer.BadParameter(
+                "no [ecosystem] sections found — pass -e for a flat single-ecosystem file."
+            )
+        authoritative = True  # combined file is the source of truth
+
+    total = 0
+    enq = 0
+    with sess.session_scope() as s:
+        for eco, entries in sections.items():
+            if authoritative:
+                focus.sync_focus(s, eco, entries)
+            else:
+                focus.upsert_focus(s, eco, entries)
+            total += len(entries)
+            if enqueue_pinned:
+                for e in entries:
+                    if e.pinned_version and enqueue(
+                        s, ecosystem=eco, name=e.name,
+                        version=e.pinned_version, priority="high",
+                    ):
+                        enq += 1
+    scope = ", ".join(sorted(sections)) if sections else "—"
+    typer.echo(f"loaded {total} focus entries ({scope}) — {enq} pinned versions enqueued")
+
+
+@focus_app.command("list")
+def focus_list_cmd(
+    ecosystem: str = typer.Option(None, "--ecosystem", "-e"),
+) -> None:
+    """List focus entries (warns if exclusive mode is on but the list is empty)."""
+    from sqlalchemy import select
+    from pkgsentry.store.models import FocusList
+    from pkgsentry.focus import focus_exclusive
+
+    sess.init_db()
+    with sess.session_scope() as s:
+        q = select(FocusList)
+        if ecosystem:
+            q = q.where(FocusList.ecosystem == ecosystem)
+        rows = s.scalars(q.order_by(FocusList.ecosystem, FocusList.name)).all()
+        for r in rows:
+            typer.echo(f"{r.ecosystem}\t{r.name}\t{r.pinned_version or '-'}")
+        typer.echo(f"# {len(rows)} entries")
+        if focus_exclusive() and not rows:
+            typer.echo(
+                "WARNING: PKGSENTRY_FOCUS_EXCLUSIVE=1 but focus list is empty — the scanner will idle."
+            )
+
+
+@focus_app.command("clear")
+def focus_clear_cmd(
+    ecosystem: str = typer.Option(None, "--ecosystem", "-e", help="Limit to one ecosystem (default: all)."),
+) -> None:
+    """Remove focus entries (all, or one ecosystem)."""
+    from pkgsentry.focus import clear_focus
+
+    sess.init_db()
+    with sess.session_scope() as s:
+        n = clear_focus(s, ecosystem)
+    typer.echo(f"cleared {n} entries")

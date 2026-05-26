@@ -99,19 +99,27 @@ async def poll_feeds_once() -> list[DiscoveredItem]:
         items.append(DiscoveredItem(name=nv[0], version=nv[1], priority="normal"))
 
     from pkgsentry.ecosystems.pypi.ingest.watchlist import is_watchlist
+    from pkgsentry.focus import load_focus_names, on_focus, gate_decision, focus_exclusive
+    exclusive = focus_exclusive()
     enq = 0
     enq_new = 0
     skipped = 0
     with sess.session_scope() as s:
+        focus_names = load_focus_names(s, ECOSYSTEM)  # preloaded once per poll
         for it in items:
-            on_watchlist = is_watchlist(s, it.name) is not None
-            brand_new = not on_watchlist and it.name in new_package_names
+            on_foc = on_focus(it.name, focus_names, ECOSYSTEM)
+            # Exclusive mode admits only focus packages — skip the per-item
+            # watchlist/brand-new work entirely.
+            on_watchlist = (not exclusive) and is_watchlist(s, it.name) is not None
+            brand_new = (not exclusive) and not on_watchlist and it.name in new_package_names
 
-            if not on_watchlist and not brand_new:
+            pri = gate_decision(
+                on_focus=on_foc, on_watchlist=on_watchlist,
+                brand_new=brand_new, exclusive=exclusive,
+            )
+            if pri is None:
                 skipped += 1
                 continue
-
-            pri = "high" if on_watchlist else "normal"
             if enqueue(s, ecosystem=ECOSYSTEM, name=it.name, version=it.version, priority=pri):
                 enq += 1
                 if brand_new:
@@ -121,5 +129,6 @@ async def poll_feeds_once() -> list[DiscoveredItem]:
         "feeds_poll",
         enqueued=enq, enqueued_new=enq_new,
         skipped=skipped, candidates=len(items),
+        focus=len(focus_names), exclusive=exclusive,
     )
     return items

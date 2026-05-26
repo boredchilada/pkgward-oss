@@ -114,6 +114,8 @@ async def poll_index_once() -> int:
     total_skipped = 0
     skipped_gate = 0
     max_cursor = cursor
+    from pkgsentry.focus import load_focus_names, on_focus, focus_exclusive
+    exclusive = focus_exclusive()
 
     while True:
         entries = await _fetch_page(since)
@@ -121,6 +123,7 @@ async def poll_index_once() -> int:
             break
 
         with sess.session_scope() as s:
+            focus_names = load_focus_names(s, ECOSYSTEM)  # preloaded once per page
             for entry in entries:
                 path = entry.get("Path", "")
                 version = entry.get("Version", "")
@@ -136,10 +139,24 @@ async def poll_index_once() -> int:
                     total_skipped += 1
                     continue
 
+                on_foc = on_focus(path, focus_names, ECOSYSTEM)
+
+                if exclusive:
+                    # Only focus modules; skip watchlist + the expensive
+                    # brand-new probe entirely.
+                    if not on_foc:
+                        skipped_gate += 1
+                        continue
+                    row = enqueue(s, ecosystem=ECOSYSTEM, name=path,
+                                  version=version, priority="high")
+                    if row is not None:
+                        total_enqueued += 1
+                    continue
+
                 on_watchlist = is_watchlist(s, path) is not None
 
-                if on_watchlist:
-                    # Watchlist: enqueue every version (supply-chain monitoring).
+                if on_foc or on_watchlist:
+                    # Focus or watchlist: enqueue every version (supply-chain monitoring).
                     row = enqueue(s, ecosystem=ECOSYSTEM, name=path,
                                   version=version, priority="high")
                     if row is not None:

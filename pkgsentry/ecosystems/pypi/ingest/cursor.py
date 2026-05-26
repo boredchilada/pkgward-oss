@@ -95,7 +95,10 @@ def pull_since(max_items: Optional[int] = DEFAULT_MAX_ITEMS) -> int:
     max_serial = serial
     # Track which packages had a "create" action in this batch
     _created_in_batch: set[str] = set()
+    from pkgsentry.focus import load_focus_names, on_focus, gate_decision, focus_exclusive
+    exclusive = focus_exclusive()
     with sess.session_scope() as s:
+        focus_names = load_focus_names(s, ECOSYSTEM)  # preloaded once per poll
         for entry in entries:
             # (name, version, timestamp, action, serial)
             name = entry[0]
@@ -116,14 +119,17 @@ def pull_since(max_items: Optional[int] = DEFAULT_MAX_ITEMS) -> int:
             if "remove" in action:
                 continue
 
-            on_watchlist = is_watchlist(s, name) is not None
-            brand_new = not on_watchlist and name in _created_in_batch
+            on_foc = on_focus(name, focus_names, ECOSYSTEM)
+            on_watchlist = (not exclusive) and is_watchlist(s, name) is not None
+            brand_new = (not exclusive) and not on_watchlist and name in _created_in_batch
 
-            if not on_watchlist and not brand_new:
+            pri = gate_decision(
+                on_focus=on_foc, on_watchlist=on_watchlist,
+                brand_new=brand_new, exclusive=exclusive,
+            )
+            if pri is None:
                 skipped += 1
                 continue
-
-            pri = "high" if on_watchlist else "normal"
             row = enqueue(s, ecosystem=ECOSYSTEM, name=name, version=str(version), priority=pri)
             if row is not None:
                 enqueued += 1

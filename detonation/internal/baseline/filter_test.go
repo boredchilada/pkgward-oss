@@ -101,6 +101,50 @@ func TestFilterPassesSuspicious(t *testing.T) {
 	}
 }
 
+func TestFilterNpmNpmrc(t *testing.T) {
+	// npm reads ~/.npmrc on every install — must be filtered so it doesn't
+	// false-positive dyn_credential_read.
+	events := []trace.TraceEvent{
+		{Phase: "install", Category: "file", Operation: "open",
+			Detail: map[string]interface{}{"path": "/root/.npmrc"}},
+	}
+	filtered := Filter("npm", events)
+	if len(filtered) != 0 {
+		t.Errorf("expected 0 events (.npmrc read is benign for npm), got %d", len(filtered))
+	}
+}
+
+func TestResolveAllowedIPsLiteral(t *testing.T) {
+	got := resolveAllowedIPs([]string{"1.2.3.4", "  ", "2.3.4.5"})
+	if _, ok := got["1.2.3.4"]; !ok {
+		t.Error("literal IP 1.2.3.4 should resolve to itself")
+	}
+	if _, ok := got["2.3.4.5"]; !ok {
+		t.Error("literal IP 2.3.4.5 should resolve to itself")
+	}
+}
+
+func TestResolveAllowedIPsLocalhost(t *testing.T) {
+	// localhost resolves from /etc/hosts (no network needed).
+	got := resolveAllowedIPs([]string{"localhost"})
+	if _, ok := got["127.0.0.1"]; !ok {
+		t.Error("localhost should resolve to include 127.0.0.1")
+	}
+}
+
+func TestFilterNonAllowedConnectPasses(t *testing.T) {
+	// A connection to a non-registry destination must survive the net allowlist
+	// (TEST-NET-3 address, never a real npm registry IP).
+	events := []trace.TraceEvent{
+		{Phase: "import", Category: "network", Operation: "connect",
+			Detail: map[string]interface{}{"addr": "203.0.113.5", "port": float64(443)}},
+	}
+	filtered := Filter("npm", events)
+	if len(filtered) != 1 {
+		t.Errorf("expected suspicious non-registry connect to survive, got %d", len(filtered))
+	}
+}
+
 func TestFilterUnknownEcosystem(t *testing.T) {
 	events := []trace.TraceEvent{
 		{Phase: "install", Category: "file", Operation: "write",

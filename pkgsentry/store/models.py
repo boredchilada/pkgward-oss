@@ -168,6 +168,28 @@ class Watchlist(Base):
     )
 
 
+class FocusList(Base):
+    """Operator-supplied per-ecosystem focus packages — a personal watchlist.
+
+    Name-level: every new release of a focus package is enqueued at high
+    priority. ``pinned_version`` (optional) is the version the operator is
+    currently running, scanned once at load time. With
+    ``PKGSENTRY_FOCUS_EXCLUSIVE=1`` the scanner ingests ONLY these packages.
+    """
+
+    __tablename__ = "focus_list"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ecosystem: Mapped[str] = mapped_column(String(32), nullable=False, default="pypi")
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    pinned_version: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("ecosystem", "name", name="uq_focuslist_ecosystem_name"),
+        Index("ix_focuslist_ecosystem", "ecosystem"),
+    )
+
+
 class FileHash(Base):
     __tablename__ = "file_hash"
     id: Mapped[int] = mapped_column(primary_key=True)

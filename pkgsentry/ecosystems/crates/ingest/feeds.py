@@ -6,11 +6,13 @@ import xml.etree.ElementTree as ET
 from typing import Optional
 
 import httpx
+from sqlalchemy import select
 
 from pkgsentry.adapter import DiscoveredItem
 from pkgsentry.logging_setup import get_logger
 from pkgsentry.queue import enqueue
 from pkgsentry.store import session as sess
+from pkgsentry.store.models import ScanQueue
 from pkgsentry.util.user_agent import user_agent
 from pkgsentry.ecosystems.crates.ingest.watchlist import is_watchlist
 
@@ -97,6 +99,49 @@ async def _fetch_rss(url: str) -> list[tuple[str, str]]:
     return parse_rss_items(resp.text)
 
 
+async def _resolve_new_latest(names: set[str]) -> dict[str, str]:
+    """Resolve crates.xml 'latest' placeholders to concrete newest versions.
+
+    crates.xml yields ``(name, 'latest')`` for a new crate whose RSS link carries
+    no version. Enqueuing the literal ``latest`` creates a second Version row and
+    a spurious 0-finding code-diff rescan when the same publish also arrives via
+    updates.xml as a concrete version. Resolving here converges both to a single
+    ``(name, version)``. Respects the crates.io 1 req/s limiter inside
+    ``_resolve_latest``."""
+    from pkgsentry.ecosystems.crates.fetch.download import _resolve_latest
+    out: dict[str, str] = {}
+    if not names:
+        return out
+    async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}) as client:
+        for name in names:
+            try:
+                out[name] = await _resolve_latest(client, name)
+            except Exception:
+                pass  # leave unresolved; caller keeps the placeholder
+    return out
+
+
+def _dedup_new_items(
+    new_items: list[tuple[str, str]],
+    known: set[str],
+    resolved: dict[str, str],
+) -> list[tuple[str, str]]:
+    """Rewrite 'latest' placeholders: drop crates already queued under a concrete
+    version, swap in resolved concrete versions, keep the placeholder only when
+    resolution failed (so coverage isn't lost)."""
+    out: list[tuple[str, str]] = []
+    for name, version in new_items:
+        if version != "latest":
+            out.append((name, version))
+        elif name in known:
+            continue
+        elif name in resolved:
+            out.append((name, resolved[name]))
+        else:
+            out.append((name, version))
+    return out
+
+
 async def poll_feeds_once() -> int:
     """Poll both RSS feeds with ingest gates.
 
@@ -106,24 +151,59 @@ async def poll_feeds_once() -> int:
     new_items = await _fetch_rss(NEW_CRATES_URL)
     update_items = await _fetch_rss(UPDATES_URL)
 
+    # Resolve brand-new "latest" placeholders to concrete versions so a publish
+    # that also shows up in updates.xml dedups to one scan. Only resolve crates
+    # not already queued, to bound crates.io API calls.
+    latest_names = {n for n, v in new_items if v == "latest"}
+    if latest_names:
+        with sess.session_scope() as s:
+            known = set(
+                s.scalars(
+                    select(ScanQueue.name).where(
+                        ScanQueue.ecosystem == ECOSYSTEM,
+                        ScanQueue.name.in_(latest_names),
+                    )
+                ).all()
+            )
+        resolved = await _resolve_new_latest(latest_names - known)
+        new_items = _dedup_new_items(new_items, known, resolved)
+
+    from pkgsentry.focus import load_focus_names, on_focus, gate_decision, focus_exclusive
+    exclusive = focus_exclusive()
     enqueued_new = 0
     enqueued_wl = 0
     skipped = 0
 
     with sess.session_scope() as s:
+        focus_names = load_focus_names(s, ECOSYSTEM)  # preloaded once per poll
+
+        # crates.xml — brand-new crates (normal), or focus/exclusive (high).
         for name, version in new_items:
+            pri = gate_decision(
+                on_focus=on_focus(name, focus_names, ECOSYSTEM),
+                on_watchlist=False, brand_new=True, exclusive=exclusive,
+            )
+            if pri is None:
+                skipped += 1
+                continue
             try:
-                enqueue(s, ecosystem=ECOSYSTEM, name=name, version=version, priority="normal")
+                enqueue(s, ecosystem=ECOSYSTEM, name=name, version=version, priority=pri)
                 enqueued_new += 1
             except Exception:
                 pass
 
+        # updates.xml — watchlist version bumps (high), or focus (high).
         for name, version in update_items:
-            if is_watchlist(s, name) is None:
+            on_wl = (not exclusive) and is_watchlist(s, name) is not None
+            pri = gate_decision(
+                on_focus=on_focus(name, focus_names, ECOSYSTEM),
+                on_watchlist=on_wl, brand_new=False, exclusive=exclusive,
+            )
+            if pri is None:
                 skipped += 1
                 continue
             try:
-                enqueue(s, ecosystem=ECOSYSTEM, name=name, version=version, priority="high")
+                enqueue(s, ecosystem=ECOSYSTEM, name=name, version=version, priority=pri)
                 enqueued_wl += 1
             except Exception:
                 pass
@@ -131,5 +211,6 @@ async def poll_feeds_once() -> int:
     total = enqueued_new + enqueued_wl
     if total or skipped:
         log.info("crates_feeds_polled", new_crates=enqueued_new,
-                 updates=enqueued_wl, skipped=skipped)
+                 updates=enqueued_wl, skipped=skipped,
+                 focus=len(focus_names), exclusive=exclusive)
     return total

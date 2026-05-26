@@ -1,0 +1,29 @@
+rules:
+  - id: js_decode_to_exec
+    mode: taint
+    message: >-
+      Base64-decoded data is tainted into eval / Function / child_process.
+      Obfuscated payloads decoded at runtime and executed — a common npm
+      lure / install-script evasion technique.
+    languages: [js, ts]
+    severity: ERROR
+    metadata:
+      severity: high
+      confidence: high
+      category: installer
+      pkgsentry_layer: opengrep
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: Buffer.from($X, 'base64')
+              - pattern: Buffer.from($X, "base64")
+              - pattern: atob(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: eval(...)
+              - pattern: Function(...)
+              - pattern: new Function(...)
+              - pattern: $CP.exec(...)
+              - pattern: $CP.execSync(...)
+              - pattern: $CP.spawn(...)

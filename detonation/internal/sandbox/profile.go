@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package sandbox
 
-import "fmt"
-
 type Profile struct {
 	Ecosystem         string
 	BaseImage         string
@@ -46,9 +44,7 @@ var profiles = map[string]*Profile{
 		InstallTimeoutSec: 180,
 		ImportTimeoutSec:  0,
 		InstallCmd: func(name, version, archivePath string) []string {
-			return []string{"sh", "-c", fmt.Sprintf(
-				"tar -xzf %s && cd %s-%s && cargo build 2>&1",
-				archivePath, name, version)}
+			return []string{"cargo", "install", "--path", archivePath}
 		},
 		ImportCmd: func(name string) []string {
 			return nil
@@ -58,19 +54,43 @@ var profiles = map[string]*Profile{
 	"gomod": {
 		Ecosystem:         "gomod",
 		BaseImage:         "golang:1.22-alpine",
-		InstallTimeoutSec: 180,
-		ImportTimeoutSec:  60,
+		InstallTimeoutSec: 240,
+		ImportTimeoutSec:  0,
+		// Go has no install-time hook the way pip/npm do. Its dynamic attack
+		// surface is `go:generate` directives (which run arbitrary commands)
+		// plus any code that executes while the toolchain resolves/builds the
+		// module. We extract the module zip and exercise download → generate →
+		// build so Tetragon traces any embedded execution. The alpine image has
+		// no gcc/git, so CGO builds and VCS-only deps fail — that is expected
+		// and benign (CGO/#cgo directives stay covered by the static
+		// go_directives analyzer); the install-time *behavior* is what we trace.
+		// GOTOOLCHAIN=local stops go from auto-downloading a newer toolchain
+		// (network noise + surprise exec); GOSUMDB=off avoids sum.golang.org
+		// lookups; CGO_ENABLED=0 lets pure-Go packages build without gcc.
 		InstallCmd: func(name, version, archivePath string) []string {
-			return []string{"sh", "-c", fmt.Sprintf(
-				"mkdir -p /tmp/build && cd /tmp/build && unzip -qo %s && "+
-					"cd \"$(ls -d */|head -1)\" && go mod init _sandbox 2>/dev/null; go build ./... 2>&1",
-				archivePath)}
+			// A Go module zip always nests its content under a top dir named
+			// "<modulepath>@<version>" (the version component carries the '@'),
+			// so the module root is the first directory containing '@'. Fall
+			// back to the shallowest go.mod, and `go mod init` when the module
+			// predates modules (no go.mod) so generate/build still have a
+			// module context. All steps are best-effort (|| true).
+			script := "set -e\n" +
+				"mkdir -p /tmp/det && cd /tmp/det\n" +
+				"unzip -q '" + archivePath + "'\n" +
+				"root=$(find . -type d -name '*@*' | head -1)\n" +
+				"if [ -z \"$root\" ]; then root=$(find . -name go.mod | awk '{print length, $0}' | sort -n | head -1 | sed 's#/go.mod##'); fi\n" +
+				"cd \"${root:-.}\"\n" +
+				"[ -f go.mod ] || go mod init '" + name + "' 2>/dev/null || go mod init detonate 2>/dev/null || true\n" +
+				"export GOFLAGS=-mod=mod GOSUMDB=off GOTOOLCHAIN=local CGO_ENABLED=0\n" +
+				"go mod download 2>&1 | tail -n 5 || true\n" +
+				"go generate ./... 2>&1 | tail -n 40 || true\n" +
+				"go build ./... 2>&1 | tail -n 40 || true\n"
+			return []string{"sh", "-c", script}
 		},
 		ImportCmd: func(name string) []string {
-			return []string{"sh", "-c",
-				"cd /tmp/build/$(ls -d */|head -1) && go test -run='^ -count=1 ./... 2>&1"}
+			return nil
 		},
-		ExtraPackages: []string{"gcc", "musl-dev", "unzip"},
+		ExtraPackages: nil,
 	},
 }
 

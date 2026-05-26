@@ -1,0 +1,12 @@
+module detonation_intel_read 1.0;
+
+require {
+	type init_t;
+	type public_content_t;
+	class file { read open getattr };
+}
+
+# Allow the detonation-svc (init_t) to read the intel overlay files, which are
+# deliberately labeled public_content_t (shared read-only content). Scoped to
+# public_content_t only — NOT user_home_t — to avoid broadening home access.
+allow init_t public_content_t:file { read open getattr };

@@ -70,6 +70,9 @@ func (c *SandboxConfig) DockerRunArgs(image string, cmd []string) []string {
 		"--rm",
 		"--network=" + c.NetworkMode,
 		"--name=" + c.ID,
+		// No --cpus: rootless Docker on this host has no CPU CFS controller
+		// delegated, so NanoCPUs makes `docker run` fail. CPULimit is retained
+		// in the config for when a cgroup-v2 CPU controller is available.
 		fmt.Sprintf("--memory=%dm", c.MemoryLimitMB),
 		"--workdir=" + c.WorkDir,
 		"-v", mountSpec,

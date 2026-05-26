@@ -42,8 +42,17 @@ with sess.session_scope() as s:
 ## Tests
 
 ```bash
-python -m pytest tests/ -x -q        # Python (306 tests)
-cd detonation && go test ./... -v     # Go
+python -m pytest tests/ -x -q          # Python (437 tests)
+cd detonation && go test ./... -v       # Go
+tools/test_opengrep_rules.sh            # opengrep rules via `--test` fixtures
+```
+
+opengrep/semgrep and (often) the Python deps aren't on dev hosts. Run against the scanner
+image with the working tree mounted — clean, doesn't touch the running scanner:
+
+```bash
+docker run --rm --entrypoint python -v "$PWD:/src" -w /src pkgsentry-scanner -m pytest tests/ -q
+docker run --rm --entrypoint bash   -v "$PWD:/src" -w /src pkgsentry-scanner tools/test_opengrep_rules.sh
 ```
 
 ## Key env vars
@@ -51,6 +60,7 @@ cd detonation && go test ./... -v     # Go
 | Var | Purpose | Default |
 |-----|---------|---------|
 | `SCANNER_INGEST` | `0` = don't enqueue new packages, `1` = poll feeds/cursor | `1` |
+| `PKGSENTRY_FOCUS_EXCLUSIVE` | `1` = scan ONLY focus-list packages (skip watchlist + brand-new gates and watchlist refresh); `0` = additive (focus packages scanned at high priority *plus* the normal gates) | `0` |
 | `OPENROUTER_API_KEY` | LLM triage API key | — |
 | `DISCORD_WEBHOOK_URL` | Malicious package alerts | — |
 | `PKGSENTRY_DB_URL` | DB connection URL | `sqlite:///pkgsentry.db` |
@@ -70,14 +80,14 @@ cd detonation && go test ./... -v     # Go
 
 ## Architecture
 
-**Ingest** (watchlist + all new packages, per-ecosystem feeds/cursor) → **Queue** (fair cross-ecosystem scheduling) → **Workers** → **Download** + SHA256 verify → **Extract** + hash (SHA256 + entropy + ssdeep) → **Code-diff** vs previous version → **Analyze** → **Score** → **Detonate** → **Re-score** → **LLM triage** (cost-gated) → **Discord alert**
+**Ingest** (focus list + watchlist + all new packages, per-ecosystem feeds/cursor) → **Queue** (fair cross-ecosystem scheduling) → **Workers** → **Download** + SHA256 verify → **Extract** + hash (SHA256 + entropy + ssdeep) → **Code-diff** vs previous version → **Analyze** → **Score** → **Detonate** (all ecosystems) → **Re-score** → **LLM triage** (cost-gated) → **Discord alert**
 
 ### Intel pack
 
 All tunable detection data is loaded from an intel pack at process start (`pkgsentry.intel.load()` in `runtime.py`). See `docs/intel-pack.md` for full reference.
 
 ```
-pkgsentry/intel/baseline/        # ships in tree, Apache 2.0
+pkgsentry/intel/baseline/        # ships in tree, AGPL-3.0 (third-party YARA under their own licenses, see NOTICE)
   intel_pack.toml                # manifest
   yara/                          # community + baseline YARA rules
   hashes/known_malicious.jsonl   # empty in baseline
@@ -89,7 +99,8 @@ pkgsentry/intel/baseline/        # ships in tree, Apache 2.0
   ioc_whitelist.toml             # benign domains
   malware_patterns.toml          # install-time file lists
   gomod_benign_tools.toml        # known-benign go:generate tools
-  opengrep/                      # opengrep rule directories (python/, rust/, go/)
+  npm_benign_tools.toml          # known-benign package.json lifecycle-script tools
+  opengrep/                      # opengrep rule directories (python/, rust/, go/, javascript/)
   detonation/                    # behavioral rule data + noise filters
 ```
 
@@ -102,23 +113,47 @@ Operators supply a private overlay via `PKGSENTRY_INTEL_PATH`. Merge semantics: 
 | PyPI | 10K + all new packages | RSS + XML-RPC cursor | Yes |
 | Crates.io | 10K + all new crates | RSS feeds | Yes |
 | Go modules | ~9K + all brand-new modules | NDJSON index cursor | Yes |
+| npm | top-N + all brand-new packages | CouchDB `_changes` seq cursor | Yes |
 
-All ecosystems share the same analysis pipeline, including detonation.
+All four ecosystems share the same analysis pipeline, including detonation (crates/Go
+sandbox builds are best-effort — install-time behavior is still traced even when a
+build fails). npm discovery uses the CouchDB `_changes` feed, which carries only the
+package name (not the version), so the cursor resolves `dist-tags.latest` for gated
+packages before enqueuing. npm install analysis parses `package.json` lifecycle scripts.
 
 ### Ingest gates
 
-A package is enqueued if it meets **either** condition:
+A package is enqueued if it meets **any** condition:
 
 | Condition | Priority | Purpose |
 |-----------|----------|---------|
+| **On focus list** (operator-supplied per ecosystem) | `high` | Monitor the operator's own dependencies |
 | **On watchlist** (top 10K per ecosystem) | `high` | Protect high-blast-radius packages |
 | **Brand new package** (first-ever publish) | `normal` | Catch lure/social-engineering packages |
 
-Existing non-watchlist version updates are skipped.
+Existing non-watchlist/non-focus version updates are skipped.
+
+**Focus list** (`FocusList` table; `pkgsentry/focus.py`): a per-ecosystem personal
+watchlist. Easiest path is one combined file with `[pypi]`/`[crates]`/`[gomod]` sections
+plus `pkgsentry run -f <file>` (focused/exclusive mode, authoritative sync). Also loadable
+without switching modes via `pkgsentry focus load <file>` (combined, no `-e`, authoritative)
+or `pkgsentry focus load <file> -e <eco>` (flat, additive). Entry syntax is lenient — a
+package `name` optionally followed by a version in any common form (`name`, `name==1.2.3`,
+`name>=1.2.3`, `name~=1.2`, `name^1.0`, gomod `name v1.2.3`) so operators can paste
+requirements.txt / go.mod / Cargo lines. The NAME is monitored (every new release scanned);
+any version present is scanned once at load (a range's lower bound). gomod matched
+case-insensitively. Parsing lives in `focus.parse_focus_file` / `_floor_version`.
+Every new release of a focus package is enqueued at `high`; a pinned version is scanned
+once at load time. The gate check is centralized in `focus.gate_decision()` and applied
+in the four gated ingest consumers. With `PKGSENTRY_FOCUS_EXCLUSIVE=1` the scanner ingests
+**only** focus packages (watchlist + brand-new gates and the watchlist refresh/seed jobs
+are skipped); an empty focus list in this mode logs `focus_exclusive_empty` and the
+scanner idles by design. Do **not** set `enable-process-ns` in Tetragon config — unrelated,
+but a similar "looks fine, breaks silently" trap noted in `docs/detonation.md`.
 
 ### Detection layers
 
-~104 rules across 12 layers. Full catalog: `docs/detection-rules.md`.
+~115 rules across 12 layers. Full catalog: `docs/detection-rules.md`.
 
 1. `analyze/imports.py` — AST import analysis
 2. `analyze/iocs.py` — URLs, IPs, onion, base64 (with benign domain whitelist)
@@ -127,10 +162,11 @@ Existing non-watchlist version updates are skipped.
 5. `ecosystems/pypi/installer.py` — setup.py AST parse (PyPI) — *being replaced by opengrep, see layer 12*
 6. `ecosystems/crates/build_rs.py` — build.rs analysis (Crates) — *being replaced by opengrep, see layer 12*
 7. `ecosystems/gomod/go_directives.py` — go:generate, init() body, CGO, replace, unsafe (Go)
+7b. `ecosystems/npm/installer.py` — package.json lifecycle scripts + referenced-JS (npm)
 8. `analyze/yara_scan.py` — YARA rule matching
 9. `analyze/version_diff.py` — clean→critical transitions, author changes, dep spikes
 10. `analyze/threat_intel.py` — known-malicious fingerprints (SHA256, ssdeep, TLSH)
-11. `detonate/` — Docker sandbox + Tetragon eBPF dynamic analysis (all ecosystems)
+11. `detonate/` — rootless-Docker sandbox + Tetragon eBPF dynamic analysis (all ecosystems)
 12. `analyze/opengrep_scan.py` — opengrep static analysis with intrafile taint tracking (all ecosystems). Shadow mode default-on via `OPENGREP_SHADOW=1`.
 
 ### Scoring
@@ -153,13 +189,15 @@ cd detonation && make build           # Cross-compile for Linux
 **Components:**
 - `internal/trace/` — TraceEvent types + Tetragon JSON collector (PID namespace filtering)
 - `internal/rules/` — 8 behavioral rules + dedup engine
-- `internal/baseline/` — noise filter for known-benign behaviors
+- `internal/baseline/` — noise filter: per-ecosystem file/exec noise **+ network allowlist** (`{eco}_net_allow`). Hostnames resolved to IPs at filter time; connects to registry/CDN destinations are dropped so normal dependency fetches don't false-positive as `dyn_import_exfil`/`dyn_install_exfil`. Tune via the intel overlay (see below).
 - `internal/sandbox/` — Docker container orchestration + per-ecosystem profiles
 - `internal/api/` — HTTP server (`/api/v1/health`, `/api/v1/detonate`)
 - `cmd/detonation-svc/` — main entry point
-- `deploy/` — systemd unit, cgroup slice, Tetragon policy, setup.sh
+- `deploy/` — systemd unit, cgroup slice, Tetragon policy, setup.sh, `selinux/` policy
 
 **Isolation:** Detonation user is NOT in the `docker` group. Uses rootless Docker (separate daemon at `/run/user/<UID>/docker.sock`, separate storage). `DOCKER_HOST` env var set via `/etc/default/detonation-svc` (generated by `setup.sh`).
+
+**Intel overlay + SELinux:** the service reads a private overlay from `$PKGSENTRY_INTEL_PATH/detonation/{rules_data,noise_baseline}.toml` (set in `/etc/default/detonation-svc`), UNION-merged over the embedded baseline — operators pin extra noise filters + `{eco}_net_allow` domains/IPs there (mine FP destinations from the `trace_event` table). Under SELinux Enforcing, the service (`init_t`) cannot read `user_home_t` files, so `setup.sh` relabels the overlay to `public_content_t` and installs `deploy/selinux/detonation_intel_read.te`. Confirm with `intel_loaded source=baseline+overlay`. Build needs **Go 1.22+** (build-time only; not installed by `setup.sh`).
 
 ## Code conventions
 
@@ -193,6 +231,7 @@ Architecture and flow diagrams live in `docs/diagrams/` (draw.io format):
 | `pypi-pipeline.drawio` | PyPI end-to-end pipeline |
 | `crates-pipeline.drawio` | Crates.io end-to-end pipeline |
 | `go-pipeline.drawio` | Go modules pipeline |
+| `npm-pipeline.drawio` | npm modules pipeline |
 | `detection-layers.drawio` | Detection layers, color-coded by ecosystem |
 | `code-diff-flow.drawio` | Code-diff scanning flow |
 | `queue-state-machine.drawio` | Queue states + fair scheduling |

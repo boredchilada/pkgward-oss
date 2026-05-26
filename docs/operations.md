@@ -90,6 +90,76 @@ with sess.session_scope() as s:
 "
 ```
 
+## Focus packages
+
+Monitor a specific set of dependencies (your own) instead of, or in addition to,
+the top-10K watchlist and all brand-new uploads.
+
+### One combined file (recommended)
+
+Write a single file with per-ecosystem sections — `#` comments and blanks ignored:
+
+```
+[pypi]
+requests==2.31.0
+cryptography
+[crates]
+serde
+[gomod]
+# name [version], whitespace-separated, matched case-insensitively
+github.com/gin-gonic/gin v1.9.1
+```
+
+The easiest way to use it — **drop the file and run focused**:
+
+```bash
+pkgsentry run -f /config/focus.txt          # focused mode: scan ONLY these
+```
+
+`-f/--focus` runs the scanner in **exclusive** mode against the file: it authoritatively
+syncs the focus list (each `[section]` replaces that ecosystem's entries), enqueues any
+pinned `name==version` immediately, and skips the watchlist + brand-new gates entirely.
+Without `-f`, `pkgsentry run` does the usual watchlist + brand-new ingest.
+
+To load a combined file *without* switching to focused mode (additive — keep watching the
+watchlist too), use the CLI and leave the scanner running normally:
+
+```bash
+docker exec pkgsentry pkgsentry focus load /config/focus.txt   # no -e: all sections
+docker exec pkgsentry pkgsentry focus list                     # all ecosystems
+docker exec pkgsentry pkgsentry focus clear                    # all (or -e <eco>)
+```
+
+### Single ecosystem (flat file)
+
+`focus load <file> -e pypi` loads a flat list for one ecosystem, **additively** (upsert —
+does not remove existing entries).
+
+### Entry syntax (lenient)
+
+Each line is a package **name** optionally followed by a version in any common form, so you
+can paste lines straight from `requirements.txt` / `go.mod` / `Cargo.toml`:
+
+```
+requests                 # monitor every new release
+requests==2.31.0         # also scan 2.31.0 once (the version you run)
+requests>=2.31.0         # same — the version present is scanned once
+flask~=3.0               # ~=, ^, and ranges accepted; lower bound used
+github.com/gin/gin v1.9.1   # gomod: space-separated
+```
+
+The **name** is what's monitored — every new release of it is scanned at high priority.
+Any version present is scanned once at load (for a range, its lower bound). Nothing is
+rejected.
+
+### Notes
+
+- After loading, every new release of a focus package is enqueued at high priority
+  automatically; pinned versions are scanned once at load.
+- The underlying toggle is `PKGSENTRY_FOCUS_EXCLUSIVE` (`1` = exclusive, `0` = additive);
+  `run -f` sets it to `1` for that process. In exclusive mode with an empty focus list the
+  scanner logs `focus_exclusive_empty` and idles by design.
+
 ## Intel pack
 
 pkgsentry loads detection content from an intel pack at startup.
@@ -97,7 +167,7 @@ pkgsentry loads detection content from an intel pack at startup.
 **Baseline only** (default, no config needed):
 
 ```
-pkgsentry/intel/baseline/   — ships in-tree, Apache 2.0
+pkgsentry/intel/baseline/   — ships in-tree, AGPL-3.0
 ```
 
 **Private overlay** (operator-supplied):
@@ -116,6 +186,39 @@ Startup log confirms the active pack:
 ```
 intel_loaded source=baseline+overlay yara_n=… hash_seeds_n=… …
 ```
+
+## Tuning the detonation network allowlist
+
+The detonation noise filter drops connections to known registry/CDN destinations
+(`{eco}_net_allow` in `detonation/noise_baseline.toml`) so normal dependency fetches don't
+false-positive as `dyn_import_exfil`. Before adding entries, **mine the data you already
+have** — the recurring destinations on benign detonations are the FP candidates:
+
+```bash
+docker exec pkgsentry python -c "
+from pkgsentry.store import session as sess
+from sqlalchemy import text
+sess.init_db()
+with sess.session_scope() as s:
+    rows = s.execute(text('''
+      SELECT d.ecosystem, te.detail->>'addr' addr, sc.verdict,
+             count(distinct d.scan_id) scans
+      FROM trace_event te
+      JOIN detonation d ON te.detonation_id=d.id
+      JOIN scan sc ON d.scan_id=sc.id
+      WHERE te.category='network' AND te.operation='connect' AND te.phase='import'
+      GROUP BY 1,2,3 ORDER BY scans DESC LIMIT 30''')).all()
+    for r in rows: print(r)
+"
+```
+
+Reverse-resolve the IPs (`socket.gethostbyaddr`) to identify the owner (Fastly =
+151.101/146.75/199.232; Cloudflare = 104.16–104.31; Google = 142.250/64.233 `1e100.net`;
+CloudFront = `cloudfront.net`). Add **hostnames** (preferred — resolved per detonation,
+self-updating) and/or the **observed registry /32s** to the per-ecosystem `*_net_allow` in
+the private overlay. **Never** add broad CDN CIDRs (would mask real exfil) or internal infra.
+Note: under SELinux the detonation service needs the overlay relabeled — `setup.sh` handles
+this; see `docs/detonation.md`.
 
 ## Debugging a frozen scanner
 

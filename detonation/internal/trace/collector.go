@@ -42,6 +42,13 @@ type tetragonKprobeArg struct {
 	SockArg   *tetragonSockArg `json:"sock_arg,omitempty"`
 	StringArg string           `json:"string_arg,omitempty"`
 	IntArg    *int64           `json:"int_arg,omitempty"`
+	FileArg   *tetragonFileArg `json:"file_arg,omitempty"`
+}
+
+// tetragonFileArg is how Tetragon renders a `type: file` argument (e.g. the
+// first arg of security_file_permission). The path lives under "path".
+type tetragonFileArg struct {
+	Path string `json:"path"`
 }
 
 type tetragonSockArg struct {
@@ -61,7 +68,7 @@ func ParseTetragonLine(line string, targetNS int) ([]TraceEvent, error) {
 
 	if raw.ProcessExec != nil {
 		proc := raw.ProcessExec.Process
-		if targetNS != 0 && proc.NS.PIDForChildren != targetNS {
+		if proc.NS.PIDForChildren != targetNS {
 			return nil, nil
 		}
 		events = append(events, TraceEvent{
@@ -79,7 +86,7 @@ func ParseTetragonLine(line string, targetNS int) ([]TraceEvent, error) {
 
 	if raw.ProcessKprobe != nil {
 		proc := raw.ProcessKprobe.Process
-		if targetNS != 0 && proc.NS.PIDForChildren != targetNS {
+		if proc.NS.PIDForChildren != targetNS {
 			return nil, nil
 		}
 
@@ -121,8 +128,14 @@ func ParseTetragonLine(line string, targetNS int) ([]TraceEvent, error) {
 			}
 
 		case fn == "__x64_sys_write" || fn == "security_file_permission":
+			// security_file_permission carries the path as a file arg, not a
+			// string arg; __x64_sys_write uses a string arg. Accept either.
 			for _, arg := range raw.ProcessKprobe.Args {
-				if arg.StringArg != "" {
+				path := arg.StringArg
+				if path == "" && arg.FileArg != nil {
+					path = arg.FileArg.Path
+				}
+				if path != "" {
 					events = append(events, TraceEvent{
 						Category:  "file",
 						Operation: "write",
@@ -130,16 +143,53 @@ func ParseTetragonLine(line string, targetNS int) ([]TraceEvent, error) {
 						Binary:    proc.Binary,
 						Timestamp: raw.Time,
 						Detail: map[string]interface{}{
-							"path": arg.StringArg,
+							"path": path,
 						},
 					})
 				}
 			}
 
-		case fn == "sys_ptrace" || fn == "process_vm_writev":
+		case fn == "sys_ptrace" || fn == "__x64_sys_process_vm_writev":
+			// dyn_proc_inject keys off Operation "ptrace"/"process_vm_writev".
+			// process_vm_writev has no bare kernel symbol, so the policy hooks
+			// the syscall form; normalize both names to the rule's vocabulary.
+			op := "ptrace"
+			if fn == "__x64_sys_process_vm_writev" {
+				op = "process_vm_writev"
+			}
 			events = append(events, TraceEvent{
 				Category:  "process",
-				Operation: fn,
+				Operation: op,
+				PID:       proc.PID,
+				Binary:    proc.Binary,
+				Timestamp: raw.Time,
+				Detail:    map[string]interface{}{},
+			})
+
+		case fn == "__x64_sys_memfd_create":
+			// Anonymous executable memory — a building block of fileless exec.
+			name := ""
+			for _, arg := range raw.ProcessKprobe.Args {
+				if arg.StringArg != "" {
+					name = arg.StringArg
+					break
+				}
+			}
+			events = append(events, TraceEvent{
+				Category:  "process",
+				Operation: "memfd_create",
+				PID:       proc.PID,
+				Binary:    proc.Binary,
+				Timestamp: raw.Time,
+				Detail:    map[string]interface{}{"name": name},
+			})
+
+		case fn == "__x64_sys_execveat":
+			// Policy filters to AT_EMPTY_PATH, i.e. execve directly from an fd
+			// (often a memfd) with no backing file on disk — fileless exec.
+			events = append(events, TraceEvent{
+				Category:  "process",
+				Operation: "fileless_exec",
 				PID:       proc.PID,
 				Binary:    proc.Binary,
 				Timestamp: raw.Time,

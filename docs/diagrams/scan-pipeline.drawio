@@ -56,7 +56,7 @@
         <mxCell id="bg_p4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="1990" width="860" height="380" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p4_label" value="&lt;b&gt;Phase 4 — Detonation&lt;/b&gt;  (PyPI only, if enabled)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
+        <mxCell id="bg_p4_label" value="&lt;b&gt;Phase 4 — Detonation&lt;/b&gt;  (all ecosystems, if enabled)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
           <mxGeometry x="230" y="1995" width="340" height="24" as="geometry"/>
         </mxCell>
 
@@ -337,10 +337,10 @@
         </mxCell>
 
         <!-- Detonate: Yes -->
-        <mxCell id="n_sandbox" value="&lt;b&gt;Send sdist to gVisor sandbox&lt;/b&gt;&lt;br&gt;via UNIX socket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+        <mxCell id="n_sandbox" value="&lt;b&gt;Send archive to rootless-Docker sandbox&lt;/b&gt;&lt;br&gt;via UNIX socket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
           <mxGeometry x="520" y="2190" width="260" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="e_det_yes" value="Yes (PyPI only)" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_detonate" target="n_sandbox" parent="1">
+        <mxCell id="e_det_yes" value="Yes (all ecosystems)" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_detonate" target="n_sandbox" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 

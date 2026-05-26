@@ -1,0 +1,66 @@
+# Known-benign tools invoked by package.json lifecycle scripts
+# (preinstall/install/postinstall/prepare). UNION semantics: overlay tools add.
+#
+# A lifecycle script whose every command-chain segment leads with a tool on
+# this list produces no finding. `node <file>` is treated as NON-benign so the
+# referenced .js gets followed and scanned. Network/exec shapes (curl, sh -c,
+# eval, base64 -d, ...) remain flagged regardless of this list.
+
+tools = [
+    # Native build / prebuilt binaries (the legitimate reason most packages
+    # need a postinstall at all).
+    "node-gyp",
+    "node-gyp-build",
+    "prebuild-install",
+    "prebuildify",
+    "node-pre-gyp",
+    # TypeScript / bundlers / compilers
+    "tsc",
+    "tsup",
+    "webpack",
+    "rollup",
+    "vite",
+    "esbuild",
+    "babel",
+    "parcel",
+    "ncc",
+    "swc",
+    # Task runners / build helpers
+    "gulp",
+    "grunt",
+    "nest",
+    "ng",
+    # File ops commonly used in build scripts
+    "rimraf",
+    "mkdirp",
+    "cpy",
+    "copyfiles",
+    "shx",
+    "cp",
+    "mv",
+    "mkdir",
+    # Lint / format / test
+    "eslint",
+    "prettier",
+    "jest",
+    "mocha",
+    "vitest",
+    # Dev-env hygiene
+    "husky",
+    "patch-package",
+    "is-ci",
+    "cross-env",
+    "lerna",
+    "nx",
+    "turbo",
+    # Package managers + shell no-ops
+    "npm",
+    "yarn",
+    "pnpm",
+    "npx",
+    "echo",
+    "true",
+    "exit",
+    "cd",
+    "node",
+]
