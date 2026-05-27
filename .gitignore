@@ -57,7 +57,7 @@ qc.py
 # Binary build artifacts (detonation Go service)
 *.exe
 detonation/detonation-svc
-detonation-svc
+detonation/bin/
 
 # Home-dir dotfiles + harness state — this tree lives in a home dir on the
 # prod scanner host (/home/pkgsentry); these are not part of the project.
