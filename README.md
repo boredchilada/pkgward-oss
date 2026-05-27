@@ -95,12 +95,13 @@ For dynamic analysis (rootless Docker + Tetragon sandbox, all ecosystems) you ne
 
 ## Comparison
 
-pkgsentry overlaps with several existing scanners. Honest summary:
+Several established tools address adjacent problems, and pkgsentry is not a drop-in replacement for all of them:
 
-- **Socket / Phylum / Endor Labs** — commercial, much larger detection corpora, IDE integrations, dependency-graph features. If you need a managed product, use them.
-- **Bumblebee** (Phylum OSS) — focused on PyPI and npm, mature CLI workflow.
-- **OSV-Scanner** — vulnerability database matching (known-CVE coverage), not malicious-package classification.
-- **pkgsentry** — four ecosystems in one engine (PyPI, crates.io, Go, npm), brand-new-package scanning explicitly in scope, a rootless-Docker + Tetragon detonation sandbox across all four, focus-mode monitoring of your own dependency list, plugin-loaded intel so you own your detection content. Geared toward operators who want to run their own scanner against the live feeds rather than consume a hosted product.
+- **Socket, Phylum, Endor Labs** — commercial platforms with large proprietary detection corpora, IDE and CI integrations, and dependency-graph analysis. Best suited to teams that want a managed, supported product.
+- **Bumblebee** (Phylum, open source) — a mature command-line scanner focused on PyPI and npm.
+- **OSV-Scanner** — matches dependencies against known-vulnerability databases (CVEs), which is a distinct problem from classifying previously-unknown malicious packages.
+
+pkgsentry is self-hosted and deliberately focused: a single engine covering four ecosystems (PyPI, crates.io, Go, and npm), with first-publish scanning of brand-new packages, a rootless-Docker + Tetragon detonation sandbox across all four, focus-mode monitoring of your own dependencies, and plugin-loaded intel so you retain control of your detection content. It is intended for operators who prefer to run their own scanner against the live registries rather than rely on a hosted service.
 
 ## Known limitations
 
