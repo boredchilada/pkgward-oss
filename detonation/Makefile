@@ -6,7 +6,7 @@ VERSION := 0.1.0
 .PHONY: build test lint clean deploy
 
 build:
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/$(BINARY) ./cmd/detonation-svc/
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -buildvcs=false -o bin/$(BINARY) ./cmd/detonation-svc/
 
 test:
 	go test ./... -v

@@ -4,7 +4,7 @@ The detonation service runs package install phases inside isolated Docker contai
 observes behavior via Tetragon eBPF tracing. It is a separate Go binary (`detonation-svc`)
 that the scanner communicates with over a UNIX socket.
 
-Runs for PyPI, Crates, and Go modules (max-concurrent 6). The pipeline reads
+Runs for PyPI, crates, Go modules, and npm (max-concurrent 6). The pipeline reads
 Tetragon's JSONL log per detonation, tags events with the install/import phase
 by time window, filters host/build noise, then evaluates the Go behavioral rules.
 
@@ -50,9 +50,9 @@ process opaque to host-level BPF tracers — Tetragon can see the Docker daemon'
 not the package's. Using runc keeps the guest's syscalls visible on the host kernel, where
 Tetragon can trace them.
 
-gVisor is installed and registered as an optional runtime in `/etc/docker/daemon.json`, but it
-is not the default. You can still run `docker run --runtime=runsc` manually for defense-in-depth
-analysis where Tetragon visibility is not required.
+gVisor (`runsc`) is not installed or used. For defense-in-depth where Tetragon visibility is
+not required, install runsc separately, register it in `/etc/docker/daemon.json`, and run
+`docker run --runtime=runsc` manually.
 
 Isolation provided by the runc path: Docker PID/mount/network/UTS namespaces, seccomp default
 profile, dropped capabilities, cgroup limits (2 CPU / 2 GB), `--no-new-privileges`, network
@@ -63,34 +63,51 @@ bridged (controlled per-call).
 - Linux, kernel 5.8+ with BTF support (`/sys/kernel/btf/vmlinux` must exist)
 - systemd
 - Docker (community edition, no EE requirement)
-- x86-64 (gVisor + Tetragon are amd64-only)
+- x86-64 (Tetragon is amd64-only)
+- Go 1.22+ to build the service (build-time only; `bootstrap.sh` installs it if missing)
 
 Tested on AlmaLinux 9. Any modern RHEL-derivative or Debian-derivative with a BTF-enabled
 kernel should work.
 
 ## Provisioning
 
-Run `detonation/deploy/setup.sh` as root on the target host. The script is idempotent — safe to
-re-run.
+### One command
+
+On a clean host, as root, from the repo's `detonation/` directory:
 
 ```bash
-# Copy the binary and deploy assets to the target host first, then:
+sudo bash deploy/bootstrap.sh
+```
+
+`bootstrap.sh` installs Docker and a Go 1.22+ toolchain if missing, builds the service
+(`-buildvcs=false`), stages it to `/home/detonation/{deploy,bin}`, runs `setup.sh`, and starts
+the sandbox.
+
+### Manual
+
+Build and stage first, then run `setup.sh` (idempotent):
+
+```bash
+cd detonation
+make build
+mkdir -p /home/detonation/deploy /home/detonation/bin
+cp -r deploy/. /home/detonation/deploy/
+cp bin/detonation-svc /home/detonation/bin/
 sudo bash /home/detonation/deploy/setup.sh
 ```
 
-What `setup.sh` does:
+`setup.sh` fails fast if a prerequisite (Docker, BTF, the staged binary/deploy tree) is missing,
+then:
 
-1. Creates OS users `detonation` and `pkgsentry` (dedicated users, no sudo).
-2. Creates directories: `/var/lib/detonation/`, `/var/run/detonation/`, `/var/lib/pkgsentry/`.
-3. Installs gVisor (`runsc`) from the official release URL.
-4. Installs Tetragon v1.3.0 via Cilium's `install.sh` (handles BPF objects + systemd unit).
-5. Enables the `tetragon` systemd service.
-6. Installs and enables the `detonation-svc` systemd unit and cgroup slice.
-7. Creates `/var/run/runsc` and persists it via `/etc/tmpfiles.d/detonation.conf`.
-   (systemd refuses to namespace a `ReadWritePaths` target that doesn't exist at unit start.)
-8. Registers `runsc` as a Docker runtime in `/etc/docker/daemon.json`.
-9. Pre-pulls `python:3.11-slim`, `node:20-slim`, `rust:1-slim` base images.
-10. Installs the Tetragon tracing policy.
+1. Creates OS users `detonation` and `pkgsentry` (dedicated, no sudo, not in `docker`).
+2. Creates `/var/lib/detonation/`, `/var/run/detonation/`, `/var/lib/pkgsentry/`.
+3. Installs Tetragon v1.3.0 via Cilium's `install.sh` and enables it.
+4. Installs and enables the `detonation-svc` unit and cgroup slice.
+5. Provisions rootless Docker for the `detonation` user (installs `uidmap`,
+   `docker-ce-rootless-extras`, `fuse-overlayfs`, `slirp4netns`).
+6. Pre-pulls the `python:3.11-slim`, `node:20-slim`, `rust:1-slim`, `golang:1.22-alpine` images.
+7. Installs the Tetragon tracing policy.
+8. Under SELinux Enforcing, relabels the intel overlay so detonation-svc can read it.
 
 ### BTF check
 

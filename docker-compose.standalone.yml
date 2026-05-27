@@ -40,6 +40,8 @@ services:
       - scanner-data:/data
       # Uncomment to load a private intel overlay (see docs/intel-pack.md):
       # - ./intel/private:/app/intel/private:ro
+      # Uncomment to reach a host detonation sandbox (see docs/detonation.md):
+      # - /var/run/detonation/detonation.sock:/var/run/detonation/detonation.sock
     env_file:
       - .env
     environment:
@@ -48,6 +50,8 @@ services:
       - PKGSENTRY_DB_URL=postgresql://pkgsentry:pkgsentry@postgres:5432/pkgsentry
       # Uncomment alongside the volume mount above:
       # - PKGSENTRY_INTEL_PATH=/app/intel/private
+      # Uncomment alongside the detonation socket mount above:
+      # - DETONATION_SOCKET=/var/run/detonation/detonation.sock
     deploy:
       resources:
         limits:
