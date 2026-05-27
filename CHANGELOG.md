@@ -4,6 +4,27 @@ All notable changes to pkgsentry are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Reserved for 0.6.0
+- **LLM integration overhaul** — multi-provider support (beyond the current OpenRouter path) and
+  a review of where LLM triage sits in the pipeline and how it's gated (cost/verdict thresholds,
+  when it runs, and how its verdict interacts with rule-based scoring).
+- **Model comparison / benchmarking** — a way to evaluate triage models head-to-head (agreement
+  with rule verdicts, false-positive/negative rate, cost, and latency) so the default model and
+  per-provider choices are driven by measured results rather than guesswork.
+
+### Coming in 0.5.1 (in testing)
+- **Detection regression suite** — a labeled corpus of known-bad / known-good sample packages
+  run through the real analyze→score path, so a change that starts missing malware or
+  over-flagging clean packages fails the test suite instead of reaching production. Includes a
+  rule-coverage check that flags any scored detection rule lacking a sample.
+- **opengrep `--test` fixtures for Python/Rust/Go** — all four language rule sets become
+  self-testing (previously JavaScript-only).
+- **Frozen-sample vault** — optionally preserve the original archive of anything flagged
+  malicious (stored inert), so a caught package remains a permanent regression anchor even after
+  the registry removes it.
+
 ## [0.5.0] — 2026-05-26
 
 ### Added
