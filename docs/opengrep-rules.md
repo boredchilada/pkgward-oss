@@ -6,8 +6,8 @@ The opengrep layer (`pkgsentry/analyze/opengrep_scan.py`) runs the [opengrep](ht
 
 | Tree | Path | Audience | License |
 |------|------|----------|---------|
-| Baseline (ships with the engine) | `pkgsentry/intel/baseline/opengrep/{python,rust,go}/*.yaml` | Public OSS users | Apache 2.0 |
-| Private overlay (operator-supplied) | `$PKGSENTRY_INTEL_PATH/opengrep/{python,rust,go}/*.yaml` | Single deployment | Operator's choice |
+| Baseline (ships with the engine) | `pkgsentry/intel/baseline/opengrep/{python,rust,go,javascript}/*.yaml` | Public OSS users | AGPL-3.0 |
+| Private overlay (operator-supplied) | `$PKGSENTRY_INTEL_PATH/opengrep/{python,rust,go,javascript}/*.yaml` | Single deployment | Operator's choice |
 
 The two directories are **UNION-merged** at process start — same semantics as the YARA dirs. Both sets of rules run on every scan; baseline rules are not replaced by overlay rules, they coexist. Rule IDs must be globally unique across both sets.
 
@@ -23,7 +23,7 @@ rules:
     mode: taint                          # or omit for plain pattern matching
     message: >-
       Network response is tainted into exec/eval/compile at install time.
-    languages: [python]                  # python | rust | go | generic
+    languages: [python]                  # python | rust | go | javascript ([js, ts]) | generic
     severity: ERROR                      # opengrep's own scale: ERROR | WARNING | INFO
     metadata:
       severity: critical                 # pkgsentry scale: low | medium | high | critical
@@ -48,7 +48,7 @@ rules:
 |-------|-----|
 | `id` | Becomes the `rule_id` after pkgsentry prefixing (`opengrep.<id>` or `opengrep.shadow_<id>`). Use snake_case. Keep it descriptive — it shows up in alerts, DB rows, and Discord messages. |
 | `message` | Becomes the `evidence` string on the Finding. Operator-facing. Be concrete about what the rule fires on. |
-| `languages` | Single-element list (`[python]`, `[rust]`, `[go]`) or `[generic]` for textual/regex rules. pkgsentry's three ecosystems are Python / Rust / Go. |
+| `languages` | `[python]`, `[rust]`, `[go]`, `[javascript]` (use `[js, ts]` to cover TypeScript too), or `[generic]` for textual/regex rules. pkgsentry scans four ecosystems — PyPI (Python), crates.io (Rust), Go modules, and npm (JavaScript/TypeScript). |
 | `severity` (top-level) | opengrep's required field. Use `ERROR` for the most serious findings; opengrep filters by this when run with `--severity` flags (we don't, but it's still required). |
 | `metadata.severity` | **The pkgsentry-side severity.** Maps to scoring points: `low=1`, `medium=8`, `high=25`, `critical=60`. This is what actually drives the verdict. |
 | `metadata.confidence` | `low`, `medium`, `high`. Currently surfaced for analyst triage; doesn't change scoring math. |
