@@ -17,10 +17,12 @@ command -v curl  >/dev/null 2>&1 || fail "curl not installed."
 
 # 1. Users — one dedicated user per app, no docker group, no sudo.
 if ! id detonation &>/dev/null; then
-    useradd -r -m -d /home/detonation -s /bin/bash detonation
+    groupadd -f detonation
+    useradd -r -m -d /home/detonation -s /bin/bash -g detonation detonation
 fi
 if ! id pkgsentry &>/dev/null; then
-    useradd -r -m -d /home/pkgsentry -s /bin/bash pkgsentry
+    groupadd -f pkgsentry
+    useradd -r -m -d /home/pkgsentry -s /bin/bash -g pkgsentry pkgsentry
 fi
 usermod -a -G detonation pkgsentry
 

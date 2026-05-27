@@ -53,7 +53,7 @@ echo "Building detonation-svc..."
 ( cd "$DET_DIR" && GOOS=linux GOARCH=amd64 go build -buildvcs=false -o bin/detonation-svc ./cmd/detonation-svc/ )
 
 # 4. Stage deploy tree + binary where setup.sh and the systemd unit expect them.
-id detonation &>/dev/null || useradd -r -m -d /home/detonation -s /bin/bash detonation
+id detonation &>/dev/null || { groupadd -f detonation; useradd -r -m -d /home/detonation -s /bin/bash -g detonation detonation; }
 mkdir -p /home/detonation/deploy /home/detonation/bin
 cp -r "$DEPLOY_DIR/." /home/detonation/deploy/
 cp "$DET_DIR/bin/detonation-svc" /home/detonation/bin/
