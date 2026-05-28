@@ -58,3 +58,27 @@ def test_detonation_result_empty_findings_no_change():
     combined = static_findings + dynamic_findings
     result = score_and_verdict(combined, watchlist_rank=None)
     assert result.verdict == "suspicious"
+
+
+def test_enqueue_gate_local_detonation_enabled(monkeypatch):
+    """A host with a local detonation client enqueues (unchanged behavior)."""
+    from types import SimpleNamespace
+    from pkgsentry.pipeline import _detonation_cluster_enabled
+    monkeypatch.delenv("DETONATION_ENABLED", raising=False)
+    assert _detonation_cluster_enabled(SimpleNamespace(is_enabled=lambda: True)) is True
+
+
+def test_enqueue_gate_scan_only_host(monkeypatch):
+    """A scan-only host (no local detonation) still enqueues when DETONATION_ENABLED=1."""
+    from types import SimpleNamespace
+    from pkgsentry.pipeline import _detonation_cluster_enabled
+    monkeypatch.setenv("DETONATION_ENABLED", "1")
+    assert _detonation_cluster_enabled(SimpleNamespace(is_enabled=lambda: False)) is True
+
+
+def test_enqueue_gate_detonation_absent(monkeypatch):
+    """No local client and no DETONATION_ENABLED → don't enqueue (no undrained pileup)."""
+    from types import SimpleNamespace
+    from pkgsentry.pipeline import _detonation_cluster_enabled
+    monkeypatch.delenv("DETONATION_ENABLED", raising=False)
+    assert _detonation_cluster_enabled(SimpleNamespace(is_enabled=lambda: False)) is False

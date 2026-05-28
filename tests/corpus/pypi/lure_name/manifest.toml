@@ -1,0 +1,11 @@
+ecosystem = "pypi"
+name = "wallet-credential-scanner"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "suspicious"
+expect_rules = ["metadata.lure_name_combo"]
+notes = "Lure name hitting 3 categories (crypto + credential + security-theater); contents inert"
+provenance = "synthetic"
+
+[metadata]
+watchlist_top_names = []

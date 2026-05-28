@@ -118,6 +118,9 @@ def show_findings(ecosystem: str, name: str, version: str) -> None:
 async def _async_run(workers: int, duration: int, focus_file: Optional[str] = None) -> None:
     from pkgsentry.adapter import adapter_registry
     from pkgsentry.workers import run_pool
+    from pkgsentry.detonation_worker import run_detonation_pool
+    from pkgsentry.detonate.client import get_client as get_detonation_client
+    from pkgsentry import detonation_queue
 
     # Focused mode (`run -f <file>`): force exclusive ingest BEFORE adapters read
     # focus_exclusive() in schedule_jobs/boot, then sync the combined file.
@@ -126,6 +129,9 @@ async def _async_run(workers: int, duration: int, focus_file: Optional[str] = No
 
     sess.init_db()
     intel.load()
+
+    from pkgsentry.util.capabilities import log_capabilities
+    log_capabilities()
 
     if focus_file:
         sync_focus_file(focus_file)
@@ -170,10 +176,51 @@ async def _async_run(workers: int, duration: int, focus_file: Optional[str] = No
                 log.info("stale_claims_swept", count=n)
 
     scheduler.add_job(_sweep_stale_job, "interval", minutes=2, id="claim_sweep")
+
+    det_enabled = get_detonation_client().is_enabled()
+    det_cluster = det_enabled or os.environ.get("DETONATION_ENABLED", "0") != "0"
+    if det_cluster:
+        def _det_sweep_stale_job():
+            with sess.session_scope() as s:
+                n = detonation_queue.sweep_stale_claims(s)
+                if n:
+                    log.info("det_stale_claims_swept", count=n)
+
+        def _det_expire_clean_job():
+            with sess.session_scope() as s:
+                n = detonation_queue.expire_stale_clean(s)
+                if n:
+                    log.info("det_clean_backlog_expired", count=n)
+
+        scheduler.add_job(_det_sweep_stale_job, "interval", minutes=2, id="det_claim_sweep")
+        scheduler.add_job(_det_expire_clean_job, "interval", minutes=15, id="det_expire_clean")
+
+    def _watchlist_auto_janitor():
+        from pkgsentry import watchlist_auto
+        if not watchlist_auto.is_enabled():
+            return
+        with sess.session_scope() as s:
+            expired = watchlist_auto.prune_expired(s)
+            over = watchlist_auto.prune_over_cap(s)
+            if expired or over:
+                log.info("watchlist_auto_janitor",
+                         pruned_expired=expired, pruned_over_cap=over)
+
+    # Hourly is enough — TTL window is in days, cap is generous, churn is slow.
+    scheduler.add_job(_watchlist_auto_janitor, "interval", minutes=60, id="watchlist_auto_janitor")
+
     scheduler.start()
 
     # Start workers first so the queue drains while boot polls watchlists.
     pool_task = asyncio.create_task(run_pool(num_workers=workers, stop_event=stop_event, poll_interval=1.0))
+
+    det_pool_task = None
+    if det_enabled:
+        det_workers = int(os.environ.get("DETONATION_WORKERS", "6"))
+        det_pool_task = asyncio.create_task(
+            run_detonation_pool(num_workers=det_workers, stop_event=stop_event, poll_interval=1.0)
+        )
+        log.info("detonation_pool_started", workers=det_workers)
 
     # Boot each ecosystem (watchlist refresh + initial poll — can be slow)
     if ingest_enabled:
@@ -195,6 +242,8 @@ async def _async_run(workers: int, duration: int, focus_file: Optional[str] = No
     finally:
         scheduler.shutdown(wait=False)
         await pool_task
+        if det_pool_task is not None:
+            await det_pool_task
 
 
 def run_forever(workers: int = 4, duration: int = 0, focus_file: Optional[str] = None) -> None:

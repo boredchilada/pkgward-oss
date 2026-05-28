@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import os
 from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -17,6 +18,10 @@ HIGH_ENTROPY_THRESHOLD = 6.0
 OBFUSCATED_THRESHOLD = 7.2
 ENTROPY_JUMP_THRESHOLD = 1.5
 MIN_FILE_SIZE = 256
+# Skip entropy on very large files (prebuilt native binaries): O(n) pure-Python
+# byte histogram, always near-max entropy (no signal), and binary.compiled_artifact
+# already covers them. Mirrors the hashing cap in pipeline._compute_file_hashes.
+MAX_FILE_SIZE = int(os.environ.get("PKGSENTRY_HASH_FULL_MAX_MB", "20")) * 1024 * 1024
 
 
 def _shannon_entropy(data: bytes) -> float:
@@ -36,6 +41,11 @@ _SKIP_EXTENSIONS = {
     ".woff", ".woff2", ".ttf", ".eot",
     ".zip", ".gz", ".bz2", ".xz", ".tar", ".whl",
     ".pyc", ".pyo", ".so", ".dll", ".pyd",
+    # Binary cert/keystore containers (PKCS#12 / DER) are encrypted by spec and
+    # always near-max entropy. Text PEM (.pem/.key) is base64 (~6 bits/byte,
+    # under threshold) and deliberately NOT skipped, so a payload disguised as
+    # PEM still trips the rule.
+    ".pfx", ".p12", ".cer", ".der", ".crt", ".jks",
 }
 
 
@@ -54,10 +64,14 @@ def analyze_entropy(
         if changed_files is not None and rel not in changed_files:
             continue
         try:
-            data = p.read_bytes()
+            size = p.stat().st_size
         except OSError:
             continue
-        if len(data) < MIN_FILE_SIZE:
+        if size < MIN_FILE_SIZE or size > MAX_FILE_SIZE:
+            continue
+        try:
+            data = p.read_bytes()
+        except OSError:
             continue
 
         ent = _shannon_entropy(data)

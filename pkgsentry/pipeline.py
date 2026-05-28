@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import math
+import os
 import shutil
 import tarfile
 import tempfile
@@ -22,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from pkgsentry.adapter import (
-    ArchivePath, Finding, IntegrityError, NoFilesError, adapter_registry,
+    ArchivePath, EcosystemAdapter, Finding, IntegrityError, NoFilesError, adapter_registry,
 )
 from pkgsentry.analyze.binary import analyze_binary_artifacts
 from pkgsentry.analyze.entropy import analyze_entropy, analyze_entropy_delta
@@ -34,27 +35,48 @@ from pkgsentry.analyze.opengrep_scan import analyze_opengrep, replaces_install_a
 from pkgsentry.analyze.version_diff import PreviousVersion, analyze_version_diff
 from pkgsentry.analyze.threat_intel import check_files_batch as check_threat_intel
 from pkgsentry.analyze.yara_scan import analyze_yara
-from pkgsentry.detect.score import score_and_verdict
+from pkgsentry.detect.score import score_and_verdict, _is_shadow_finding
+from pkgsentry import vault
+from pkgsentry.util import capabilities as caps
 from pkgsentry.util.extract import safe_extract
 from pkgsentry.logging_setup import get_logger
 from pkgsentry.queue import mark_done, mark_failed
 from pkgsentry.store import session as sess
 from pkgsentry.detonate.client import get_client as get_detonation_client
 from pkgsentry.detonate.gate import should_detonate
+from pkgsentry import detonation_queue
 from pkgsentry.store.models import (
-    Detonation,
     FileHash,
     Finding as FindingRow,
     Package,
     RuleHit,
     Scan,
     ScanQueue,
-    TraceEvent,
     Version,
     Watchlist,
 )
 
 log = get_logger("pipeline")
+
+_DETONATION_ECOSYSTEMS = {"pypi", "crates", "gomod", "npm"}
+_PREFERRED_ARCHIVE = {"pypi": "sdist", "crates": "crate", "gomod": "gomod_zip", "npm": "npm_tarball"}
+
+
+def _detonation_priority(*, verdict: str, watchlist_rank: Optional[int]) -> str:
+    if verdict in ("suspicious", "malicious") or watchlist_rank is not None:
+        return "high"
+    return "low"
+
+
+def _detonation_cluster_enabled(det_client) -> bool:
+    """Whether to enqueue detonation jobs from this host.
+
+    True if a detonation service is reachable locally, OR detonation is deployed
+    elsewhere in the cluster (DETONATION_ENABLED=1) so a scan-only worker host
+    still enqueues for a draining host to pick up. Default off keeps single-host
+    no-detonation deployments from piling up undrained jobs.
+    """
+    return det_client.is_enabled() or os.environ.get("DETONATION_ENABLED", "0") != "0"
 
 
 def _is_watchlist(session: Session, name: str, ecosystem: str) -> Optional[int]:
@@ -242,6 +264,14 @@ def _bump_rulehits_deferred(findings: Iterable[Finding]) -> None:
                 row.count += delta
 
 
+# Files larger than this get SHA-256 only (streamed). Entropy/ssdeep/TLSH are
+# O(n) in pure Python (or near it) and ruinously slow on big prebuilt native
+# binaries (e.g. ~50-200MB platform packages: esbuild/turbo/swc/AI tools) while
+# adding little signal — a compiled binary is always near-max entropy and rarely
+# matches a fuzzy fingerprint. Exact SHA-256 (threat-intel) still covers them.
+HASH_FULL_MAX_BYTES = int(os.environ.get("PKGSENTRY_HASH_FULL_MAX_MB", "20")) * 1024 * 1024
+
+
 def _shannon_entropy(data: bytes) -> float:
     if not data:
         return 0.0
@@ -250,26 +280,33 @@ def _shannon_entropy(data: bytes) -> float:
     return -sum((c / length) * math.log2(c / length) for c in freq.values())
 
 
+def _sha256_stream(path: Path) -> str:
+    """SHA-256 without loading the whole file into memory."""
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 @dataclass
 class FileInfo:
     sha256: str
     entropy: float
     ssdeep: str
+    tlsh: str = ""
 
 
 def _compute_file_hashes(
     root: Path, archive_kind: str,
 ) -> tuple[dict[str, FileInfo], dict[str, str]]:
-    """Walk *root*, SHA-256 + entropy + ssdeep every file.
+    """Walk *root*, SHA-256 + entropy + ssdeep + tlsh every file.
 
     Returns ``(normalized_info, norm_to_real)`` where keys are normalized
-    relative paths and values are FileInfo with sha256/entropy/ssdeep.
+    relative paths and values are FileInfo with sha256/entropy/ssdeep/tlsh.
     """
-    try:
-        import ppdeep
-        _ssdeep = ppdeep.hash
-    except ImportError:
-        _ssdeep = None
+    _ssdeep = caps.ppdeep.hash if caps.HAS_PPDEEP else None
+    _tlsh = caps.tlsh.hash if caps.HAS_TLSH else None
 
     normalized_info: dict[str, FileInfo] = {}
     norm_to_real: dict[str, str] = {}
@@ -284,13 +321,27 @@ def _compute_file_hashes(
         else:
             normalized = real
         try:
+            size = p.stat().st_size
+        except OSError:
+            continue
+        if size > HASH_FULL_MAX_BYTES:
+            # Large file: stream SHA-256 only, skip the expensive metrics.
+            try:
+                sha = _sha256_stream(p)
+            except OSError:
+                continue
+            normalized_info[normalized] = FileInfo(sha256=sha, entropy=0.0, ssdeep="", tlsh="")
+            norm_to_real[normalized] = real
+            continue
+        try:
             data = p.read_bytes()
         except OSError:
             continue
         sha = hashlib.sha256(data).hexdigest()
         ent = _shannon_entropy(data) if len(data) >= 64 else 0.0
         fuzzy = _ssdeep(data) if _ssdeep and len(data) >= 64 else ""
-        normalized_info[normalized] = FileInfo(sha256=sha, entropy=ent, ssdeep=fuzzy)
+        tl = _tlsh(data) if _tlsh and len(data) >= 64 else ""
+        normalized_info[normalized] = FileInfo(sha256=sha, entropy=ent, ssdeep=fuzzy, tlsh=tl)
         norm_to_real[normalized] = real
     return normalized_info, norm_to_real
 
@@ -395,6 +446,35 @@ def _run_analyzers(
     return findings
 
 
+async def run_static_analyzers(
+    sub: Path,
+    *,
+    ecosystem: str,
+    adapter: EcosystemAdapter,
+    arc_kind: str,
+    changed: set[str] | None = None,
+    current_info: dict[str, FileInfo] | None = None,
+    prev_info: dict[str, FileInfo] | None = None,
+    norm_to_real: dict[str, str] | None = None,
+) -> list[Finding]:
+    """Compose all static analyzers for an extracted archive root.
+
+    Single source of truth for "which static analyzers run for ecosystem X over
+    this extracted dir" — the install-analyzer gate plus ``_run_analyzers``. Both
+    ``process_one`` and the regression-corpus harness call this so they cannot
+    drift. ``_run_analyzers`` is CPU-bound and offloaded to a thread (the install
+    analyzer is awaited directly, matching the prod path)."""
+    findings: list[Finding] = []
+    if arc_kind == adapter.install_archive_kind and not replaces_install_analyzer_for(ecosystem):
+        findings.extend(await adapter.analyze_install(sub, changed_files=changed))
+    analyzer_findings = await asyncio.to_thread(
+        _run_analyzers, sub, changed, current_info or {}, prev_info or {},
+        norm_to_real or {}, ecosystem=ecosystem,
+    )
+    findings.extend(analyzer_findings)
+    return findings
+
+
 def _persist_findings(session: Session, scan: Scan, findings: list[Finding]) -> None:
     for f in findings:
         session.add(FindingRow(
@@ -422,7 +502,11 @@ def _persist_and_finalize(
     sdist_files: list[str],
     wheel_files: list[str],
 ) -> None:
-    """Scoring, persistence, detonation, LLM triage — all sync, runs in thread."""
+    """Scoring, persistence, LLM triage, detonation-enqueue — all sync, runs in thread.
+
+    Detonation is enqueued (DetonationQueue) and run asynchronously by
+    detonation_worker.py; the scan is finalized here with the static verdict.
+    """
     with sess.session_scope() as s:
         row = s.get(ScanQueue, queue_id)
         if row is None:
@@ -478,10 +562,36 @@ def _persist_and_finalize(
         # Threat intel: check file hashes against known-malicious fingerprints
         for kind, infos in all_file_hashes:
             intel_batch = {
-                path: {"sha256": fi.sha256, "ssdeep": fi.ssdeep}
+                path: {"sha256": fi.sha256, "ssdeep": fi.ssdeep, "tlsh": fi.tlsh}
                 for path, fi in infos.items()
             }
             all_findings.extend(check_threat_intel(s, intel_batch))
+
+        # For confirmed-malicious (auto-watchlisted) names, carry forward
+        # findings on SHA-unchanged files from the most-recent prior scan
+        # within the TTL window. The attacker pattern is byte-identical
+        # re-publishes; without this, our changed_files optimization would
+        # surface only the deltas (3 of 11 findings) and thin the LLM's
+        # evidence basis — even though the verdict held via the chain rule.
+        try:
+            from pkgsentry.watchlist_auto import is_watchlist_auto_only
+            if is_watchlist_auto_only(s, ecosystem, name):
+                from pkgsentry.finding_reuse import carry_forward_findings
+                cur_hashes: dict[str, str] = {}
+                for _kind, infos in all_file_hashes:
+                    for path, fi in infos.items():
+                        cur_hashes[path] = fi.sha256
+                carried = carry_forward_findings(
+                    s, ecosystem, name, scan.id, cur_hashes,
+                )
+                if carried:
+                    all_findings.extend(carried)
+                    log.info("findings_carried_forward",
+                             ecosystem=ecosystem, pkg=f"{name}=={version}",
+                             carried=len(carried))
+        except Exception as e:
+            log.warning("findings_carry_forward_skipped",
+                        ecosystem=ecosystem, name=name, error=str(e))
 
         rank = _is_watchlist(s, name, ecosystem)
         result = score_and_verdict(all_findings, watchlist_rank=rank)
@@ -494,98 +604,57 @@ def _persist_and_finalize(
         _persist_findings(s, scan, all_findings)
         _persist_file_hashes(s, scan.id, all_file_hashes)
 
-        # --- Detonation (best-effort, sync) ---
-        # npm detonation re-enabled: the detonation noise baseline now whitelists
-        # .npmrc reads (npm_file_noise) and registry connections (npm_net_allow),
-        # so normal `npm install` traffic no longer false-positives as malicious.
-        _DETONATION_ECOSYSTEMS = {"pypi", "crates", "gomod", "npm"}
-        _PREFERRED_ARCHIVE = {"pypi": "sdist", "crates": "crate", "gomod": "gomod_zip", "npm": "npm_tarball"}
+        # --- Detonation: enqueue for async processing (decoupled from this scan) ---
         is_first_version = prev is None
         det_client = get_detonation_client()
-        if ecosystem in _DETONATION_ECOSYSTEMS and det_client.is_enabled() and should_detonate(
-            verdict=result.verdict,
-            score=result.score,
-            findings=all_findings,
-            watchlist_rank=rank,
-            is_new_package=is_first_version,
+        if (
+            ecosystem in _DETONATION_ECOSYSTEMS
+            and _detonation_cluster_enabled(det_client)
+            and should_detonate(
+                verdict=result.verdict,
+                score=result.score,
+                findings=all_findings,
+                watchlist_rank=rank,
+                is_new_package=is_first_version,
+            )
         ):
-            det_archive = None
-            preferred = _PREFERRED_ARCHIVE.get(ecosystem, "sdist")
-            for arc in archives:
-                if arc.kind == preferred:
-                    det_archive = arc
-                    break
-            if det_archive is None and archives:
-                det_archive = archives[0]
+            detonation_queue.enqueue(
+                s,
+                scan_id=scan.id,
+                version_id=ver.id,
+                ecosystem=ecosystem,
+                name=name,
+                version=version,
+                archive_kind=_PREFERRED_ARCHIVE.get(ecosystem, "sdist"),
+                priority=_detonation_priority(verdict=result.verdict, watchlist_rank=rank),
+                static_verdict=result.verdict,
+            )
 
-            if det_archive is not None:
-                try:
-                    log.info("detonation_start", archive=det_archive.kind)
-                    det_result = det_client.detonate_sync(
-                        ecosystem=ecosystem,
-                        name=name,
-                        version=version,
-                        archive_path=str(det_archive.path),
-                        archive_kind=det_archive.kind,
-                    )
-                    if det_result is not None:
-                        det_row = Detonation(
-                            scan_id=scan.id,
-                            ecosystem=ecosystem,
-                            sandbox_id=det_result.detonation_id,
-                            status=det_result.status,
-                            install_exit_code=det_result.install_phase.exit_code if det_result.install_phase else None,
-                            install_duration_ms=det_result.install_phase.duration_ms if det_result.install_phase else None,
-                            install_timed_out=det_result.install_phase.timed_out if det_result.install_phase else False,
-                            import_exit_code=det_result.import_phase.exit_code if det_result.import_phase else None,
-                            import_duration_ms=det_result.import_phase.duration_ms if det_result.import_phase else None,
-                            import_timed_out=det_result.import_phase.timed_out if det_result.import_phase else False,
-                            total_trace_events=det_result.total_trace_events,
-                            filtered_trace_events=det_result.filtered_trace_events,
-                            finished_at=datetime.now(timezone.utc),
-                        )
-                        s.add(det_row)
-                        s.flush()
-
-                        for evt in det_result.trace_events_json:
-                            s.add(TraceEvent(
-                                detonation_id=det_row.id,
-                                phase=evt.get("phase", "install"),
-                                category=evt.get("category", "unknown"),
-                                operation=evt.get("operation", "unknown"),
-                                pid=evt.get("pid"),
-                                binary=evt.get("binary"),
-                                detail=evt.get("detail") or {},
-                                matched_rule=evt.get("matched_rule"),
-                            ))
-
-                        dyn_findings = det_result.to_findings()
-                        if dyn_findings:
-                            all_findings.extend(dyn_findings)
-                            _persist_findings(s, scan, dyn_findings)
-                            result = score_and_verdict(all_findings, watchlist_rank=rank)
-                            scan.verdict = result.verdict
-                            scan.score = result.score
-                            scan.alert_tag = result.alert_tag
-                            log.info(
-                                "detonation_rescored",
-                                dyn_findings=len(dyn_findings),
-                                new_verdict=result.verdict, new_score=result.score,
-                            )
-
-                        log.info(
-                            "detonation_done",
-                            status=det_result.status,
-                            trace_events=det_result.total_trace_events,
-                            dyn_findings=len(dyn_findings) if det_result else 0,
-                        )
-                except Exception as e:
-                    log.warning("detonation_skipped", error=str(e))
+        # --- Frozen-sample vault (private; no-op unless PKGSENTRY_VAULT_PATH set) ---
+        # Preserve the original archive of anything the engine flags malicious,
+        # before the registry yanks it — a permanent regression anchor + forensic
+        # reference. Runs while the archive is still on disk (cleaned up by the
+        # caller's finally). Keyed on the rule/dynamic verdict, not LLM.
+        if result.verdict == "malicious" and vault.is_enabled() and archives:
+            try:
+                preferred = _PREFERRED_ARCHIVE.get(ecosystem, "sdist")
+                vault_arc = next((a for a in archives if a.kind == preferred), archives[0])
+                scored_rules = [f.rule_id for f in all_findings if not _is_shadow_finding(f)]
+                vault.archive_to_vault(
+                    ecosystem=ecosystem, name=name, version=version,
+                    archive_path=Path(vault_arc.path), archive_kind=vault_arc.kind,
+                    verdict=result.verdict, score=result.score,
+                    expect_rules=scored_rules,
+                )
+            except Exception as e:
+                log.warning("vault_archive_skipped", error=str(e))
 
         # --- LLM triage (sync) ---
         llm_dominated = result.verdict == "malicious"
         if llm_dominated:
             from pkgsentry.llm import triage as llm_triage_mod
+            from pkgsentry.notify import discord as discord_notify
+            tri = None  # None => LLM disabled or triage crashed (could not adjudicate)
             if llm_triage_mod.is_enabled():
                 try:
                     triage_root = None
@@ -627,19 +696,58 @@ def _persist_and_finalize(
                             rule_verdict=result.verdict, llm_verdict=tri.verdict,
                             cost=tri.cost_usd, latency_ms=tri.latency_ms,
                         )
-                        if tri.verdict == "malicious":
-                            from pkgsentry.notify import discord as discord_notify
-                            if discord_notify.is_enabled():
-                                discord_notify.send_alert(
-                                    pkg_name=name, pkg_version=version,
-                                    ecosystem=ecosystem,
-                                    rule_verdict=result.verdict,
-                                    rule_score=result.score,
-                                    n_findings=len(all_findings),
-                                    triage=tri, findings=all_findings,
-                                )
                 except Exception as e:
                     log.warning("llm_triage_skipped", error=str(e))
+                    tri = None
+
+            # Auto-watchlist on double-confirmed malicious (rules + LLM agree):
+            # ensures the next release of this name is scanned at high priority,
+            # closing the "brand-new gate fires once per name" gap. Idempotent,
+            # rate-limited, TTL-managed. See pkgsentry.watchlist_auto.
+            if tri is not None and tri.verdict == "malicious":
+                try:
+                    from pkgsentry import watchlist_auto
+                    status = watchlist_auto.add_confirmed_malicious(
+                        s, ecosystem, name, scan_id=scan.id,
+                    )
+                    if status:
+                        log.info("watchlist_auto_outcome",
+                                 ecosystem=ecosystem, name=name, status=status)
+                except Exception as e:
+                    log.warning("watchlist_auto_failed",
+                                ecosystem=ecosystem, name=name, error=str(e))
+
+            # Fail OPEN: the rules said malicious. Alert unless the LLM explicitly
+            # CLEARED it (benign/suspicious). If the LLM couldn't adjudicate —
+            # disabled, errored (bad JSON after retries), or crashed — alert anyway
+            # tagged "llm_unverified" so a real malicious package is never silently
+            # dropped just because triage failed.
+            llm_cleared = tri is not None and tri.verdict in ("benign", "suspicious")
+            if not llm_cleared and discord_notify.is_enabled():
+                if tri is None or tri.verdict != "malicious":
+                    if not scan.alert_tag:
+                        scan.alert_tag = "llm_unverified"
+                    log.warning(
+                        "alert_llm_unverified",
+                        rule_verdict=result.verdict, score=result.score,
+                        llm_verdict=(tri.verdict if tri is not None else "unavailable"),
+                    )
+                if tri is None:
+                    tri = llm_triage_mod.LLMTriageResult(
+                        verdict="unverified", confidence=0.0,
+                        reasoning="LLM triage unavailable (disabled or skipped)",
+                        iocs=[], agrees_with_rules=None, model="n/a",
+                        prompt_tokens=0, completion_tokens=0, cost_usd=0.0,
+                        latency_ms=0, raw_response={},
+                    )
+                discord_notify.send_alert(
+                    pkg_name=name, pkg_version=version,
+                    ecosystem=ecosystem,
+                    rule_verdict=result.verdict,
+                    rule_score=result.score,
+                    n_findings=len(all_findings),
+                    triage=tri, findings=all_findings,
+                )
 
         mark_done(s, row, token=claim_token)
         final_verdict = scan.verdict
@@ -773,14 +881,12 @@ async def process_one(queue_id: int, claim_token: Optional[str] = None) -> None:
                         changed=len(changed), total=len(current_info),
                     )
 
-                if arc.kind == adapter.install_archive_kind and not replaces_install_analyzer_for(ecosystem):
-                    all_findings.extend(await adapter.analyze_install(sub, changed_files=changed))
-
                 t1 = time.monotonic()
                 log.info("analyzing", kind=arc.kind)
-                analyzer_findings = await asyncio.to_thread(
-                    _run_analyzers, sub, changed, current_info, prev_info, norm_to_real,
-                    ecosystem=ecosystem,
+                analyzer_findings = await run_static_analyzers(
+                    sub, ecosystem=ecosystem, adapter=adapter, arc_kind=arc.kind,
+                    changed=changed, current_info=current_info, prev_info=prev_info,
+                    norm_to_real=norm_to_real,
                 )
                 t_analyze = round(time.monotonic() - t1, 1)
                 all_findings.extend(analyzer_findings)

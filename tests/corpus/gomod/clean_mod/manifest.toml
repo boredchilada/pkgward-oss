@@ -1,0 +1,12 @@
+ecosystem = "gomod"
+name = "example.com/tidy"
+version = "v1.0.0"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = [
+    "gomod.init_net_chain",
+    "gomod.init_exec_chain",
+    "gomod.go_generate_exec",
+]
+notes = "Realistic clean Go module — FP guard for go directive / init analysis"
+provenance = "synthetic"

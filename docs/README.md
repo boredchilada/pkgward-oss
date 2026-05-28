@@ -7,6 +7,5 @@
 | [Detonation](detonation.md) | Deploying the rootless-Docker + Tetragon sandbox |
 | [Detection rules](detection-rules.md) | Full rule catalog across 12 detection layers |
 | [Ecosystems](ecosystems-reference.md) | API reference and attack surface per ecosystem |
-| [Roadmap](ROADMAP.md) | Completed and planned features |
 
 Architecture and flow diagrams live in `diagrams/` (draw.io format).

@@ -50,6 +50,27 @@ crates_exec_noise = [
     "/rustup",
 ]
 
+# Go modules: go build cache + module cache + toolchain install paths.
+gomod_file_noise = [
+    "/go/pkg/mod/",
+    "/go/pkg/",
+    "/root/.cache/go-build/",
+    "/.cache/go-build/",
+    "/usr/local/go/",
+]
+
+# Go modules: exec of go toolchain + archive extraction (unzip/tar).
+gomod_exec_noise = [
+    "/go",
+    "/compile",
+    "/link",
+    "/asm",
+    "/vet",
+    "/gofmt",
+    "/unzip",
+    "/tar",
+]
+
 # Per-ecosystem network destination allowlist (hostnames resolved to IPs at
 # detonation time, or literal IPs). Connections to these expected registry /
 # CDN endpoints are dropped before the network exfil rules run, so normal

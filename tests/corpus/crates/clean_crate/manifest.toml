@@ -1,0 +1,12 @@
+ecosystem = "crates"
+name = "tidy-math"
+version = "0.1.0"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = [
+    "crates.build_rs_net_exec_chain",
+    "crates.build_rs_network",
+    "crates.build_rs_exec",
+]
+notes = "Realistic clean crate with a trivial build.rs — FP guard for build.rs analysis"
+provenance = "synthetic"

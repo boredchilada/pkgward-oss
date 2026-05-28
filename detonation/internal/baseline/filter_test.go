@@ -2,8 +2,11 @@
 package baseline
 
 import (
+	"reflect"
+	"strings"
 	"testing"
 
+	"detonation/internal/intel"
 	"detonation/internal/trace"
 )
 
@@ -153,5 +156,67 @@ func TestFilterUnknownEcosystem(t *testing.T) {
 	filtered := Filter("unknown", events)
 	if len(filtered) != 1 {
 		t.Errorf("unknown ecosystem should pass all events through, got %d", len(filtered))
+	}
+}
+
+func TestFilterGomodBuildNoise(t *testing.T) {
+	events := []trace.TraceEvent{
+		{Phase: "install", Category: "file", Operation: "open",
+			Detail: map[string]interface{}{"path": "/go/pkg/mod/github.com/x/y/z.go"}},
+		{Phase: "install", Category: "process", Operation: "exec",
+			Detail: map[string]interface{}{"binary": "/usr/local/go/pkg/tool/linux_amd64/compile"}},
+	}
+	if got := Filter("gomod", events); len(got) != 0 {
+		t.Errorf("expected gomod build cache + compile exec to be filtered, got %d", len(got))
+	}
+}
+
+func TestFilterGomodKeepsCredentialReads(t *testing.T) {
+	// Build noise is dropped, but a real credential read during a gomod build
+	// must still surface — including .npmrc (a non-npm package touching it is
+	// flaggable by design).
+	events := []trace.TraceEvent{
+		{Phase: "install", Category: "file", Operation: "open",
+			Detail: map[string]interface{}{"path": "/root/.ssh/id_rsa"}},
+		{Phase: "install", Category: "file", Operation: "open",
+			Detail: map[string]interface{}{"path": "/root/.npmrc"}},
+	}
+	if got := Filter("gomod", events); len(got) != 2 {
+		t.Errorf("expected both credential reads to pass through gomod filter, got %d", len(got))
+	}
+}
+
+// Guardrail: every populated *_file_noise / *_exec_noise list in the baseline
+// must be consumed by Filter for its ecosystem. Catches the gomod-class gap
+// (list present in the struct/TOML but no switch branch wiring it in).
+func TestEveryNoiseListIsWired(t *testing.T) {
+	intel.Reset()
+	defer intel.Reset()
+	n := intel.Load().Noise
+	v := reflect.ValueOf(n)
+	tp := v.Type()
+	for i := 0; i < tp.NumField(); i++ {
+		tag := tp.Field(i).Tag.Get("toml")
+		vals, ok := v.Field(i).Interface().([]string)
+		if !ok || len(vals) == 0 {
+			continue
+		}
+		var eco string
+		var evt trace.TraceEvent
+		switch {
+		case strings.HasSuffix(tag, "_file_noise"):
+			eco = strings.TrimSuffix(tag, "_file_noise")
+			evt = trace.TraceEvent{Category: "file", Operation: "open",
+				Detail: map[string]interface{}{"path": "/x" + vals[0] + "y"}}
+		case strings.HasSuffix(tag, "_exec_noise"):
+			eco = strings.TrimSuffix(tag, "_exec_noise")
+			evt = trace.TraceEvent{Category: "process", Operation: "exec",
+				Detail: map[string]interface{}{"binary": "/usr/bin" + vals[0]}}
+		default:
+			continue // net_allow needs DNS; not exercised here
+		}
+		if got := Filter(eco, []trace.TraceEvent{evt}); len(got) != 0 {
+			t.Errorf("noise list %q is populated but Filter(%q) did not drop a matching event — unwired in filter.go", tag, eco)
+		}
 	}
 }

@@ -146,6 +146,32 @@ class ScanQueue(Base):
     )
 
 
+class DetonationQueue(Base):
+    """Async detonation jobs, decoupled from the synchronous scan pipeline."""
+    __tablename__ = "detonation_queue"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scan_id: Mapped[int] = mapped_column(ForeignKey("scan.id", ondelete="CASCADE"))
+    version_id: Mapped[int] = mapped_column(ForeignKey("version.id", ondelete="CASCADE"))
+    ecosystem: Mapped[str] = mapped_column(String(32), nullable=False, default="pypi")
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    version: Mapped[str] = mapped_column(String(128), nullable=False)
+    archive_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="sdist")
+    priority: Mapped[str] = mapped_column(String(16), nullable=False, default="low")    # high|normal|low
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")  # pending|claimed|done|failed|expired
+    static_verdict: Mapped[str] = mapped_column(String(16), nullable=False, default="clean")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    claim_token: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    enqueued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    claimed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("scan_id", name="uq_detq_scan"),
+        Index("ix_detq_pull", "status", "priority", "enqueued_at"),
+    )
+
+
 class ScanCursor(Base):
     __tablename__ = "scan_cursor"
     ecosystem: Mapped[str] = mapped_column(String(32), primary_key=True)

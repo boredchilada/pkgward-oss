@@ -28,7 +28,7 @@ func TestAssignPhase(t *testing.T) {
 func TestParseKprobePtraceNormalizesOperation(t *testing.T) {
 	raw := `{"process_kprobe":{"process":{"pid":12345,"binary":"/usr/bin/python3","ns":{"pid_for_children":99}},"function_name":"sys_ptrace","args":[{"int_arg":16}]},"time":"2024-01-01T00:00:00Z"}`
 
-	events, err := ParseTetragonLine(raw, 99)
+	events, err := ParseTetragonLine(raw, nil)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestParseSecurityFilePermissionFileArg(t *testing.T) {
 	// security_file_permission carries the path as a file_arg, not string_arg.
 	raw := `{"process_kprobe":{"process":{"pid":12345,"binary":"/usr/bin/python3","ns":{"pid_for_children":99}},"function_name":"security_file_permission","args":[{"file_arg":{"path":"/root/.bashrc"}},{"int_arg":2}]},"time":"2024-01-01T00:00:00Z"}`
 
-	events, err := ParseTetragonLine(raw, 99)
+	events, err := ParseTetragonLine(raw, nil)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestParseSecurityFilePermissionFileArg(t *testing.T) {
 func TestParseMemfdCreate(t *testing.T) {
 	raw := `{"process_kprobe":{"process":{"pid":12345,"binary":"/usr/bin/python3","ns":{"pid_for_children":99}},"function_name":"__x64_sys_memfd_create","args":[{"string_arg":"payload"},{"int_arg":1}]},"time":"2024-01-01T00:00:00Z"}`
 
-	events, err := ParseTetragonLine(raw, 99)
+	events, err := ParseTetragonLine(raw, nil)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestParseMemfdCreate(t *testing.T) {
 func TestParseExecveatFileless(t *testing.T) {
 	raw := `{"process_kprobe":{"process":{"pid":12345,"binary":"/usr/bin/python3","ns":{"pid_for_children":99}},"function_name":"__x64_sys_execveat","args":[{"int_arg":3},{"string_arg":""},{"int_arg":4096}]},"time":"2024-01-01T00:00:00Z"}`
 
-	events, err := ParseTetragonLine(raw, 99)
+	events, err := ParseTetragonLine(raw, nil)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestParseExecveatFileless(t *testing.T) {
 func TestParseKprobeProcessVmWritev(t *testing.T) {
 	raw := `{"process_kprobe":{"process":{"pid":12345,"binary":"/usr/bin/python3","ns":{"pid_for_children":99}},"function_name":"__x64_sys_process_vm_writev","args":[]},"time":"2024-01-01T00:00:00Z"}`
 
-	events, err := ParseTetragonLine(raw, 99)
+	events, err := ParseTetragonLine(raw, nil)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

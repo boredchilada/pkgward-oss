@@ -23,11 +23,15 @@ INDEX_URL = "https://index.golang.org/index"
 USER_AGENT = user_agent()
 DEFAULT_LIMIT = 2000
 
-_PSEUDO_RE = re.compile(r"^v0\.0\.0-\d{14}-[0-9a-f]{12}$")
+# Go pseudo-versions in all three forms end in <14-digit UTC timestamp>-<12-char
+# commit hash> (optionally +incompatible): v0.0.0-…, vX.Y.Z-0.…, vX.Y.Z-pre.0.….
+# The old `^v0\.0\.0-…$` anchor only caught the first form, so pseudo-versions of
+# repos with a prior tag (most popular modules) leaked past the skip gate.
+_PSEUDO_RE = re.compile(r"\d{14}-[0-9a-f]{12}(\+incompatible)?$")
 
 
 def _is_pseudo_version(version: str) -> bool:
-    return bool(_PSEUDO_RE.match(version))
+    return bool(_PSEUDO_RE.search(version))
 
 
 def _ts_to_cursor(iso: str) -> int:

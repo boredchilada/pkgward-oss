@@ -1,0 +1,8 @@
+ecosystem = "pypi"
+name = "evil-pkg"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["installer.urlopen_exec_chain", "iocs.url_suspicious"]
+notes = "W4SP-style setup.py: download -> exec at install time"
+provenance = "synthetic"

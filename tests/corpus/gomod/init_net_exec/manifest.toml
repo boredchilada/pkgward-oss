@@ -1,0 +1,8 @@
+ecosystem = "gomod"
+name = "evil.example/helper"
+version = "v1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["gomod.init_exec_chain", "gomod.init_net_chain"]
+notes = "init() fetches over the network and runs a shell command at import time"
+provenance = "synthetic"

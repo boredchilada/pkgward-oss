@@ -1,0 +1,15 @@
+ecosystem = "pypi"
+name = "quiet-then-evil"
+version = "2.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["version_diff.clean_to_critical"]
+notes = "A previously-clean package introduces a critical install-time payload on update"
+provenance = "synthetic"
+
+[prev]
+version = "1.0.0"
+verdict = "clean"
+score = 0
+rule_ids = []
+finding_count = 0

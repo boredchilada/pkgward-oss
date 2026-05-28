@@ -18,6 +18,7 @@ from pkgsentry.queue import enqueue, MAX_AUTO_ATTEMPTS
 from pkgsentry.store import session as sess
 from pkgsentry.store.models import ScanQueue, Watchlist
 from pkgsentry.util.user_agent import user_agent
+from pkgsentry.watchlist_auto import AUTO_MALICIOUS_RANK
 
 log = get_logger("gomod.watchlist")
 
@@ -237,7 +238,12 @@ async def refresh_watchlist() -> int:
         return 0
 
     with sess.session_scope() as s:
-        s.execute(delete(Watchlist).where(Watchlist.ecosystem == ECOSYSTEM))
+        # Preserve auto-added confirmed-malicious rows; only popularity rows
+        # get rebuilt by this refresh.
+        s.execute(delete(Watchlist).where(
+            Watchlist.ecosystem == ECOSYSTEM,
+            Watchlist.rank != AUTO_MALICIOUS_RANK,
+        ))
         for rank, (mod_path, stars) in enumerate(ranked, start=1):
             s.add(Watchlist(
                 ecosystem=ECOSYSTEM,
@@ -367,6 +373,19 @@ def _case_encode(path: str) -> str:
     return "".join(out)
 
 
+def _drop_pseudo(successes: list) -> list:
+    """Filter pseudo-versions out of resolved @latest results unless
+    GOMOD_SCAN_PSEUDO=1. A watchlisted module whose @latest is a pseudo-version
+    (HEAD past the last tag) would otherwise enqueue a giant untagged monorepo
+    snapshot at high priority — high FP rate, low signal (nobody `go get`s a
+    pseudo-version by choice). Mirrors the cursor poll's pseudo gate.
+    Lazy import avoids the cursor<->watchlist module cycle."""
+    if os.environ.get("GOMOD_SCAN_PSEUDO", "0") == "1":
+        return successes
+    from pkgsentry.ecosystems.gomod.ingest.cursor import _is_pseudo_version
+    return [(o, c, v) for o, c, v in successes if not _is_pseudo_version(v)]
+
+
 async def seed_watchlist_queue(concurrency: int = 20) -> int:
     """Enqueue the latest version of every gomod watchlist module at high priority.
     Uses proxy.golang.org/@latest to resolve versions."""
@@ -401,6 +420,7 @@ async def seed_watchlist_queue(concurrency: int = 20) -> int:
     unscannable = [(o, r) for o, c, v, r in results if c is not None and v is None]
     transient_errors = [(o, r) for o, c, v, r in results if c is None]
     transient = len(transient_errors)
+    successes = _drop_pseudo(successes)
 
     for i in range(0, len(successes), 100):
         chunk = successes[i:i + 100]
@@ -481,6 +501,7 @@ async def seed_missing_watchlist(concurrency: int = 20) -> int:
     successes = [(o, c, v) for o, c, v, _ in results if v is not None]
     unscannable = [(o, r) for o, c, v, r in results if c is not None and v is None]
     transient = sum(1 for o, c, v, r in results if c is None)
+    successes = _drop_pseudo(successes)
 
     for i in range(0, len(successes), 100):
         chunk = successes[i:i + 100]

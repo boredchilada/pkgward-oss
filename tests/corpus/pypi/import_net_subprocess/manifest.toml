@@ -1,0 +1,13 @@
+ecosystem = "pypi"
+name = "netsub"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = [
+    "imports.network_subprocess_chain",
+    "imports.network_at_import",
+    "imports.subprocess_at_import",
+    "imports.subprocess_at_import_suspicious",
+]
+notes = "Module-import-time download + subprocess exec (durabletask-shape)"
+provenance = "synthetic"

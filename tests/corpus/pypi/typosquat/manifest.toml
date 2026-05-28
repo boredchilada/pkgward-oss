@@ -1,0 +1,11 @@
+ecosystem = "pypi"
+name = "reqests"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "suspicious"
+expect_rules = ["metadata.typosquat_candidate"]
+notes = "Typosquat of 'requests' — package contents are inert; the name is the lure"
+provenance = "synthetic"
+
+[metadata]
+watchlist_top_names = ["requests", "numpy", "flask", "django"]

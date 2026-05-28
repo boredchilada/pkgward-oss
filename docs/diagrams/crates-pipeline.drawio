@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="app.diagrams.net" modified="2026-05-23T00:00:00.000Z" agent="Claude" version="26.0.0" type="device">
+<mxfile host="app.diagrams.net" modified="2026-05-23T00:00:00.000Z" agent="pkgsentry" version="26.0.0" type="device">
   <diagram id="crates-pipeline" name="Crates.io Ecosystem Pipeline">
     <mxGraphModel dx="1800" dy="4500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="4400" math="0" shadow="0">
       <root>
@@ -486,12 +486,12 @@
         <mxCell id="bg_p7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="240" y="2760" width="740" height="200" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation&lt;/b&gt;  (rootless Docker + Tetragon)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
-          <mxGeometry x="250" y="2765" width="340" height="24" as="geometry"/>
+        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation enqueue&lt;/b&gt;  (async; drained by detonation_worker)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
+          <mxGeometry x="250" y="2765" width="420" height="24" as="geometry"/>
         </mxCell>
 
         <!-- No detonation box -->
-        <mxCell id="n_detonate" value="&lt;b&gt;&lt;font size=&quot;3&quot;&gt;Detonation: rootless-Docker sandbox + Tetragon&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;cargo build&lt;/font&gt; + import in a rootless-Docker sandbox, traced by Tetragon eBPF.&lt;br&gt;Build is best-effort &amp;mdash; install-time behavior is captured even on build failure." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;" vertex="1" parent="1">
+        <mxCell id="n_detonate" value="&lt;b&gt;&lt;font size=&quot;3&quot;&gt;Detonation runs async (post-score)&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;If should_detonate(): enqueue &amp;rarr; DetonationQueue. The detonation_worker pool runs &lt;font face=&quot;Courier New&quot;&gt;cargo build&lt;/font&gt; + import in a rootless-Docker sandbox (Tetragon eBPF, best-effort build), re-scores, and sends a delayed alert on a flip to malicious.&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Full worker flow: scan-pipeline.drawio&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;" vertex="1" parent="1">
           <mxGeometry x="370" y="2800" width="480" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="e_univ_nodet" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_universal" target="n_detonate" parent="1">

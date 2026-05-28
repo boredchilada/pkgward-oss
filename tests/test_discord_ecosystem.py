@@ -41,3 +41,28 @@ def test_build_embed_footer_says_pkgsentry():
         triage=_fake_triage(), top_findings=[],
     )
     assert "pkgsentry" in embed["footer"]["text"]
+
+
+def test_build_embed_unverified_when_llm_errored():
+    """Fail-open alert: LLM couldn't adjudicate → distinct title/desc, grey, no false 'confirmed'."""
+    embed = _build_embed(
+        pkg_name="bc-pkg", pkg_version="1.0.1", ecosystem="pypi",
+        rule_verdict="malicious", rule_score=61, n_findings=2,
+        triage=_fake_triage(verdict="error", confidence=0.0, model="z-ai/glm-5.1"),
+        top_findings=[],
+    )
+    assert "unverified" in embed["title"].lower()
+    assert "could not verify" in embed["description"].lower()
+    assert "confirmed" not in embed["description"].lower()
+    assert embed["color"] == 0x95A5A6
+
+
+def test_build_embed_unverified_when_llm_unavailable():
+    embed = _build_embed(
+        pkg_name="x", pkg_version="1.0", ecosystem="npm",
+        rule_verdict="malicious", rule_score=70, n_findings=1,
+        triage=_fake_triage(verdict="unverified", confidence=0.0, model="n/a"),
+        top_findings=[],
+    )
+    assert "unverified" in embed["title"].lower()
+    assert embed["color"] == 0x95A5A6

@@ -1,0 +1,8 @@
+ecosystem = "npm"
+name = "evil-npm"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["installer.npm_lifecycle_net_exec"]
+notes = "package.json postinstall downloads a script and pipes it into a shell"
+provenance = "synthetic"

@@ -40,6 +40,8 @@ type NoiseFilters struct {
 	NpmExecNoise    []string `toml:"npm_exec_noise"`
 	CratesFileNoise []string `toml:"crates_file_noise"`
 	CratesExecNoise []string `toml:"crates_exec_noise"`
+	GomodFileNoise  []string `toml:"gomod_file_noise"`
+	GomodExecNoise  []string `toml:"gomod_exec_noise"`
 
 	// Per-ecosystem network destination allowlist. Entries are hostnames
 	// (resolved to IPs at filter time) or literal IPs. Connections to these
@@ -105,14 +107,19 @@ func Load() *Pack {
 		}
 	}
 
+	n := pack.Noise
 	log.Printf(
-		"intel_loaded source=%s sensitive_paths=%d sensitive_envs=%d shells=%d pypi_file_noise=%d crates_file_noise=%d",
+		"intel_loaded source=%s sensitive_paths=%d sensitive_envs=%d shells=%d "+
+			"pypi_file/exec/net=%d/%d/%d npm_file/exec/net=%d/%d/%d "+
+			"crates_file/exec/net=%d/%d/%d gomod_file/exec/net=%d/%d/%d",
 		pack.Source,
 		len(pack.Rules.SensitivePathPrefixes),
 		len(pack.Rules.SensitiveEnvPrefixes),
 		len(pack.Rules.ShellBinaries),
-		len(pack.Noise.PypiFileNoise),
-		len(pack.Noise.CratesFileNoise),
+		len(n.PypiFileNoise), len(n.PypiExecNoise), len(n.PypiNetAllow),
+		len(n.NpmFileNoise), len(n.NpmExecNoise), len(n.NpmNetAllow),
+		len(n.CratesFileNoise), len(n.CratesExecNoise), len(n.CratesNetAllow),
+		len(n.GomodFileNoise), len(n.GomodExecNoise), len(n.GomodNetAllow),
 	)
 
 	loaded = pack
@@ -166,6 +173,8 @@ func mergeNoise(base, overlay NoiseFilters) NoiseFilters {
 		NpmExecNoise:    unionStrings(base.NpmExecNoise, overlay.NpmExecNoise),
 		CratesFileNoise: unionStrings(base.CratesFileNoise, overlay.CratesFileNoise),
 		CratesExecNoise: unionStrings(base.CratesExecNoise, overlay.CratesExecNoise),
+		GomodFileNoise:  unionStrings(base.GomodFileNoise, overlay.GomodFileNoise),
+		GomodExecNoise:  unionStrings(base.GomodExecNoise, overlay.GomodExecNoise),
 		PypiNetAllow:    unionStrings(base.PypiNetAllow, overlay.PypiNetAllow),
 		NpmNetAllow:     unionStrings(base.NpmNetAllow, overlay.NpmNetAllow),
 		CratesNetAllow:  unionStrings(base.CratesNetAllow, overlay.CratesNetAllow),

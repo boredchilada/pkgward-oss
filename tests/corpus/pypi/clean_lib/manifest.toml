@@ -1,0 +1,12 @@
+ecosystem = "pypi"
+name = "tidy-greeter"
+version = "1.2.0"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = [
+    "installer.urlopen_exec_chain",
+    "installer.subprocess_at_install",
+    "imports.network_subprocess_chain",
+]
+notes = "Realistic clean library — FP guard for the pypi install/import analyzers"
+provenance = "synthetic"

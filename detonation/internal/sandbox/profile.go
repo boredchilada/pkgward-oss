@@ -31,7 +31,7 @@ var profiles = map[string]*Profile{
 		InstallTimeoutSec: 120,
 		ImportTimeoutSec:  30,
 		InstallCmd: func(name, version, archivePath string) []string {
-			return []string{"npm", "install", "--ignore-scripts=false", archivePath}
+			return []string{"npm", "install", "--ignore-scripts=false", "--no-audit", "--no-fund", archivePath}
 		},
 		ImportCmd: func(name string) []string {
 			return []string{"node", "-e", "require('" + name + "')"}

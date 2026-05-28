@@ -13,6 +13,7 @@ from pkgsentry.queue import enqueue
 from pkgsentry.store import session as sess
 from pkgsentry.store.models import Watchlist
 from pkgsentry.util.user_agent import user_agent
+from pkgsentry.watchlist_auto import AUTO_MALICIOUS_RANK
 
 log = get_logger("crates.watchlist")
 
@@ -76,7 +77,12 @@ async def refresh_watchlist() -> int:
         return 0
 
     with sess.session_scope() as s:
-        s.execute(delete(Watchlist).where(Watchlist.ecosystem == ECOSYSTEM))
+        # Preserve auto-added confirmed-malicious rows; only popularity rows
+        # get rebuilt by this refresh.
+        s.execute(delete(Watchlist).where(
+            Watchlist.ecosystem == ECOSYSTEM,
+            Watchlist.rank != AUTO_MALICIOUS_RANK,
+        ))
         for rank, (name, downloads) in enumerate(all_crates[:TOP_N], start=1):
             s.add(Watchlist(
                 ecosystem=ECOSYSTEM,

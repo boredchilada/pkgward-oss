@@ -6,6 +6,8 @@ from sqlalchemy import select
 from pkgsentry.queue import (
     MAX_AUTO_ATTEMPTS,
     STALE_CLAIM_TIMEOUT_SECONDS,
+    _eco_weights,
+    _weighted_order,
     claim_next,
     enqueue,
     mark_done,
@@ -174,3 +176,60 @@ def test_sweep_does_not_touch_fresh_claims(db_session):
     db_session.refresh(row)
     assert row.status == "claimed"
     assert row.claimed_at == fresh_claimed or row.claimed_at is not None
+
+
+# --- Weighted ecosystem selection (Lever 1: backlog-proportional with floor) --
+
+
+def test_eco_weights_equal_when_counts_equal():
+    """Equal backlog → equal weight (matches old uniform fairness)."""
+    ws = _eco_weights(["a", "b", "c", "d"], {"a": 10, "b": 10, "c": 10, "d": 10})
+    assert all(abs(w - ws[0]) < 1e-9 for w in ws)
+
+
+def test_eco_weights_floor_preserved_under_skew():
+    """A 100:1 backlog skew must not let the small ecosystem drop below the floor."""
+    ws = _eco_weights(["big", "small1", "small2", "small3"],
+                      {"big": 1000, "small1": 1, "small2": 1, "small3": 1})
+    # default reserved=0.4, n=4 → floor = 0.1 each (before demand share)
+    assert all(w >= 0.1 - 1e-9 for w in ws[1:])
+    # And the big one is clamped at max-share (0.7), not the raw 0.99…
+    assert ws[0] <= 0.7 + 1e-9
+
+
+def test_eco_weights_single_ecosystem():
+    assert _eco_weights(["only"], {"only": 999}) == [1.0]
+
+
+def test_weighted_order_yields_each_exactly_once():
+    out = _weighted_order(["a", "b", "c", "d"], [0.5, 0.2, 0.2, 0.1])
+    assert sorted(out) == ["a", "b", "c", "d"]
+
+
+def test_claim_next_backlog_dominates_but_floor_protects(db_session):
+    """Heavy npm backlog (~100:1) should get the majority of claims, but the
+    tiny pypi backlog must still be served (no starvation)."""
+    for i in range(100):
+        enqueue(db_session, ecosystem="npm", name=f"n{i}", version="1", priority="normal")
+    enqueue(db_session, ecosystem="pypi", name="p0", version="1", priority="normal")
+
+    counts = {"npm": 0, "pypi": 0}
+    for i in range(80):
+        r = claim_next(db_session)
+        if r is None:
+            break
+        row, _ = r
+        counts[row.ecosystem] += 1
+        # Re-enqueue to keep the skew constant (so the test measures the
+        # selection bias, not the queue draining).
+        enqueue(
+            db_session, ecosystem=row.ecosystem,
+            name=f"refill_{row.ecosystem}_{i}", version="1", priority="normal",
+        )
+
+    total = counts["npm"] + counts["pypi"]
+    assert total >= 60
+    # npm dominates (well above the old uniform 50% with N=2 ecosystems).
+    assert counts["npm"] / total > 0.55, counts
+    # pypi still served — the floor protects it from full starvation.
+    assert counts["pypi"] >= 5, counts

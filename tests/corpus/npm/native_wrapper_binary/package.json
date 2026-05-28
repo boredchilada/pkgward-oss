@@ -1,0 +1,9 @@
+{
+  "name": "examplecli",
+  "version": "1.0.0",
+  "description": "Example native CLI distributed as prebuilt platform binaries",
+  "bin": {
+    "examplecli": "bin/cli.js"
+  },
+  "license": "MIT"
+}

@@ -200,10 +200,19 @@ One JSON object per line. Each entry represents a known-malicious file fingerpri
 the threat-intel matching layer (exact SHA256, ssdeep fuzzy >= 70%, TLSH distance <= 120).
 
 ```json
-{"sha256": "abc123...", "ssdeep": "48:...", "tlsh": "T1...", "campaign": "TrapDoor", "note": "build.rs variant A"}
+{"sha256": "abc123...", "ssdeep": "48:...", "tlsh": "T1...", "campaign": "TrapDoor", "label": "malicious", "file_pattern": "build.rs", "description": "build.rs variant A"}
 ```
 
-Seed fingerprints into the database:
+Optional fields:
+
+- `file_pattern` — a filename glob (e.g. `*.js`, `build.rs`). When set, the **fuzzy** tiers
+  (ssdeep/TLSH) only match files whose name matches the glob, so a near-distance hit on an
+  unrelated file type is scoped out. Exact SHA256 matches ignore it.
+- `label` — maps to the emitted finding severity: `malicious` → critical (default),
+  `suspicious` → high, `pua` → medium.
+
+Seed fingerprints into the database (idempotent — re-running upserts, backfilling any newly
+added fields onto existing entries without clobbering present values):
 
 ```bash
 python -m pkgsentry.store.seed_intel
@@ -237,11 +246,31 @@ writes, node_modules churn, rustc invocations). These are filtered out before be
 rules evaluate.
 
 ```toml
-pypi_file_noise = ["/site-packages/", "/.cache/pip/", "/tmp/pip-", ...]
-pypi_exec_noise = ["/python", "/pip"]
-npm_file_noise = ["/.npm/_cacache/", "/node_modules/", ...]
+pypi_file_noise   = ["/site-packages/", "/.cache/pip/", "/tmp/pip-", ...]
+pypi_exec_noise   = ["/python", "/pip"]
+npm_file_noise    = ["/.npm/_cacache/", "/node_modules/", ...]
 crates_file_noise = ["/.cargo/registry/", "/target/", ...]
+gomod_file_noise  = ["/go/pkg/mod/", "/root/.cache/go-build/", ...]
+gomod_exec_noise  = ["/go", "/compile", "/link", "/unzip", ...]
+{eco}_net_allow   = ["proxy.golang.org", ...]   # registry/CDN connect destinations
 ```
+
+All four ecosystems support `{eco}_file_noise` / `{eco}_exec_noise` / `{eco}_net_allow`.
+These files are consumed by the **detonation Go service** (which loads the same baseline +
+`PKGSENTRY_INTEL_PATH` overlay independently); the Python loader also parses them, but only
+the Go service filters with them.
+
+## Detection data → consumer (which ecosystems use what)
+
+| Intel content | Consumer | Ecosystems |
+|---|---|---|
+| `yara/`, `opengrep/`, `hashes/` | yara_scan / opengrep_scan / threat_intel | all |
+| `prompts/`, `thresholds`, `scoring_weights`, `behavioral_chains` | LLM triage / scoring | all |
+| `lure_keywords`, `ioc_whitelist` | metadata-lure / iocs | all |
+| `malware_patterns` | install-time pattern analyzer | pypi only (targets are pypi install files) |
+| `gomod_benign_tools` | go:generate analyzer | gomod only |
+| `npm_benign_tools` | npm lifecycle-script analyzer | npm only |
+| `detonation/rules_data`, `detonation/noise_baseline` | detonation Go service | all (Go-side) |
 
 ## Creating your own overlay
 

@@ -1,0 +1,8 @@
+ecosystem = "pypi"
+name = "discord-beacon"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["malware.discord_webhook"]
+notes = "Discord webhook used as an exfil dead-drop"
+provenance = "synthetic"

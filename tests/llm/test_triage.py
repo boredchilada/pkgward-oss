@@ -248,7 +248,9 @@ def test_triage_handles_invalid_json(monkeypatch, tmp_path: Path):
 
     import openai
     monkeypatch.setattr(openai, "OpenAI", _FakeOpenAI)
+    monkeypatch.setattr(triage_mod, "MAX_RETRIES", 2)
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-fake")
+    _reset_budget_for_tests()
 
     out = triage(
         pkg_name="x", pkg_version="1.0", rule_verdict="suspicious",
@@ -256,7 +258,95 @@ def test_triage_handles_invalid_json(monkeypatch, tmp_path: Path):
     )
     assert out.verdict == "error"
     assert "invalid JSON" in out.reasoning
-    assert out.prompt_tokens == 10
+    # 3 attempts (1 + 2 retries), tokens/cost accumulate across them.
+    assert out.prompt_tokens == 30
+    _reset_budget_for_tests()
+
+
+class _SequenceCompletions:
+    """Returns a different canned response per call (to exercise retries)."""
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = 0
+
+    def create(self, **kwargs):
+        resp = self._responses[min(self.calls, len(self._responses) - 1)]
+        self.calls += 1
+
+        class _Resp:
+            def model_dump(_self):
+                return resp
+        return _Resp()
+
+
+def _seq_openai(responses):
+    holder = {"completions": _SequenceCompletions(responses)}
+
+    class _Chat:
+        completions = holder["completions"]
+
+    class _OpenAI:
+        def __init__(self, *a, **kw):
+            self.chat = _Chat()
+
+    return _OpenAI, holder["completions"]
+
+
+def _good_response(verdict="malicious"):
+    return {
+        "id": "ok", "object": "chat.completion", "model": "z-ai/glm-5.1",
+        "choices": [{"message": {"role": "assistant", "content": json.dumps({
+            "verdict": verdict, "confidence": 0.9, "reasoning": "ok",
+            "iocs": [], "agrees_with_rules": True,
+        })}}],
+        "usage": {"prompt_tokens": 100, "completion_tokens": 20, "cost": 0.001},
+    }
+
+
+def _bad_json_response():
+    return {
+        "id": "bad", "object": "chat.completion", "model": "z-ai/glm-5.1",
+        "choices": [{"message": {"role": "assistant", "content": "{truncated"},
+                     "finish_reason": "length"}],
+        "usage": {"prompt_tokens": 100, "completion_tokens": 20, "cost": 0.001},
+    }
+
+
+def test_triage_retries_then_succeeds(monkeypatch, tmp_path: Path):
+    """Bad JSON twice, then valid → triage recovers instead of erroring."""
+    fake, completions = _seq_openai([_bad_json_response(), _bad_json_response(), _good_response("malicious")])
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", fake)
+    monkeypatch.setattr(triage_mod, "MAX_RETRIES", 2)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-fake")
+    _reset_budget_for_tests()
+
+    out = triage(
+        pkg_name="x", pkg_version="1.0", rule_verdict="malicious",
+        findings=[], extracted_root=tmp_path,
+    )
+    assert out.verdict == "malicious"
+    assert completions.calls == 3
+    assert out.cost_usd == pytest.approx(0.003)  # 3 calls accumulated
+    _reset_budget_for_tests()
+
+
+def test_triage_exhausts_retries_then_errors(monkeypatch, tmp_path: Path):
+    """All attempts return bad JSON → error after MAX_RETRIES+1 tries."""
+    fake, completions = _seq_openai([_bad_json_response()])
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", fake)
+    monkeypatch.setattr(triage_mod, "MAX_RETRIES", 2)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-fake")
+    _reset_budget_for_tests()
+
+    out = triage(
+        pkg_name="x", pkg_version="1.0", rule_verdict="malicious",
+        findings=[], extracted_root=tmp_path,
+    )
+    assert out.verdict == "error"
+    assert completions.calls == 3
+    _reset_budget_for_tests()
 
 
 def test_budget_blocks_when_max_usd_hit(monkeypatch, tmp_path: Path):

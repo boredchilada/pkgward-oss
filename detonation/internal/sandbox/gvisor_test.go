@@ -37,7 +37,7 @@ func TestSandboxIDUnique(t *testing.T) {
 
 func TestBuildDockerRunArgs(t *testing.T) {
 	cfg := NewSandboxConfig("pypi", "/tmp/pkg.tar.gz")
-	args := cfg.DockerRunArgs("python:3.11-slim", []string{"pip", "install", "--no-deps", "/sandbox/pkg.tar.gz"})
+	args := cfg.DockerRunArgs("python:3.11-slim", []string{"pip", "install", "--no-deps", "/sandbox/pkg.tar.gz"}, "")
 
 	if len(args) == 0 {
 		t.Fatal("empty docker args")

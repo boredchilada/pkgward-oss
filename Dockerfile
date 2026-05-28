@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Base build deps + curl needed to pull the opengrep binary release.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc libc6-dev curl ca-certificates && \
+    apt-get install -y --no-install-recommends gcc g++ libc6-dev curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 # --- opengrep static-analysis layer ---
@@ -18,11 +18,14 @@ RUN curl -fsSL "https://github.com/opengrep/opengrep/releases/download/v${OPENGR
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir py-tlsh || true
+    pip install --no-cache-dir py-tlsh && \
+    python -c "import tlsh, yara, ppdeep"
 
 COPY pyproject.toml .
 COPY pkgsentry/ pkgsentry/
 RUN pip install --no-cache-dir -e .
+
+COPY tools/stats.py tools/stats.py
 
 VOLUME /data
 

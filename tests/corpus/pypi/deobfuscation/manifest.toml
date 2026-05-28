@@ -1,0 +1,12 @@
+ecosystem = "pypi"
+name = "packed-loader"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = [
+    "malware.deobfuscation_exec_chain",
+    "imports.exec_at_import",
+    "yara.base64_exec_chain",
+]
+notes = "Decompress + unmarshal + exec — staged payload deobfuscation in an install script"
+provenance = "synthetic"

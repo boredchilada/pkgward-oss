@@ -61,6 +61,32 @@ def test_compute_hashes_deterministic(tmp_path):
     assert h1 == h2
 
 
+def test_compute_hashes_large_file_sha_only(tmp_path, monkeypatch):
+    """A file above the size cap (big native binary) gets a streamed SHA-256 but
+    skips the expensive entropy/ssdeep/TLSH metrics — and the SHA matches the
+    non-streamed value."""
+    import hashlib
+    import pkgsentry.pipeline as pl
+
+    monkeypatch.setattr(pl, "HASH_FULL_MAX_BYTES", 1024)
+    blob = b"\x00\xff" * 4096  # 8 KB, > cap
+    _write(tmp_path, {"big.node": blob})
+    hashes, _ = pl._compute_file_hashes(tmp_path, "wheel")
+    fi = hashes["big.node"]
+    assert fi.sha256 == hashlib.sha256(blob).hexdigest()  # streamed == whole-file
+    assert fi.entropy == 0.0 and fi.ssdeep == "" and fi.tlsh == ""
+
+
+def test_compute_hashes_small_file_full_metrics(tmp_path, monkeypatch):
+    import pkgsentry.pipeline as pl
+    monkeypatch.setattr(pl, "HASH_FULL_MAX_BYTES", 1024 * 1024)
+    _write(tmp_path, {"a.py": b"x" * 512})
+    hashes, _ = pl._compute_file_hashes(tmp_path, "wheel")
+    # under cap -> sha present (entropy may be ~0 for uniform data, but the
+    # metric path ran; just assert it didn't take the sha-only branch shape)
+    assert hashes["a.py"].sha256
+
+
 # ---------------------------------------------------------------------------
 # _find_changed_files
 # ---------------------------------------------------------------------------

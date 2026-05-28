@@ -7,16 +7,44 @@ from pkgsentry.ecosystems.gomod.ingest.cursor import (
     _parse_ndjson,
     _ts_to_cursor,
 )
+from pkgsentry.ecosystems.gomod.ingest.watchlist import _drop_pseudo
 
 
 def test_pseudo_version_detected():
     assert _is_pseudo_version("v0.0.0-20260524162133-d0041de52970")
 
 
+def test_pseudo_version_with_base_tag_detected():
+    # Go's other two pseudo-version forms: base is a prior release/prerelease.
+    # The old ^v0.0.0-…$ anchor missed these, leaking popular-repo snapshots.
+    assert _is_pseudo_version("v2.0.6-0.20260527234050-cfc1f1127b38+incompatible")
+    assert _is_pseudo_version("v1.4.6-0.20260527232346-619543fb65c5")
+    assert _is_pseudo_version("v0.32.5-rc.1.0.20260527234838-28e2817b6f40")
+    assert _is_pseudo_version("v2.0.0-20260527235025-e245d2e6fcd6+incompatible")
+
+
 def test_tagged_version_not_pseudo():
     assert not _is_pseudo_version("v1.2.3")
     assert not _is_pseudo_version("v0.1.0")
     assert not _is_pseudo_version("v2.0.0-beta.1")
+    assert not _is_pseudo_version("v1.10.0-rc.1")
+    assert not _is_pseudo_version("v1.4.6")
+
+
+def test_drop_pseudo_filters_watchlist_seed(monkeypatch):
+    monkeypatch.delenv("GOMOD_SCAN_PSEUDO", raising=False)
+    successes = [
+        ("github.com/a/tagged", "github.com/a/tagged", "v1.4.6"),
+        ("github.com/b/snap", "github.com/b/snap", "v1.4.6-0.20260527232346-619543fb65c5"),
+    ]
+    kept = _drop_pseudo(successes)
+    assert kept == [("github.com/a/tagged", "github.com/a/tagged", "v1.4.6")]
+
+
+def test_drop_pseudo_respects_opt_in(monkeypatch):
+    monkeypatch.setenv("GOMOD_SCAN_PSEUDO", "1")
+    successes = [("github.com/b/snap", "github.com/b/snap", "v1.4.6-0.20260527232346-619543fb65c5")]
+    assert _drop_pseudo(successes) == successes
 
 
 def test_cursor_roundtrip():

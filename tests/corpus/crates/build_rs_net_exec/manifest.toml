@@ -1,0 +1,12 @@
+ecosystem = "crates"
+name = "evil-crate"
+version = "0.1.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = [
+    "crates.build_rs_net_exec_chain",
+    "crates.build_rs_network",
+    "crates.build_rs_exec",
+]
+notes = "build.rs fetches a payload over the network and pipes it into a shell at compile time"
+provenance = "synthetic"

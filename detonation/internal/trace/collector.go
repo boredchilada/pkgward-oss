@@ -28,14 +28,13 @@ type tetragonProcessKprobe struct {
 }
 
 type tetragonProcess struct {
-	PID       int               `json:"pid"`
-	Binary    string            `json:"binary"`
-	Arguments string            `json:"arguments"`
-	NS        tetragonNamespace `json:"ns"`
-}
-
-type tetragonNamespace struct {
-	PIDForChildren int `json:"pid_for_children"`
+	PID       int    `json:"pid"`
+	Binary    string `json:"binary"`
+	Arguments string `json:"arguments"`
+	// Tetragon's container id, derived from the cgroup and truncated (~31
+	// chars) relative to the full 64-char docker id. Used to attribute each
+	// event to the sandbox container that produced it.
+	Docker string `json:"docker"`
 }
 
 type tetragonKprobeArg struct {
@@ -58,19 +57,21 @@ type tetragonSockArg struct {
 	DPort  int    `json:"dport"`
 }
 
-func ParseTetragonLine(line string, targetNS int) ([]TraceEvent, error) {
+func ParseTetragonLine(line string, containers []string) ([]TraceEvent, error) {
 	var raw tetragonEvent
 	if err := json.Unmarshal([]byte(line), &raw); err != nil {
 		return nil, err
 	}
 
 	var events []TraceEvent
+	var docker string
 
 	if raw.ProcessExec != nil {
 		proc := raw.ProcessExec.Process
-		if proc.NS.PIDForChildren != targetNS {
+		if !matchesContainer(proc.Docker, containers) {
 			return nil, nil
 		}
+		docker = proc.Docker
 		events = append(events, TraceEvent{
 			Category:  "process",
 			Operation: "exec",
@@ -86,9 +87,10 @@ func ParseTetragonLine(line string, targetNS int) ([]TraceEvent, error) {
 
 	if raw.ProcessKprobe != nil {
 		proc := raw.ProcessKprobe.Process
-		if proc.NS.PIDForChildren != targetNS {
+		if !matchesContainer(proc.Docker, containers) {
 			return nil, nil
 		}
+		docker = proc.Docker
 
 		fn := raw.ProcessKprobe.FunctionName
 
@@ -198,10 +200,36 @@ func ParseTetragonLine(line string, targetNS int) ([]TraceEvent, error) {
 		}
 	}
 
+	for i := range events {
+		events[i].Docker = docker
+	}
 	return events, nil
 }
 
-func CollectFromReader(r io.Reader, targetNS int) []TraceEvent {
+// matchesContainer reports whether an event from container id evtDocker
+// belongs to one of the target sandbox containers. An empty target set means
+// "keep everything" — the caller falls back to that when it could not capture
+// the sandbox's container id. Tetragon truncates the id, so match by prefix in
+// either direction.
+func matchesContainer(evtDocker string, containers []string) bool {
+	if len(containers) == 0 {
+		return true
+	}
+	if evtDocker == "" {
+		return false
+	}
+	for _, id := range containers {
+		if id == "" {
+			continue
+		}
+		if strings.HasPrefix(id, evtDocker) || strings.HasPrefix(evtDocker, id) {
+			return true
+		}
+	}
+	return false
+}
+
+func CollectFromReader(r io.Reader, containers []string) []TraceEvent {
 	var all []TraceEvent
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
@@ -210,7 +238,7 @@ func CollectFromReader(r io.Reader, targetNS int) []TraceEvent {
 		if line == "" {
 			continue
 		}
-		events, err := ParseTetragonLine(line, targetNS)
+		events, err := ParseTetragonLine(line, containers)
 		if err != nil {
 			continue
 		}
@@ -219,11 +247,11 @@ func CollectFromReader(r io.Reader, targetNS int) []TraceEvent {
 	return all
 }
 
-// CollectFromTetragonLog reads a Tetragon JSONL log and returns all
-// events with `time` between since and until (inclusive). Pass targetNS=0
-// to skip PID-namespace filtering — useful when the host is dedicated to
-// detonation and the noise filter handles container-vs-host separation.
-func CollectFromTetragonLog(path string, since, until time.Time, targetNS int) []TraceEvent {
+// CollectFromTetragonLog reads a Tetragon JSONL log and returns all events
+// with `time` between since and until (inclusive) that belong to one of the
+// given sandbox container ids. Pass an empty/nil slice to keep all events
+// (no container attribution available).
+func CollectFromTetragonLog(path string, since, until time.Time, containers []string) []TraceEvent {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil
@@ -249,7 +277,7 @@ func CollectFromTetragonLog(path string, since, until time.Time, targetNS int) [
 			}
 		}
 
-		events, err := ParseTetragonLine(line, targetNS)
+		events, err := ParseTetragonLine(line, containers)
 		if err != nil {
 			continue
 		}

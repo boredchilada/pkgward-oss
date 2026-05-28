@@ -242,28 +242,23 @@
         <mxCell id="bg_p7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="2290" width="860" height="310" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation&lt;/b&gt;  (rootless Docker + Tetragon)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
+        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation enqueue&lt;/b&gt;  (async; drained by detonation_worker)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
           <mxGeometry x="230" y="2295" width="380" height="24" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_sandbox" value="&lt;b&gt;Rootless-Docker sandbox&lt;/b&gt; (runc runtime)&lt;br&gt;Go profile in &lt;code&gt;detonation/internal/sandbox/&lt;/code&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Build is best-effort; install/import behavior is what matters&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
-          <mxGeometry x="400" y="2330" width="460" height="80" as="geometry"/>
+        <mxCell id="n_enqueue" value="&lt;b&gt;Enqueue &amp;rarr; DetonationQueue&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;scan finalizes on the static verdict;&lt;br&gt;detonation runs async in the worker pool&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="400" y="2350" width="460" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="e_univ_sandbox" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_universal" target="n_sandbox" parent="1">
+        <mxCell id="e_univ_enqueue" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_universal" target="n_enqueue" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-
-        <mxCell id="n_tetragon" value="&lt;b&gt;Tetragon eBPF behavioral rules&lt;/b&gt;&lt;br&gt;Same as PyPI: exfil, creds, reverse shell, etc." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
-          <mxGeometry x="420" y="2430" width="420" height="50" as="geometry"/>
-        </mxCell>
-        <mxCell id="e_sandbox_tetragon" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_sandbox" target="n_tetragon" parent="1">
+        <mxCell id="e_enqueue_verdict" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_enqueue" target="d_verdict" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-
-        <mxCell id="n_rescore" value="&lt;b&gt;Re-score&lt;/b&gt; with dynamic findings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
-          <mxGeometry x="470" y="2510" width="320" height="40" as="geometry"/>
+        <mxCell id="n_async_note" value="&lt;font color=&quot;#6b4e00&quot;&gt;&lt;i&gt;Async: detonation_worker re-fetches, detonates (rootless-Docker + Tetragon,&lt;br&gt;Go profile, best-effort build), re-scores, and sends a delayed alert on a flip to&lt;br&gt;malicious. Full worker flow: scan-pipeline.drawio&lt;/i&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="400" y="2455" width="460" height="55" as="geometry"/>
         </mxCell>
-        <mxCell id="e_tetragon_rescore" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_tetragon" target="n_rescore" parent="1">
+        <mxCell id="e_enqueue_note" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_enqueue" target="n_async_note" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
@@ -277,9 +272,6 @@
 
         <mxCell id="d_verdict" value="&lt;b&gt;verdict ==&lt;br&gt;malicious?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
           <mxGeometry x="570" y="2670" width="120" height="70" as="geometry"/>
-        </mxCell>
-        <mxCell id="e_rescore_verdict" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_rescore" target="d_verdict" parent="1">
-          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
         <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;Same as PyPI/Crates (OpenRouter, cost-gated)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">

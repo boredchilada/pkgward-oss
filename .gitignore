@@ -8,6 +8,8 @@ __pycache__/
 .mypy_cache/
 build/
 dist/
+!tests/corpus/**/dist/
+!tests/corpus/**/dist/**
 *.egg
 .venv/
 venv/

@@ -1,0 +1,12 @@
+ecosystem = "npm"
+name = "tidy-strings"
+version = "2.0.1"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = [
+    "installer.npm_lifecycle_net_exec",
+    "installer.npm_lifecycle_network",
+    "installer.npm_install_script_net_exec",
+]
+notes = "Clean package with a benign node-gyp postinstall — FP guard for lifecycle-script analysis"
+provenance = "synthetic"

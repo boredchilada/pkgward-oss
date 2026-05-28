@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
+import os
 import random
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,43 @@ _PRIORITY_ORDER = {"high": 0, "normal": 1, "low": 2}
 
 MAX_AUTO_ATTEMPTS = 3
 STALE_CLAIM_TIMEOUT_SECONDS = 900
+
+# Backlog-weighted ecosystem selection. Reserved fraction is split equally
+# among non-empty ecosystems (the floor — guarantees no ecosystem starves);
+# the remainder is allocated proportionally to backlog size; any one ecosystem
+# is capped at max-share to prevent a 10x surge from fully dominating.
+SCHED_RESERVED_FRACTION = float(os.environ.get("SCHED_RESERVED_FRACTION", "0.4"))
+SCHED_MAX_ECO_SHARE = float(os.environ.get("SCHED_MAX_ECO_SHARE", "0.7"))
+
+
+def _eco_weights(ecosystems: list[str], counts: dict[str, int]) -> list[float]:
+    """Weight = floor + proportional-demand, clamped to max-share."""
+    n = len(ecosystems)
+    if n <= 1:
+        return [1.0] * n
+    reserved = max(0.0, min(SCHED_RESERVED_FRACTION, 1.0))
+    max_share = max(reserved / n, min(SCHED_MAX_ECO_SHARE, 1.0))
+    total = sum(counts.get(e, 0) for e in ecosystems) or 1
+    base = reserved / n
+    return [
+        min(base + (1.0 - reserved) * counts.get(e, 0) / total, max_share)
+        for e in ecosystems
+    ]
+
+
+def _weighted_order(ecosystems: list[str], weights: list[float]) -> list[str]:
+    """Weighted sample without replacement → an ordered try-list.
+    The first pick is biased by weight; if its row's claim CAS races, the
+    iterator falls back to subsequent picks. N≤4 so the loop is trivial."""
+    remaining = list(zip(ecosystems, weights))
+    out: list[str] = []
+    while remaining:
+        ecos, ws = zip(*remaining)
+        # All-zero weights → uniform fallback.
+        pick = random.choices(ecos, weights=ws if any(ws) else None, k=1)[0]
+        out.append(pick)
+        remaining = [(e, w) for e, w in remaining if e != pick]
+    return out
 
 
 def enqueue(
@@ -101,25 +139,29 @@ def enqueue(
 def claim_next(session: Session) -> Optional[tuple[ScanQueue, str]]:
     """Claim the highest-priority pending item, fair across ecosystems.
 
-    Within each priority tier we pick a random ecosystem that has pending
-    work, then take the oldest item in that ecosystem.  This prevents one
-    ecosystem with a large backlog from starving another.
+    Within each priority tier the ecosystem is chosen by **backlog-weighted**
+    sampling with a reserved floor: SCHED_RESERVED_FRACTION of attention is
+    split equally so no ecosystem starves; the remainder is allocated
+    proportionally to backlog size (so a backlogged ecosystem like npm draws
+    its fair share of capacity), capped at SCHED_MAX_ECO_SHARE so a surge in
+    one ecosystem can't fully dominate. Uniform-random was the previous
+    behavior — it gave every ecosystem 1/N regardless of backlog, throttling
+    the heavy one to its slice (npm: 79% of backlog → 25% of claims).
     """
     token = uuid.uuid4().hex
     for prio in ("high", "normal", "low"):
-        # Find which ecosystems have pending items at this priority.
-        ecosystems = [
-            r[0] for r in session.execute(
-                select(ScanQueue.ecosystem)
-                .where(ScanQueue.status == "pending", ScanQueue.priority == prio)
-                .group_by(ScanQueue.ecosystem)
-            ).all()
-        ]
-        if not ecosystems:
+        # Pending count per ecosystem at this priority.
+        rows = session.execute(
+            select(ScanQueue.ecosystem, func.count())
+            .where(ScanQueue.status == "pending", ScanQueue.priority == prio)
+            .group_by(ScanQueue.ecosystem)
+        ).all()
+        if not rows:
             continue
-        # Shuffle so no ecosystem is systematically preferred.
-        random.shuffle(ecosystems)
-        for eco in ecosystems:
+        ecosystems = [r[0] for r in rows]
+        counts = {r[0]: int(r[1]) for r in rows}
+        weights = _eco_weights(ecosystems, counts)
+        for eco in _weighted_order(ecosystems, weights):
             row = session.scalars(
                 select(ScanQueue)
                 .where(

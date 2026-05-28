@@ -11,6 +11,8 @@ services:
     restart: unless-stopped
     volumes:
       - scanner-data:/data
+      # Frozen-sample vault (used only when PKGSENTRY_VAULT_PATH is set).
+      - vault-data:/data/vault
       # Optional: detonation sandbox socket (see docs/detonation.md)
       - /var/run/detonation/detonation.sock:/var/run/detonation/detonation.sock
       # Shared staging dir so the detonation service (host-side) can
@@ -28,10 +30,12 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.0"
-          memory: 2G
-    command: ["run", "--workers", "6"]
+          cpus: "4.0"
+          memory: 6G
+    command: ["run", "--workers", "10"]
 
 volumes:
   scanner-data:
     name: pkgsentry-data
+  vault-data:
+    name: pkgsentry-vault

@@ -14,6 +14,7 @@ from pkgsentry.queue import enqueue
 from pkgsentry.store import session as sess
 from pkgsentry.store.models import Watchlist
 from pkgsentry.util.user_agent import user_agent
+from pkgsentry.watchlist_auto import AUTO_MALICIOUS_RANK
 
 log = get_logger("ingest.watchlist")
 ECOSYSTEM = "pypi"
@@ -47,7 +48,16 @@ async def refresh_watchlist(top_n: int = 10000) -> int:
     written = 0
     with sess.session_scope() as s:
         # Wipe and reinsert — simpler than diffing.
-        existing = {w.name: w for w in s.scalars(select(Watchlist).where(Watchlist.ecosystem == ECOSYSTEM)).all()}
+        # Skip auto-added confirmed-malicious rows so popularity refresh doesn't
+        # evict them (they belong to the auto-watchlist gate, not this top-N).
+        existing = {
+            w.name: w for w in s.scalars(
+                select(Watchlist).where(
+                    Watchlist.ecosystem == ECOSYSTEM,
+                    Watchlist.rank != AUTO_MALICIOUS_RANK,
+                )
+            ).all()
+        }
         seen: set[str] = set()
         for idx, entry in enumerate(rows[:top_n], start=1):
             name = entry.get("project") or entry.get("name")

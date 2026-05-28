@@ -42,10 +42,15 @@ with sess.session_scope() as s:
 ## Tests
 
 ```bash
-python -m pytest tests/ -x -q          # Python (437 tests)
+python -m pytest tests/ -x -q          # Python (459 tests)
 cd detonation && go test ./... -v       # Go
-tools/test_opengrep_rules.sh            # opengrep rules via `--test` fixtures
+tools/test_opengrep_rules.sh            # opengrep rules via `--test` fixtures (all 4 langs)
+python -m pytest tests/test_regression_corpus.py tests/test_rule_coverage.py -q  # detection regression suite
 ```
+
+The regression corpus (`tests/corpus/`) runs labeled known-bad/known-good samples through the
+real analyze→score path so detection regressions fail the build. See `docs/regression-testing.md`.
+Private samples/vault load via `PKGSENTRY_CORPUS_PATH` / `PKGSENTRY_VAULT_PATH`.
 
 opengrep/semgrep and (often) the Python deps aren't on dev hosts. Run against the scanner
 image with the working tree mounted — clean, doesn't touch the running scanner:
@@ -69,18 +74,36 @@ docker run --rm --entrypoint bash   -v "$PWD:/src" -w /src pkgsentry-scanner too
 | `PKGSENTRY_LLM_MAX_USD` | Per-process budget cap | `20.0` |
 | `PKGSENTRY_LLM_MAX_CALLS_PER_HOUR` | Rate limit on triage calls | `1000` |
 | `PKGSENTRY_INTEL_PATH` | Path to private intel pack overlay | unset (baseline only) |
+| `PKGSENTRY_CORPUS_PATH` | Path to a private regression-corpus dir (extra known-bad/good samples) | unset |
+| `PKGSENTRY_VAULT_PATH` | Frozen-sample vault dir; when set, malicious archives are auto-preserved (inert) | unset (off) |
 | `DETONATION_SOCKET` | Detonation service UNIX socket | — |
 | `DETONATION_URL` | TCP fallback for detonation service | — |
+| `DETONATION_WORKERS` | Async detonation worker pool size (drains `DetonationQueue`; match the service `--max-concurrent`) | `6` |
+| `DETONATION_ENABLED` | Force detonation-enqueue even without a local detonation client — set on scan-only worker hosts so they enqueue into the shared `DetonationQueue` for a draining host (a host with `DETONATION_SOCKET` enqueues regardless) | `0` |
 | `GOMOD_SCAN_PSEUDO` | `1` = scan Go pseudo-versions, `0` = skip | `0` |
 | `GITHUB_TOKEN` | GitHub API token for Go watchlist (optional) | — |
 | `OPENGREP_ENABLED` | Master switch for the opengrep layer | `1` |
 | `OPENGREP_SHADOW` | `1` = shadow mode (findings excluded from scoring); `0` = cutover (replaces legacy install-time analyzers) | `1` |
 | `OPENGREP_TIMEOUT_SEC` | Per-package wall-clock timeout for the opengrep subprocess | `60` |
 | `OPENGREP_BIN` | Override the opengrep binary path / PATH name | `opengrep` |
+| `PKGSENTRY_LLM_MAX_RETRIES` | Retries on bad/invalid JSON from the LLM (cost/tokens accumulate across attempts) | `2` |
+| `PKGSENTRY_LLM_MAX_RESPONSE_TOKENS` | Cap on the LLM response (prevents `finish_reason=length` truncation that produces invalid JSON). On `finish_reason=length` the retry escalates by 1.5×, capped at `*_CEILING`. | `5000` |
+| `PKGSENTRY_LLM_MAX_RESPONSE_TOKENS_CEILING` | Hard ceiling for the escalating retry on length-truncation. Beyond this the model is treated as rambling and the call bails. | `8000` |
+| `PKGSENTRY_HASH_FULL_MAX_MB` | Files above this size get SHA-256 only (streamed); entropy/ssdeep/TLSH skipped. Big prebuilt native binaries are near-useless for those metrics. | `20` |
+| `SCHED_RESERVED_FRACTION` | Fraction of claim-share split *equally* among non-empty ecosystems (the floor — guarantees no ecosystem starves). Set `1.0` for legacy uniform-fair behavior. | `0.4` |
+| `SCHED_MAX_ECO_SHARE` | Upper cap on any single ecosystem's claim-share, so a surge can't fully dominate. | `0.7` |
+| `WATCHLIST_AUTO_MALICIOUS` | Master switch for the auto-watchlist gate (double-confirmed malicious → add at sentinel rank). | `1` |
+| `WATCHLIST_AUTO_TTL_DAYS` | Auto-added watchlist entries are pruned after this many days without a re-confirm. | `180` |
+| `WATCHLIST_AUTO_MAX_PER_ECO` | Hard cap per ecosystem on auto-added entries; oldest evicted when over. | `5000` |
+| `WATCHLIST_AUTO_MAX_ADDS_PER_HOUR` | Per-ecosystem add-rate ceiling (in-process, defense-in-depth). | `100` |
+| `WATCHLIST_AUTO_BLOCKLIST` | `"eco:name,eco:name,…"` — names that are NEVER auto-added (operator FP exit ramp). | unset |
+| `PKGSENTRY_FINDING_REUSE_DAYS` | For auto-watchlisted names, TTL window for carrying forward prior findings on SHA-unchanged files. Bounds rule-update staleness. | `7` |
 
 ## Architecture
 
-**Ingest** (focus list + watchlist + all new packages, per-ecosystem feeds/cursor) → **Queue** (fair cross-ecosystem scheduling) → **Workers** → **Download** + SHA256 verify → **Extract** + hash (SHA256 + entropy + ssdeep) → **Code-diff** vs previous version → **Analyze** → **Score** → **Detonate** (all ecosystems) → **Re-score** → **LLM triage** (cost-gated) → **Discord alert**
+**Ingest** (focus list + watchlist + all new packages, per-ecosystem feeds/cursor) → **Queue** (backlog-weighted cross-ecosystem scheduling, see "Queue scheduling" below) → **Workers** → **Download** + SHA256 verify → **Extract** + hash (streamed SHA-256 always; entropy + ssdeep + TLSH only on files ≤ `PKGSENTRY_HASH_FULL_MAX_MB`) → **Code-diff** vs previous version → **Analyze** → **Score** → **LLM triage** (cost-gated, on static-malicious, retried on bad JSON) → **Discord alert** (fail-open: rule-malicious alerts unless the LLM explicitly clears it; alerts where the LLM couldn't adjudicate are tagged `llm_unverified`); the scan finalizes on the static verdict and **enqueues** detonation (`DetonationQueue`) instead of running it inline.
+
+**Detonation is async** (`pkgsentry/detonation_worker.py`, since 0.5.1): a separate worker pool drains `DetonationQueue` → **Detonate** (all ecosystems) → **Re-score** → **delayed Discord alert** if the verdict flips to malicious. This keeps the scan pipeline from blocking on the detonation service's concurrency cap. See `docs/internal/detonation-decouple-0.5.1.md` and `docs/diagrams/scan-pipeline.drawio`.
 
 ### Intel pack
 
@@ -148,8 +171,10 @@ once at load time. The gate check is centralized in `focus.gate_decision()` and 
 in the four gated ingest consumers. With `PKGSENTRY_FOCUS_EXCLUSIVE=1` the scanner ingests
 **only** focus packages (watchlist + brand-new gates and the watchlist refresh/seed jobs
 are skipped); an empty focus list in this mode logs `focus_exclusive_empty` and the
-scanner idles by design. Do **not** set `enable-process-ns` in Tetragon config — unrelated,
-but a similar "looks fine, breaks silently" trap noted in `docs/detonation.md`.
+scanner idles by design. (Detonation trace events are attributed to the sandbox by the
+Tetragon `docker` container id, not PID namespace — this host's Tetragon export emits no
+`ns` data, so namespace-based filtering, in both the collector and the tracing policy, is
+inert. See `docs/detonation.md` → "Event attribution".)
 
 ### Detection layers
 
@@ -175,7 +200,15 @@ but a similar "looks fine, breaks silently" trap noted in `docs/detonation.md`.
 
 ### Queue scheduling
 
-`queue.py` `claim_next()` uses fair cross-ecosystem scheduling: for each priority tier (high → normal → low), discovers which ecosystems have pending items, shuffles randomly, then picks the oldest item within the chosen ecosystem.
+`queue.py` `claim_next()` uses **backlog-weighted** scheduling across ecosystems with a reserved floor. For each priority tier (high → normal → low) it counts pending items per ecosystem and picks one by weighted sampling: `SCHED_RESERVED_FRACTION` (default 0.4) of attention is split *equally* among non-empty ecosystems (the floor — guarantees nothing starves), the remainder is allocated *proportionally to backlog size*, and any single ecosystem is clamped at `SCHED_MAX_ECO_SHARE` (default 0.7) so a surge can't fully dominate. Within the chosen ecosystem the oldest pending item is claimed (CAS-on-status); on a CAS race the loop falls back to the next ecosystem in the weighted-sample order. `SCHED_RESERVED_FRACTION=1.0` reverts to the previous uniform-fair behavior. Priority tiers are strictly ordered (any high-priority item beats any backlog at lower tiers).
+
+### Auto-watchlist + finding carry-forward (`pkgsentry/watchlist_auto.py`, `finding_reuse.py`)
+
+When a scan completes with **both** `result.verdict == "malicious"` *and* `tri.verdict == "malicious"` (rules and LLM agree), the pipeline calls `watchlist_auto.add_confirmed_malicious(s, ecosystem, name)`. This inserts `(ecosystem, name)` into the `Watchlist` table at **sentinel rank `9_999_999`** so every future release of the name is enqueued at high priority — closes the gap where the brand-new ingest gate fires *once per name* (a follow-up malicious release after the initial catch would otherwise be skipped). Idempotent (`refreshed_at` updates on re-confirm). Size-controlled by a TTL janitor (default 180d), per-ecosystem hard cap, and in-process add-rate ceiling; FP exit via the `WATCHLIST_AUTO_BLOCKLIST` env or `pkgsentry watchlist auto remove`. The four `refresh_watchlist` paths filter `WHERE rank != AUTO_MALICIOUS_RANK` so popularity refresh never evicts auto-added rows.
+
+For auto-watchlisted names *only*, the pipeline also runs **finding carry-forward**: after analyzers complete (still respecting `changed_files`), `finding_reuse.carry_forward_findings()` queries the most-recent prior scan of the same package within `PKGSENTRY_FINDING_REUSE_DAYS` (default 7) and appends every prior finding whose file's `(file_path, sha256)` is unchanged in the current scan's `FileHash` set. Scoring + the LLM see the full merged evidence; analyzers don't re-run on unchanged files. Scoped to known-bad names so a yara/opengrep rule update doesn't risk stale-cache false-negatives on clean packages.
+
+CLI for inspection / FP trimming: `pkgsentry watchlist auto {list,remove,purge,backfill}`. The `backfill` subcommand walks scan history and adds every package that ever produced a double-confirmed verdict — useful as a one-shot after enabling the gate.
 
 ## Detonation service (Go)
 
@@ -211,14 +244,16 @@ cd detonation && make build           # Cross-compile for Linux
 ## Pipeline threading model
 
 `pipeline.py` uses `asyncio.to_thread()` to keep the event loop unblocked:
-- `_extract_and_hash()` — extraction + SHA256/entropy/ssdeep hashing (CPU-bound)
+- `_extract_and_hash()` — extraction + SHA256/entropy/ssdeep/TLSH hashing (CPU-bound)
 - `_run_analyzers()` — all static analyzers (CPU-bound)
-- `_persist_and_finalize()` — scoring, DB writes, detonation, LLM triage, mark_done
+- `_persist_and_finalize()` — scoring, DB writes, LLM triage, detonation-**enqueue**, mark_done
 - `_bump_rulehits_deferred()` — uses its own `session_scope()` to avoid row-lock deadlocks
 
 Never call sync DB operations or CPU-heavy code directly from `process_one()`. Wrap in `asyncio.to_thread()`.
 
 Workers have a 15-min per-package timeout. Extraction allows up to 25K files per archive.
+
+**Detonation runs in a separate async pool** (`detonation_worker.py`, started by `runtime._async_run` when detonation is enabled, sized by `DETONATION_WORKERS`). It drains `DetonationQueue`, re-fetches the archive by `(ecosystem, name, version)`, detonates off the event loop, then in a **fresh short `session_scope`** persists `Detonation`/`TraceEvent`, re-scores, and fires `discord.send_dynamic_alert` only on a flip to malicious (the inline path already alerts on static-malicious). Same session discipline as the scan pipeline — never hold a session across the detonation HTTP call.
 
 ## Diagrams
 
@@ -234,7 +269,7 @@ Architecture and flow diagrams live in `docs/diagrams/` (draw.io format):
 | `npm-pipeline.drawio` | npm modules pipeline |
 | `detection-layers.drawio` | Detection layers, color-coded by ecosystem |
 | `code-diff-flow.drawio` | Code-diff scanning flow |
-| `queue-state-machine.drawio` | Queue states + fair scheduling |
+| `queue-state-machine.drawio` | Queue states + backlog-weighted scheduling |
 | `ecosystem-lifecycle.drawio` | Seed → Baseline → Incremental lifecycle |
 
 ## Debugging a frozen scanner

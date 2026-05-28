@@ -2,7 +2,7 @@
 
 Multi-ecosystem malware scanner for package registries. Watches PyPI, crates.io, the Go module proxy, and npm for both supply-chain compromises on popular packages and lure / social-engineering attacks on brand-new names.
 
-> **Status: alpha.** Runs in the maintainer's production setup against the live PyPI / crates.io / Go module / npm feeds. The engine API and intel-pack schema may shift before v1.0. Verdicts are correct for the maintainer's data; your mileage will vary until you tune your own intel pack.
+> Runs against the live PyPI, crates.io, Go module proxy, and npm feeds. The baseline intel pack ships in-tree and catches obvious malware; operational detection comes from a tuned private overlay (see [Engine + intel pack](#engine--intel-pack)).
 
 ## What it catches
 
@@ -79,8 +79,8 @@ For dynamic analysis (rootless Docker + Tetragon sandbox, all ecosystems) you ne
 | [Intel pack](docs/intel-pack.md) | Building and loading private detection overlays |
 | [Detonation](docs/detonation.md) | Deploying the rootless-Docker + Tetragon sandbox |
 | [Detection rules](docs/detection-rules.md) | Full rule catalog across 12 detection layers |
+| [Regression testing](docs/regression-testing.md) | Known-bad/known-good corpus suite to catch detection regressions |
 | [Ecosystems](docs/ecosystems-reference.md) | API reference and attack surface per ecosystem |
-| [Roadmap](docs/ROADMAP.md) | Completed and planned features |
 
 ## Ecosystem coverage
 
@@ -110,11 +110,9 @@ pkgsentry is self-hosted and deliberately focused: a single engine covering four
 - **crates.io / Go detonation builds are best-effort** — install/import behavior is observed for all ecosystems, but some crates/modules fail to build inside the sandbox (the malicious install-time code still executes and is traced).
 - **The baseline intel pack is intentionally minimal.** It catches obviously-bad inputs (the kind any decent static scanner would). The maintainer's private overlay is what produces the operationally-useful detection rate.
 
-## Contributing
+## Security
 
-DCO required — sign your commits with `git commit -s`. See `CONTRIBUTING.md`.
-
-Security disclosures: see `SECURITY.md`. Please do not file a public issue for an active vulnerability.
+Disclosures: see `SECURITY.md`. Please do not file a public issue for an active vulnerability.
 
 ## Acknowledgments
 

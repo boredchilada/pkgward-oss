@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" agent="Claude" version="26.0.0">
+<mxfile host="app.diagrams.net" agent="pkgsentry" version="26.0.0">
   <diagram id="queue-state-machine" name="Queue State Machine">
     <mxGraphModel dx="1400" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1100" math="0" shadow="0">
       <root>
@@ -26,7 +26,7 @@
         </mxCell>
 
         <!-- PENDING detail box -->
-        <mxCell id="pendingDetail" value="&lt;font style=&quot;font-size:11px&quot;&gt;&lt;b&gt;Ordering:&lt;/b&gt; priority (high &amp;rarr; normal &amp;rarr; low),&lt;br&gt;then FIFO within priority.&lt;br&gt;&lt;b&gt;Fair scheduling:&lt;/b&gt; random shuffle across&lt;br&gt;ecosystems prevents starvation.&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+        <mxCell id="pendingDetail" value="&lt;font style=&quot;font-size:11px&quot;&gt;&lt;b&gt;Ordering:&lt;/b&gt; priority (high &amp;rarr; normal &amp;rarr; low),&lt;br&gt;then FIFO within priority.&lt;br&gt;&lt;b&gt;Scheduling:&lt;/b&gt; backlog-weighted across&lt;br&gt;ecosystems with a reserved floor (no starvation).&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
           <mxGeometry x="60" y="220" width="280" height="90" as="geometry" />
         </mxCell>
 
@@ -142,7 +142,7 @@
         <!-- ==================== LEGEND / NOTES ==================== -->
 
         <!-- Fair scheduling note -->
-        <mxCell id="fairNote" value="&lt;b&gt;Fair Scheduling (claim_next)&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:11px&quot;&gt;1. Find ecosystems with pending items at each priority tier&lt;br&gt;2. Shuffle ecosystems randomly&lt;br&gt;3. Pick oldest item within chosen ecosystem&lt;br&gt;&lt;br&gt;Prevents one ecosystem's backlog&lt;br&gt;from starving another.&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#E6F3FF;strokeColor=#6c8ebf;fontSize=12;align=left;spacingLeft=8;" vertex="1" parent="1">
+        <mxCell id="fairNote" value="&lt;b&gt;Backlog-weighted Scheduling (claim_next)&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:11px&quot;&gt;1. Count pending items per ecosystem at each priority tier&lt;br&gt;2. Weighted sample: SCHED_RESERVED_FRACTION (def 0.4) split equally (floor),&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;remainder proportional to backlog, capped at SCHED_MAX_ECO_SHARE (def 0.7)&lt;br&gt;3. Pick oldest item within chosen ecosystem (CAS-on-status)&lt;br&gt;&lt;br&gt;Backlogged ecosystem (e.g. npm) draws its share;&lt;br&gt;floor prevents quiet ecosystems from starving.&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#E6F3FF;strokeColor=#6c8ebf;fontSize=12;align=left;spacingLeft=8;" vertex="1" parent="1">
           <mxGeometry x="960" y="280" width="310" height="130" as="geometry" />
         </mxCell>
 

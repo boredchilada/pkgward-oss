@@ -60,7 +60,9 @@ def _build_embed(
     triage: LLMTriageResult,
     top_findings: list[Finding],
 ) -> dict:
-    color = _severity_color(triage.verdict, triage.confidence)
+    # Grey when the LLM couldn't adjudicate (fail-open alert); red/orange when it did.
+    unverified = triage.verdict not in ("malicious", "suspicious", "benign")
+    color = 0x95A5A6 if unverified else _severity_color(triage.verdict, triage.confidence)
     url_template = REGISTRY_URLS.get(ecosystem, f"https://example.com/{ecosystem}/{{name}}/{{version}}")
     registry_url = _defang(url_template.format(name=pkg_name, version=pkg_version))
 
@@ -106,12 +108,16 @@ def _build_embed(
         "inline": False,
     })
 
-    if triage.agrees_with_rules is False:
+    if unverified:
+        desc = (f"Rules flagged **{pkg_name}** {pkg_version} as **{rule_verdict}** — "
+                f"LLM could not verify ({triage.verdict}). Review manually.")
+    elif triage.agrees_with_rules is False:
         desc = f"Rules flagged **{pkg_name}** {pkg_version} as **{triage.verdict}** (LLM disagrees)"
     else:
         desc = f"LLM triage confirmed **{pkg_name}** {pkg_version} as **{triage.verdict}**"
+    title = "⚠️ Suspect Package (LLM unverified)" if unverified else "⚠️ Malicious Package Detected"
     embed = {
-        "title": f"⚠️ Malicious Package Detected",
+        "title": title,
         "description": desc,
         "color": color,
         "fields": fields,
@@ -132,6 +138,33 @@ def _pick_top_findings(findings: list[Finding], limit: int = 8) -> list[Finding]
     )[:limit]
 
 
+def _post_embed(embed: dict, *, pkg_name: str, pkg_version: str) -> bool:
+    """Rate-limited webhook POST. Best-effort — never raises."""
+    url = os.environ.get(WEBHOOK_URL_ENV)
+    if not url:
+        return False
+
+    global _last_send
+    with _rate_lock:
+        now = time.monotonic()
+        wait = MIN_INTERVAL - (now - _last_send)
+        if wait > 0:
+            time.sleep(wait)
+        _last_send = time.monotonic()
+
+    payload = {"username": "pkgsentry", "embeds": [embed]}
+    try:
+        resp = httpx.post(url, json=payload, timeout=WEBHOOK_TIMEOUT)
+        if resp.status_code == 204:
+            log.info("discord_alert_sent", name=pkg_name, version=pkg_version)
+            return True
+        log.warning("discord_alert_failed", status=resp.status_code, body=resp.text[:200])
+        return False
+    except Exception as e:
+        log.warning("discord_alert_error", error=str(e))
+        return False
+
+
 def send_alert(
     *,
     pkg_name: str,
@@ -145,19 +178,8 @@ def send_alert(
 ) -> bool:
     """Post a Discord webhook alert. Returns True on success, False on failure.
     Best-effort — never raises."""
-    url = os.environ.get(WEBHOOK_URL_ENV)
-    if not url:
+    if not os.environ.get(WEBHOOK_URL_ENV):
         return False
-
-    global _last_send
-    with _rate_lock:
-        now = time.monotonic()
-        wait = MIN_INTERVAL - (now - _last_send)
-        if wait > 0:
-            time.sleep(wait)
-        _last_send = time.monotonic()
-
-    top = _pick_top_findings(findings)
     embed = _build_embed(
         pkg_name=pkg_name,
         pkg_version=pkg_version,
@@ -166,21 +188,51 @@ def send_alert(
         rule_score=rule_score,
         n_findings=n_findings,
         triage=triage,
-        top_findings=top,
+        top_findings=_pick_top_findings(findings),
     )
+    return _post_embed(embed, pkg_name=pkg_name, pkg_version=pkg_version)
 
-    payload = {
-        "username": "pkgsentry",
-        "embeds": [embed],
+
+def send_dynamic_alert(
+    *,
+    pkg_name: str,
+    pkg_version: str,
+    ecosystem: str,
+    static_verdict: str,
+    new_verdict: str,
+    new_score: int,
+    n_findings: int,
+    findings: list[Finding],
+) -> bool:
+    """Alert for a verdict flipped to malicious by async detonation (no LLM triage).
+    Best-effort — never raises."""
+    if not os.environ.get(WEBHOOK_URL_ENV):
+        return False
+    url_template = REGISTRY_URLS.get(ecosystem, f"https://example.com/{ecosystem}/{{name}}/{{version}}")
+    registry_url = _defang(url_template.format(name=pkg_name, version=pkg_version))
+
+    fields = [
+        {"name": "Package", "value": f"`{pkg_name}=={pkg_version}`", "inline": True},
+        {"name": "Ecosystem", "value": ecosystem, "inline": True},
+        {"name": "Verdict", "value": f"**{new_verdict.upper()}** (score: {new_score})", "inline": True},
+        {"name": "Static verdict", "value": static_verdict, "inline": True},
+        {"name": "Findings", "value": str(n_findings), "inline": True},
+    ]
+    top = _pick_top_findings(findings)
+    if top:
+        finding_lines = []
+        for f in top[:8]:
+            loc = f"`{f.file}:{f.line}`" if f.file and f.line else "`N/A`"
+            evidence = _defang(f.evidence[:80]) if f.evidence else ""
+            finding_lines.append(f"**{f.rule_id}** [{f.severity}/{f.confidence}] {loc}\n{evidence}")
+        fields.append({"name": "Top Rule Hits", "value": "\n".join(finding_lines)[:1024], "inline": False})
+    fields.append({"name": "Registry", "value": f"`{registry_url}`", "inline": False})
+
+    embed = {
+        "title": "⚠️ Malicious Package Detected (detonation)",
+        "description": f"Detonation flipped **{pkg_name}** {pkg_version} to **{new_verdict}** (static verdict: {static_verdict})",
+        "color": 0xED4245,
+        "fields": fields,
+        "footer": {"text": "pkgsentry | dynamic detonation"},
     }
-
-    try:
-        resp = httpx.post(url, json=payload, timeout=WEBHOOK_TIMEOUT)
-        if resp.status_code == 204:
-            log.info("discord_alert_sent", name=pkg_name, version=pkg_version)
-            return True
-        log.warning("discord_alert_failed", status=resp.status_code, body=resp.text[:200])
-        return False
-    except Exception as e:
-        log.warning("discord_alert_error", error=str(e))
-        return False
+    return _post_embed(embed, pkg_name=pkg_name, pkg_version=pkg_version)

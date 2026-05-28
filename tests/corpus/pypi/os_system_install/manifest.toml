@@ -1,0 +1,8 @@
+ecosystem = "pypi"
+name = "curl-pipe-sh"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["installer.os_system_at_install", "malware.download_command"]
+notes = "Classic curl|sh dropper invoked from setup.py via os.system"
+provenance = "synthetic"

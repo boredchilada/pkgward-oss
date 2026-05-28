@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pkgsentry"
-version = "0.5.0"
-description = "Multi-ecosystem supply-chain malware scanner for PyPI, crates.io, and Go modules."
+version = "0.5.1"
+description = "Multi-ecosystem supply-chain malware scanner for PyPI, crates.io, Go modules, and npm."
 requires-python = ">=3.11"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}

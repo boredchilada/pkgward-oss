@@ -36,15 +36,17 @@ def baseline_dir() -> Path:
     return _BASELINE_DIR
 
 
-def load(overlay_path: Optional[Path] = None) -> IntelPack:
+def load(overlay_path: Optional[Path] = None, *, use_env: bool = True) -> IntelPack:
     """Load baseline + optional overlay, merge, set as the module-level current.
 
     `overlay_path` overrides the PKGSENTRY_INTEL_PATH env var when provided
-    (mainly for tests).
+    (mainly for tests). Pass `use_env=False` to force a deterministic
+    baseline-only load that ignores PKGSENTRY_INTEL_PATH (used by the public
+    regression corpus, whose golden expectations are pinned to the baseline pack).
     """
     global _current
 
-    if overlay_path is None:
+    if overlay_path is None and use_env:
         env_path = os.environ.get("PKGSENTRY_INTEL_PATH", "").strip()
         if env_path:
             overlay_path = Path(env_path)
@@ -65,6 +67,8 @@ def load(overlay_path: Optional[Path] = None) -> IntelPack:
             lure_categories=sorted(merged.lure_keywords.keys()),
             scoring_weights=dict(merged.scoring_weights),
             thresholds=dict(merged.thresholds),
+            det_noise_lists=sorted(merged.detonation_noise.keys()),
+            det_rules_lists=sorted(merged.detonation_rules_data.keys()),
         )
         _current = merged
     elif overlay_path is not None:

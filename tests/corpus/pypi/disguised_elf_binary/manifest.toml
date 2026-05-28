@@ -1,0 +1,8 @@
+ecosystem = "pypi"
+name = "accelpkg"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "suspicious"
+expect_rules = ["binary.hidden_executable"]
+notes = "An ELF executable shipped under a .py filename — a genuine disguise. Pins binary.hidden_executable so weakening the extension-less case (see native_wrapper_binary) can't also blind the disguise case."
+provenance = "synthetic"

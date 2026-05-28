@@ -1,0 +1,10 @@
+{
+  "name": "tidy-strings",
+  "version": "2.0.1",
+  "description": "string helpers",
+  "main": "index.js",
+  "scripts": {
+    "postinstall": "node-gyp rebuild",
+    "test": "jest"
+  }
+}

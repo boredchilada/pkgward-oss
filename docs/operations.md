@@ -43,6 +43,24 @@ development, but PostgreSQL is recommended for production.
 Set `SCANNER_INGEST=0` to start workers without enqueueing new packages (useful for
 draining an existing queue before a maintenance window).
 
+### Scaling horizontally (multiple worker hosts)
+
+The scan queue and the detonation queue are both DB-coordinated (claim-token
+compare-and-set), so additional hosts can drain the same queues with no double-work.
+To add a scan-worker host:
+
+- Point it at the **same** `PKGSENTRY_DB_URL` as the primary.
+- Set **`SCANNER_INGEST=0`** so only the primary polls feeds / advances cursors (no
+  duplicate enqueues or cursor races); the new host purely drains the queue.
+- If the cluster runs detonation but this host has no local detonation service, set
+  **`DETONATION_ENABLED=1`** so its scans still enqueue detonation jobs for a host with
+  a detonation service to drain. (A host with `DETONATION_SOCKET`/`DETONATION_URL`
+  enqueues regardless.) The detonation worker pool only starts where a detonation
+  service is actually reachable.
+
+Give each host as many `--workers` / `cpus` as it has; throughput scales roughly
+linearly with total cores across hosts.
+
 ## Logs
 
 ```bash
@@ -240,6 +258,65 @@ with e.begin() as c:
 "
 ```
 
+## Auto-watchlist (confirmed-malicious gate)
+
+When a scan finishes with **both** the rule verdict and the LLM verdict at
+`malicious`, pkgsentry inserts `(ecosystem, name)` into the `Watchlist` at a
+sentinel rank (`9_999_999`) so every future release of that name is enqueued at
+high priority. This closes the "brand-new gate fires once per name" gap — a
+follow-up malicious release of an already-burned name would otherwise be
+skipped by the brand-new ingest gate.
+
+Auto-added rows are distinguishable by their rank: a popularity entry has
+`rank ≤ ~10_000`; an auto-added one has `rank = 9_999_999`. The four ecosystem
+`refresh_watchlist` jobs skip rows at the sentinel rank, so popularity refresh
+never evicts an auto-added row.
+
+For confirmed-malicious names the scanner *also* carries forward findings on
+SHA-unchanged files from the most-recent prior scan (`PKGSENTRY_FINDING_REUSE_DAYS`,
+default 7) — needed because a re-publish that only changes a handful of files
+(common for many packages, malicious or not) would otherwise see the
+`changed_files` optimization suppress analyzers on the unchanged majority, and
+the new scan would surface only the deltas (e.g. 3 of 11 findings) to scoring
+and the LLM.
+
+### Inspecting and trimming auto-added entries
+
+```bash
+# list all auto-added entries (sentinel-rank rows)
+docker exec pkgsentry pkgsentry watchlist auto list
+docker exec pkgsentry pkgsentry watchlist auto list --ecosystem npm
+
+# remove a single FP (e.g. an over-flagged build/fetch tool)
+docker exec pkgsentry pkgsentry watchlist auto remove npm <name>
+
+# bulk-prune: drop everything older than N days
+docker exec pkgsentry pkgsentry watchlist auto purge --older-than-days 30
+
+# one-shot backfill: walk scan history and add every package that ever produced
+# a double-confirmed verdict in the last N days (default 30).
+docker exec pkgsentry pkgsentry watchlist auto backfill --days 30
+```
+
+### Permanent FP blocklist
+Set `WATCHLIST_AUTO_BLOCKLIST="npm:bad-name,pypi:other"` in `.env`. Names listed
+there are **never** auto-added, even on double-confirm. Survives across restarts;
+upgrade path is a private-intel TOML in a future release.
+
+### Size-control layers (all env-tunable)
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `WATCHLIST_AUTO_MALICIOUS` | Master on/off | `1` |
+| `WATCHLIST_AUTO_TTL_DAYS` | Auto-added entries pruned after no re-confirm | `180` |
+| `WATCHLIST_AUTO_MAX_PER_ECO` | Hard cap per ecosystem; oldest evicted over | `5000` |
+| `WATCHLIST_AUTO_MAX_ADDS_PER_HOUR` | Per-ecosystem add-rate ceiling (in-process) | `100` |
+| `WATCHLIST_AUTO_BLOCKLIST` | `"eco:name,eco:name"` — never auto-add | unset |
+| `PKGSENTRY_FINDING_REUSE_DAYS` | TTL window for carry-forward of prior findings | `7` |
+
+The janitor (`watchlist_auto_janitor`, hourly) drops expired entries and
+evicts oldest when over the cap. Logs `watchlist_auto_janitor` events.
+
 ## Seeding threat-intel fingerprints
 
 ```bash
@@ -267,6 +344,115 @@ intel pack(s). Safe to re-run — inserts are upserted by SHA256.
 
 Legacy prefixes `PKGWATCH_*` and `PYPI_SCANNER_*` are accepted as fallbacks for all
 `PKGSENTRY_*` vars.
+
+## Data retention and investigation
+
+The scanner keeps full evidence for every scan it runs. This makes false-positive
+analysis, rule-tuning, and threat-intel seeding tractable without re-fetching
+upstream archives that may have been yanked.
+
+### What's persisted
+
+| Table | What it stores |
+|---|---|
+| `scan` | One row per scan: verdict, score, alert_tag, started_at, finished_at, duration |
+| `finding` | One row per individual finding: rule_id, category, severity, file path, line number, **evidence text** (the substring or chain that triggered the rule) |
+| `file_hash` | Per-file SHA-256 + ssdeep + entropy + archive_kind for every file extracted from every scanned archive |
+| `detonation` | Per-detonation outcome: install/import exit codes, durations, timeouts, trace-event counts |
+| `trace_event` | One row per Tetragon-captured behavior in the sandbox: phase, category, operation, detail, matched_rule, pid, binary |
+| `triage_decision` (if LLM enabled) | LLM verdict, cost, latency, model ID for each triaged scan |
+| `watchlist` | Per-ecosystem watched names + rank (popularity rank for top-N, sentinel `9_999_999` for auto-watchlisted entries) |
+
+These rows are not garbage-collected by default. At ~10K scans/day on a
+moderately-loaded host this produces ~5M `finding` rows and ~14M `file_hash`
+rows per week of operation; plan disk accordingly. A future release may add an
+opt-in retention policy (TTL-by-`finished_at` on `finding` and `file_hash`).
+
+### Vault (frozen malicious archives)
+
+When `PKGSENTRY_VAULT_PATH` is set (or the standalone compose mounts
+`pkgsentry-vault`), confirmed-malicious archives are auto-preserved (inert)
+under that directory. The naming convention is:
+
+```
+<eco>__<name>__<version>__<sha256-prefix>.zip
+<eco>__<name>__<version>__<sha256-prefix>.manifest.toml
+```
+
+This means you can re-analyze, fingerprint, or seed threat-intel from real
+samples even after the upstream registry has yanked them. The manifest carries
+the verdict + rule hits at the time of capture.
+
+### Investigating a finding after the fact
+
+The persisted `evidence` column on `finding` carries the actual substring or
+chain that triggered the rule, which is usually enough to verify a finding
+without re-fetching the archive:
+
+```sql
+-- All findings for a scan you want to inspect
+SELECT rule_id, severity, file, line, evidence
+FROM finding
+WHERE scan_id = <id>
+ORDER BY CASE severity
+  WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4
+END;
+
+-- Findings on a specific package across all versions
+SELECT v.version, s.verdict, s.score, f.rule_id, f.severity, f.file
+FROM scan s
+JOIN version v ON s.version_id = v.id
+JOIN package p ON v.package_id = p.id
+LEFT JOIN finding f ON f.scan_id = s.id
+WHERE p.ecosystem = 'pypi' AND p.name = '<name>'
+ORDER BY s.finished_at DESC;
+
+-- How often a given rule fires, and where (FP triage):
+SELECT f.rule_id, COUNT(*) AS hits, AVG(s.score) AS avg_score
+FROM finding f JOIN scan s ON f.scan_id = s.id
+WHERE f.severity IN ('critical','high')
+GROUP BY 1 ORDER BY 2 DESC;
+```
+
+When the `evidence` text isn't enough, the vault provides the actual archive.
+When the vault doesn't have it either, `pip download <name>==<version>
+--no-deps -d /tmp/x` (or `npm pack <name>@<version>` / `cargo pkgid ...`) will
+fetch the upstream copy if it's still published.
+
+### Turning a confirmed FP into a regression test
+
+When you verify that a flagged package was actually benign, write the case
+into the regression corpus so future rule changes can't re-introduce the FP:
+
+1. Place the archive under your corpus directory (`PKGSENTRY_CORPUS_PATH` for
+   private samples, or `tests/corpus/` for public).
+2. Add a YAML manifest describing the expected outcome:
+   ```yaml
+   ecosystem: pypi
+   name: example-tool
+   version: 1.2.3
+   expect:
+     verdict_not: malicious
+     # OR allowlist specific findings that are known-benign:
+     allowed_findings:
+       - rule_id: malware.credential_file_access
+         file_substr: 'tests/'
+   ```
+3. The regression-corpus test (`tests/test_regression_corpus.py`) runs the
+   full analyze → score path against every corpus sample on CI, so a future
+   rule change that re-classifies the sample as malicious will fail the build.
+
+See `docs/regression-testing.md` for the full corpus format.
+
+### Auto-watchlist FP exit ramps
+
+```bash
+docker exec pkgsentry pkgsentry watchlist auto list
+docker exec pkgsentry pkgsentry watchlist auto remove <ecosystem> <name>
+```
+
+Or set `WATCHLIST_AUTO_BLOCKLIST="<eco>:<name>,<eco>:<name>,…"` in `.env` to
+keep names from ever being auto-added on a future backfill.
 
 ## Updating the scanner
 

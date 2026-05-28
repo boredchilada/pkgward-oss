@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -39,6 +40,14 @@ func newID() string {
 	b := make([]byte, 8)
 	rand.Read(b)
 	return "det-" + hex.EncodeToString(b)
+}
+
+func readCIDFile(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
 }
 
 func NewSandboxConfig(ecosystem, archivePath string) SandboxConfig {
@@ -62,7 +71,7 @@ func NewSandboxConfig(ecosystem, archivePath string) SandboxConfig {
 //
 // Uses Docker's default runtime (runc) rather than runsc — gVisor would
 // hide guest syscalls from Tetragon. See package doc for rationale.
-func (c *SandboxConfig) DockerRunArgs(image string, cmd []string) []string {
+func (c *SandboxConfig) DockerRunArgs(image string, cmd []string, cidFile string) []string {
 	archiveBasename := filepath.Base(c.ArchivePath)
 	mountSpec := fmt.Sprintf("%s:%s/%s:ro", c.ArchivePath, c.WorkDir, archiveBasename)
 	args := []string{
@@ -76,8 +85,11 @@ func (c *SandboxConfig) DockerRunArgs(image string, cmd []string) []string {
 		fmt.Sprintf("--memory=%dm", c.MemoryLimitMB),
 		"--workdir=" + c.WorkDir,
 		"-v", mountSpec,
-		image,
 	}
+	if cidFile != "" {
+		args = append(args, "--cidfile="+cidFile)
+	}
+	args = append(args, image)
 	args = append(args, cmd...)
 	return args
 }
@@ -89,9 +101,17 @@ type PhaseResult struct {
 }
 
 type Sandbox struct {
-	Config  SandboxConfig
-	profile *Profile
-	baseDir string
+	Config       SandboxConfig
+	profile      *Profile
+	baseDir      string
+	containerIDs []string
+}
+
+// ContainerIDs returns the full docker container ids launched by this sandbox
+// (one per phase that ran). Empty if id capture failed; callers treat that as
+// "no container attribution" and fall back to time-window-only filtering.
+func (s *Sandbox) ContainerIDs() []string {
+	return s.containerIDs
 }
 
 func New(ecosystem, archivePath, baseDir string) (*Sandbox, error) {
@@ -127,13 +147,27 @@ func (s *Sandbox) RunPhase(ctx context.Context, phase string, cmd []string, time
 	defer cancel()
 
 	start := time.Now()
-	runArgs := s.Config.DockerRunArgs(s.profile.BaseImage, cmd)
+
+	// Capture the container id Tetragon will tag this phase's events with, so
+	// the collector can attribute events to this sandbox and drop other
+	// containers' activity. Docker writes the cidfile at create time, before
+	// --rm removes the container, so it survives the run.
+	cidFile := filepath.Join(s.baseDir, "cids", s.Config.ID+"-"+phase+".cid")
+	_ = os.MkdirAll(filepath.Dir(cidFile), 0o755)
+	_ = os.Remove(cidFile)
+
+	runArgs := s.Config.DockerRunArgs(s.profile.BaseImage, cmd, cidFile)
 	c := exec.CommandContext(ctx, "docker", runArgs...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 
 	err := c.Run()
 	elapsed := int(time.Since(start).Milliseconds())
+
+	if id := readCIDFile(cidFile); id != "" {
+		s.containerIDs = append(s.containerIDs, id)
+	}
+	_ = os.Remove(cidFile)
 
 	if ctx.Err() == context.DeadlineExceeded {
 		// Best-effort cleanup if docker is still holding the name.

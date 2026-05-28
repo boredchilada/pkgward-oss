@@ -1,0 +1,8 @@
+ecosystem = "pypi"
+name = "env-stealer"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["malware.env_bulk_exfil"]
+notes = "setup.py POSTs the full environment to an external collector at install time"
+provenance = "synthetic"

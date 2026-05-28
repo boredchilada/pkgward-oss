@@ -1,0 +1,8 @@
+ecosystem = "pypi"
+name = "ssh-stealer"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["malware.credential_file_access"]
+notes = "Reads the user's SSH private key at install time and exfiltrates it"
+provenance = "synthetic"

@@ -71,6 +71,8 @@ func Filter(ecosystem string, events []trace.TraceEvent) []trace.TraceEvent {
 		execNoise = noise.CratesExecNoise
 		netAllow = noise.CratesNetAllow
 	case "gomod":
+		fileNoise = noise.GomodFileNoise
+		execNoise = noise.GomodExecNoise
 		netAllow = noise.GomodNetAllow
 	default:
 		return events

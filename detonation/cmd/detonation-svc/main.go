@@ -6,17 +6,28 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"detonation/internal/api"
 	"detonation/internal/intel"
 )
 
+func envIntDefault(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return def
+}
+
 func main() {
 	socketPath := flag.String("socket", "/var/run/detonation/detonation.sock", "UNIX socket path")
 	listenAddr := flag.String("listen", "", "TCP listen address (overrides socket)")
 	baseDir := flag.String("base-dir", "/var/lib/detonation", "base directory for overlays and traces")
-	maxConcurrent := flag.Int("max-concurrent", 2, "max concurrent detonations")
+	maxConcurrent := flag.Int("max-concurrent", envIntDefault("MAX_CONCURRENT", 6),
+		"max concurrent detonations (default from MAX_CONCURRENT env, else 6; match DETONATION_WORKERS)")
 	tetragonLog := flag.String("tetragon-log", "/var/log/tetragon/tetragon.log",
 		"Tetragon JSONL export log path (read for trace events during each detonation)")
 	flag.Parse()

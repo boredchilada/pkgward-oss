@@ -21,10 +21,6 @@ func sensitivePathPrefixes() []string {
 	return intel.Current().Rules.SensitivePathPrefixes
 }
 
-func sensitiveEnvPrefixes() []string {
-	return intel.Current().Rules.SensitiveEnvPrefixes
-}
-
 func shellBinaries() []string {
 	return intel.Current().Rules.ShellBinaries
 }

@@ -1,0 +1,4 @@
+# opengrep --test fixtures for pth_import_injection (.pth file).
+# ruleid: pth_import_injection
+import malicious_bootstrap
+/usr/local/lib/python3.11/site-packages

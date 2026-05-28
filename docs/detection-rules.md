@@ -283,7 +283,14 @@ Package is installed/imported in a rootless-Docker sandbox with Tetragon eBPF tr
 | `dyn_suspicious_write` | critical | high | Write to persistence path (crontab, /etc/systemd, .bashrc, authorized_keys) via `security_file_permission` MAY_WRITE hook |
 | `dyn_fileless_exec` | critical / medium | high / medium | `execveat(AT_EMPTY_PATH)` fileless execution (critical); `memfd_create` anonymous executable memory (medium) |
 
-All non-network kprobe hooks are namespace-filtered (`matchNamespaces Pid NotIn [host]`) so host activity is not misattributed to a detonation. Note: Tetragon `matchArgs` has no `In` operator — use `Equal` with multiple values (OR-matched).
+Trace events are attributed to the detonation's own sandbox container by the Tetragon
+`docker` container id (captured per phase via `docker run --cidfile`), so concurrent
+detonations and host activity are not misattributed. The tracing policy also carries
+`matchNamespaces Pid NotIn [host]` as best-effort defense-in-depth, but it is **not** relied
+upon: this host's Tetragon export does not populate PID-namespace data, so that selector is
+inert and host events still reach the log — the collector-side container-id filter is the
+real boundary. Note: Tetragon `matchArgs` has no `In` operator — use `Equal` with multiple
+values (OR-matched).
 
 ## Fetch-level findings
 

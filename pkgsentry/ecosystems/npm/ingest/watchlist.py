@@ -27,6 +27,7 @@ from pkgsentry.queue import enqueue
 from pkgsentry.store import session as sess
 from pkgsentry.store.models import ScanQueue, Watchlist
 from pkgsentry.util.user_agent import user_agent
+from pkgsentry.watchlist_auto import AUTO_MALICIOUS_RANK
 
 log = get_logger("npm.watchlist")
 
@@ -176,9 +177,16 @@ async def refresh_watchlist(top_n: int = TOP_N) -> int:
 
     now = datetime.now(timezone.utc)
     with sess.session_scope() as s:
+        # Skip auto-added confirmed-malicious rows so popularity refresh doesn't
+        # evict them (they belong to the auto-watchlist gate, not this top-N).
         existing = {
             w.name.lower(): w
-            for w in s.scalars(select(Watchlist).where(Watchlist.ecosystem == ECOSYSTEM)).all()
+            for w in s.scalars(
+                select(Watchlist).where(
+                    Watchlist.ecosystem == ECOSYSTEM,
+                    Watchlist.rank != AUTO_MALICIOUS_RANK,
+                )
+            ).all()
         }
         kept: set[str] = set()
         for idx, name in enumerate(final, start=1):

@@ -8,6 +8,7 @@ Three-tier matching (same priority order as dephish):
 """
 from __future__ import annotations
 
+import fnmatch
 import logging
 from dataclasses import dataclass
 from typing import Optional
@@ -17,23 +18,30 @@ from sqlalchemy.orm import Session
 
 from pkgsentry.adapter import Finding
 from pkgsentry.store.models import ThreatIntelHash
+from pkgsentry.util import capabilities as caps
 
 log = logging.getLogger(__name__)
 
-try:
-    import ppdeep
-    _has_ppdeep = True
-except ImportError:
-    _has_ppdeep = False
-
-try:
-    import tlsh as _tlsh
-    _has_tlsh = True
-except ImportError:
-    _has_tlsh = False
-
 SSDEEP_THRESHOLD = 70
 TLSH_THRESHOLD = 120
+
+# Per-campaign TLSH override. Lower than the global default for campaigns whose
+# fingerprint is short or structurally common enough that the loose 120 default
+# false-positives on unrelated small modules. Validated reskins for these
+# families clustered at much lower distances (github_contents_exfil: 28).
+_CAMPAIGN_TLSH_THRESHOLD = {
+    "github_contents_exfil": 60,
+}
+
+_LABEL_SEVERITY = {"malicious": "critical", "suspicious": "high", "pua": "medium"}
+
+
+def _pattern_ok(entry: ThreatIntelHash, name: str) -> bool:
+    """Scope a fuzzy match to the fingerprint's intended filename glob (exact
+    sha256 matches bypass this)."""
+    if not entry.file_pattern or not name:
+        return True
+    return fnmatch.fnmatch(name, entry.file_pattern)
 
 
 @dataclass
@@ -55,10 +63,13 @@ def check_file(
     sha256: str,
     ssdeep_hash: str = "",
     tlsh_hash: str = "",
+    filename: str = "",
 ) -> Optional[ThreatMatch]:
     intel = _load_intel(session)
     if not intel:
         return None
+
+    name = filename.rsplit("/", 1)[-1] if filename else ""
 
     for entry in intel:
         if entry.sha256 == sha256:
@@ -69,11 +80,11 @@ def check_file(
                 intel_sha256=entry.sha256,
             )
 
-    if _has_ppdeep and ssdeep_hash:
+    if caps.HAS_PPDEEP and ssdeep_hash:
         for entry in intel:
-            if not entry.ssdeep:
+            if not entry.ssdeep or not _pattern_ok(entry, name):
                 continue
-            similarity = ppdeep.compare(ssdeep_hash, entry.ssdeep)
+            similarity = caps.ppdeep.compare(ssdeep_hash, entry.ssdeep)
             if similarity >= SSDEEP_THRESHOLD:
                 return ThreatMatch(
                     tier="ssdeep", score=float(similarity),
@@ -82,12 +93,13 @@ def check_file(
                     intel_sha256=entry.sha256,
                 )
 
-    if _has_tlsh and tlsh_hash and tlsh_hash not in ("TNULL", ""):
+    if caps.HAS_TLSH and tlsh_hash and tlsh_hash not in ("TNULL", ""):
         for entry in intel:
-            if not entry.tlsh or entry.tlsh == "TNULL":
+            if not entry.tlsh or entry.tlsh == "TNULL" or not _pattern_ok(entry, name):
                 continue
-            dist = _tlsh.diff(tlsh_hash, entry.tlsh)
-            if dist <= TLSH_THRESHOLD:
+            dist = caps.tlsh.diff(tlsh_hash, entry.tlsh)
+            threshold = _CAMPAIGN_TLSH_THRESHOLD.get(entry.campaign, TLSH_THRESHOLD)
+            if dist <= threshold:
                 return ThreatMatch(
                     tier="tlsh", score=float(dist),
                     campaign=entry.campaign, label=entry.label,
@@ -115,13 +127,15 @@ def check_files_batch(
             sha256=hashes.get("sha256", ""),
             ssdeep_hash=hashes.get("ssdeep", ""),
             tlsh_hash=hashes.get("tlsh", ""),
+            filename=path,
         )
         if match is None:
             continue
+        severity = _LABEL_SEVERITY.get((match.label or "malicious").lower(), "critical")
         findings.append(Finding(
             rule_id=f"intel.{match.campaign}",
             category="threat_intel",
-            severity="critical",
+            severity=severity,
             confidence="high",
             file=path,
             evidence=(

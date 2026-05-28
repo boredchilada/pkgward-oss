@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import re
@@ -34,6 +35,17 @@ API_KEY_ENV = "OPENROUTER_API_KEY"
 MAX_CODE_BYTES = 32 * 1024  # ~12K tokens, GLM 5.1 handles this fine
 LINES_AROUND_FINDING = 20
 REQUEST_TIMEOUT = 60.0
+# Retry the call+parse when the model returns truncated/invalid JSON. Cap the
+# response so the JSON verdict object isn't cut off mid-stream (the usual cause).
+MAX_RETRIES = int(env_chain("PKGSENTRY_LLM_MAX_RETRIES", default="2"))
+MAX_RESPONSE_TOKENS = int(env_chain("PKGSENTRY_LLM_MAX_RESPONSE_TOKENS", default="5000"))
+# Hard ceiling when escalating max_tokens on finish_reason=length retries —
+# beyond this we assume the model is just rambling and bail.
+MAX_RESPONSE_TOKENS_CEILING = int(env_chain("PKGSENTRY_LLM_MAX_RESPONSE_TOKENS_CEILING", default="8000"))
+# Upper bound on files visited by the source-stats recon walk. Large gomod
+# monorepos (scanned as pseudo-versions) hold 100K+ files; we only need an
+# estimate for the truncation %, not an exact count.
+MAX_RECON_FILES = 20000
 
 
 # --- In-process budget guardrail ----------------------------------------------
@@ -129,6 +141,18 @@ _ECOSYSTEM_CONFIG = {
         ),
         "source_exts": ("*.go",),
     },
+    "npm": {
+        "priority_files": ("package.json",),
+        "prompt_ecosystem": "npm",
+        "prompt_language": "JavaScript",
+        "prompt_source_desc": "JavaScript/TypeScript source from a third-party npm package",
+        "prompt_install_time_focus": (
+            "package.json lifecycle scripts (preinstall/install/postinstall/prepare), "
+            "the bin entry and referenced install scripts, and top-level module code that "
+            "runs on require()"
+        ),
+        "source_exts": ("*.js", "*.mjs", "*.cjs", "*.ts"),
+    },
 }
 
 _DEFAULT_ECOSYSTEM_CONFIG = {
@@ -169,6 +193,35 @@ def is_enabled() -> bool:
 _PTH_IMPORT_RE = re.compile(r"(?:^|[;\s])import\s+([\w][\w.]*)")
 
 
+def _safe_rglob(root: Path, pattern: str, *, limit: Optional[int] = None):
+    """Recursively yield files under `root` whose name matches `pattern`,
+    tolerant of the extraction tree changing under the walk.
+
+    The per-scan temp dir can be torn down while triage is still walking a
+    large tree, so `pathlib.rglob`'s directory scan can raise FileNotFoundError
+    out of the generator and abort the whole triage (observed on giant gomod
+    monorepos). `os.walk` skips vanished/unreadable directories via `onerror`
+    and does not follow symlinks, so a dangling symlinked dir can't crash it.
+    `limit` caps how many matching files are yielded so we never crawl an
+    entire monorepo when an estimate suffices. Mirrors `Path.rglob`: a
+    multi-component pattern (e.g. "mod/gen.go") matches on the path tail.
+    """
+    pat_parts = pattern.split("/")
+    n = 0
+    for dirpath, _dirs, files in os.walk(root, onerror=lambda _e: None):
+        for fn in files:
+            full = Path(dirpath) / fn
+            rel_parts = full.relative_to(root).parts
+            if len(pat_parts) <= len(rel_parts) and all(
+                fnmatch.fnmatch(seg, pp)
+                for seg, pp in zip(rel_parts[-len(pat_parts):], pat_parts)
+            ):
+                yield full
+                n += 1
+                if limit is not None and n >= limit:
+                    return
+
+
 def _resolve_pth_module(extracted_root: Path, dotted: str) -> Optional[Path]:
     """Map a dotted module name to a .py file inside the extracted tree.
 
@@ -187,10 +240,10 @@ def _resolve_pth_module(extracted_root: Path, dotted: str) -> Optional[Path]:
     leaf = parts[-1] + ".py"
     if len(parts) > 1:
         parent_name = parts[-2]
-        for cand in extracted_root.rglob(leaf):
+        for cand in _safe_rglob(extracted_root, leaf):
             if cand.is_file() and cand.parent.name == parent_name:
                 return cand
-    for cand in extracted_root.rglob(leaf):
+    for cand in _safe_rglob(extracted_root, leaf):
         if cand.is_file():
             return cand
     return None
@@ -201,7 +254,7 @@ def _pth_companion_files(extracted_root: Path) -> list[Path]:
     it imports — these are install-time-equivalent because .pth files execute
     at every Python interpreter startup once the package is installed."""
     out: list[Path] = []
-    for pth in extracted_root.rglob("*.pth"):
+    for pth in _safe_rglob(extracted_root, "*.pth"):
         if not pth.is_file():
             continue
         out.append(pth)
@@ -260,7 +313,7 @@ def _gather_source(
     for priority_name in priority_names:
         if total >= MAX_CODE_BYTES:
             break
-        for p in extracted_root.rglob(priority_name):
+        for p in _safe_rglob(extracted_root, priority_name):
             rel = str(p.relative_to(extracted_root))
             if rel in seen:
                 continue
@@ -282,7 +335,23 @@ def _gather_source(
                 break
         if total >= MAX_CODE_BYTES:
             break
-    # Then any other files with findings, ±LINES_AROUND_FINDING.
+    # File-level findings (a file is flagged but with no specific line, e.g. gomod
+    # init()/cgo chains aggregate all init bodies) — include the whole file so the
+    # model can see the flagged code instead of nothing.
+    if total < MAX_CODE_BYTES:
+        for f in findings:
+            if total >= MAX_CODE_BYTES:
+                break
+            if not f.file or f.line is not None:
+                continue
+            cand = extracted_root / f.file
+            if not cand.is_file():
+                m = list(_safe_rglob(extracted_root, Path(f.file).name))
+                cand = m[0] if m else None
+            if cand is not None and cand.is_file() and not _include(cand):
+                break
+
+    # Then any other files with line-anchored findings, ±LINES_AROUND_FINDING.
     if total < MAX_CODE_BYTES:
         by_file: dict[str, set[int]] = {}
         for f in findings:
@@ -292,7 +361,7 @@ def _gather_source(
         for fname, lines in by_file.items():
             if total >= MAX_CODE_BYTES:
                 break
-            matches = list(extracted_root.rglob(fname))
+            matches = list(_safe_rglob(extracted_root, fname))
             if not matches:
                 continue
             p = matches[0]
@@ -482,69 +551,117 @@ def triage(
     # Compute truncation stats for the LLM prompt
     eco_cfg = _ECOSYSTEM_CONFIG.get(ecosystem, _DEFAULT_ECOSYSTEM_CONFIG)
     _src_exts = eco_cfg.get("source_exts", ("*.py",))
-    source_files_total = sum(
-        1 for ext in _src_exts for p in extracted_root.rglob(ext) if p.is_file()
-    )
-    source_bytes_total = sum(
-        p.stat().st_size for ext in _src_exts for p in extracted_root.rglob(ext)
-        if p.is_file() and p.stat().st_size < 10 * 1024 * 1024
-    )
+    source_files_total = 0
+    source_bytes_total = 0
+    for ext in _src_exts:
+        for p in _safe_rglob(extracted_root, ext, limit=MAX_RECON_FILES):
+            try:
+                sz = p.stat().st_size
+            except OSError:
+                continue
+            source_files_total += 1
+            if sz < 10 * 1024 * 1024:
+                source_bytes_total += sz
     truncation_pct = max(0, 100 - int(len(source) / max(source_bytes_total, 1) * 100))
+    if source == "(no source extracted)" and source_files_total > 0:
+        log.warning(
+            "llm_triage_no_source",
+            ecosystem=ecosystem, pkg=f"{pkg_name}=={pkg_version}",
+            source_files_total=source_files_total,
+            findings_with_file=sum(1 for f in findings if f.file),
+        )
     messages, _delim = _build_messages(
         pkg_name, pkg_version, findings, source, ecosystem=ecosystem,
         source_files_total=source_files_total, truncation_pct=truncation_pct,
     )
 
+    # Retry the call+parse: the model occasionally returns truncated/invalid
+    # JSON (often finish_reason=length), which previously errored the whole
+    # triage and — because the alert path requires a clean LLM verdict — let a
+    # real malicious package pass un-adjudicated and un-alerted. Cost/tokens
+    # accumulate across attempts.
+    #
+    # On finish_reason=length we escalate `max_tokens` for the next attempt
+    # (1.5×, capped at MAX_RESPONSE_TOKENS_CEILING). Retrying with the same cap
+    # against the same prompt just burns cost for guaranteed-identical
+    # truncation — observed 3x4500-tok failures on finding-heavy packages.
     started = time.monotonic()
-    try:
-        resp = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            response_format={"type": "json_object"},
-            temperature=0.1,
-            extra_body={"usage": {"include": True}},
-        )
-    except Exception as e:
-        latency_ms = int((time.monotonic() - started) * 1000)
-        log.warning("llm_call_failed", error=str(e), latency_ms=latency_ms)
-        return LLMTriageResult(
-            verdict="error", confidence=0.0, reasoning=f"LLM call failed: {e}",
-            iocs=[], agrees_with_rules=None, model=model,
-            prompt_tokens=0, completion_tokens=0, cost_usd=0.0,
-            latency_ms=latency_ms, raw_response={"error": str(e)},
-        )
+    total_cost = 0.0
+    total_prompt = 0
+    total_completion = 0
+    last_raw: dict = {}
+    parsed: Optional[dict] = None
+    last_err = ""
+    current_max_tokens = MAX_RESPONSE_TOKENS
+
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                response_format={"type": "json_object"},
+                temperature=0.1,
+                max_tokens=current_max_tokens,
+                extra_body={"usage": {"include": True}},
+            )
+        except Exception as e:
+            last_err = f"LLM call failed: {e}"
+            log.warning("llm_triage_retry", attempt=attempt + 1, attempts=MAX_RETRIES + 1,
+                        reason="call_failed", error=str(e))
+            continue
+
+        last_raw = resp.model_dump() if hasattr(resp, "model_dump") else resp.dict()
+        choice = (last_raw.get("choices") or [{}])[0]
+        content = (choice.get("message") or {}).get("content", "")
+        finish_reason = choice.get("finish_reason")
+        usage = last_raw.get("usage") or {}
+        total_prompt += usage.get("prompt_tokens", 0) or 0
+        total_completion += usage.get("completion_tokens", 0) or 0
+        total_cost += float(usage.get("cost") or 0.0)
+
+        cleaned = (content or "").strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE)
+        try:
+            candidate = json.loads(cleaned)
+        except json.JSONDecodeError:
+            last_err = "invalid JSON from model"
+            log.warning("llm_triage_retry", attempt=attempt + 1, attempts=MAX_RETRIES + 1,
+                        reason="invalid_json", finish_reason=finish_reason,
+                        max_tokens=current_max_tokens,
+                        content=(content or "")[:500])
+            if finish_reason == "length" and current_max_tokens < MAX_RESPONSE_TOKENS_CEILING:
+                current_max_tokens = min(int(current_max_tokens * 1.5), MAX_RESPONSE_TOKENS_CEILING)
+            continue
+
+        cand_verdict = str(candidate.get("verdict", "")).lower()
+        if cand_verdict not in {"malicious", "suspicious", "benign"}:
+            last_err = f"invalid verdict: {cand_verdict!r}"
+            log.warning("llm_triage_retry", attempt=attempt + 1, attempts=MAX_RETRIES + 1,
+                        reason="invalid_verdict", verdict=cand_verdict, finish_reason=finish_reason)
+            continue
+
+        parsed = candidate
+        break
+
     latency_ms = int((time.monotonic() - started) * 1000)
+    _record_call(total_cost)
 
-    raw = resp.model_dump() if hasattr(resp, "model_dump") else resp.dict()
-    content = raw.get("choices", [{}])[0].get("message", {}).get("content", "")
-    usage = raw.get("usage") or {}
-    prompt_tokens = usage.get("prompt_tokens", 0) or 0
-    completion_tokens = usage.get("completion_tokens", 0) or 0
-    cost_usd = float(usage.get("cost") or 0.0)
-
-    parsed: dict = {}
-    cleaned = (content or "").strip()
-    if cleaned.startswith("```"):
-        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE)
-    try:
-        parsed = json.loads(cleaned)
-    except json.JSONDecodeError:
-        log.warning("llm_response_invalid_json", content=(content or "")[:300])
+    if parsed is None:
+        log.warning("llm_triage_error", pkg=f"{pkg_name}=={pkg_version}",
+                    attempts=MAX_RETRIES + 1, error=last_err,
+                    content=str((last_raw.get("choices") or [{}])[0].get("message", {}).get("content", ""))[:500])
         return LLMTriageResult(
-            verdict="error", confidence=0.0, reasoning="invalid JSON from model",
+            verdict="error", confidence=0.0, reasoning=last_err or "LLM triage failed",
             iocs=[], agrees_with_rules=None, model=model,
-            prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
-            cost_usd=cost_usd, latency_ms=latency_ms, raw_response=raw,
+            prompt_tokens=total_prompt, completion_tokens=total_completion,
+            cost_usd=total_cost, latency_ms=latency_ms,
+            raw_response=last_raw or {"error": last_err},
         )
 
     llm_verdict = str(parsed.get("verdict", "")).lower()
-    if llm_verdict not in {"malicious", "suspicious", "benign"}:
-        llm_verdict = "error"
-
     llm_confidence = float(parsed.get("confidence", 0.0) or 0.0)
     final_verdict = _enforce_no_downgrade(llm_verdict, rule_verdict, findings, llm_confidence)
-
-    _record_call(cost_usd)
 
     return LLMTriageResult(
         verdict=final_verdict,
@@ -553,9 +670,9 @@ def triage(
         iocs=_validate_iocs(parsed.get("iocs", []), source),
         agrees_with_rules=bool(parsed["agrees_with_rules"]) if isinstance(parsed.get("agrees_with_rules"), (bool, int)) else (parsed.get("agrees_with_rules") == "true" if isinstance(parsed.get("agrees_with_rules"), str) else None),
         model=model,
-        prompt_tokens=prompt_tokens,
-        completion_tokens=completion_tokens,
-        cost_usd=cost_usd,
+        prompt_tokens=total_prompt,
+        completion_tokens=total_completion,
+        cost_usd=total_cost,
         latency_ms=latency_ms,
-        raw_response=raw,
+        raw_response=last_raw,
     )

@@ -1,0 +1,9 @@
+ecosystem = "npm"
+name = "examplecli"
+version = "1.0.0"
+label = "good"
+expected_verdict = "clean"
+expect_rules = ["binary.compiled_artifact"]
+forbid_rules = ["binary.hidden_executable"]
+notes = "Native-binary CLI wrapper: launcher spawns extension-less dist/tool-<os>-<arch> binaries (the esbuild/turbo/biome pattern). FP guard for binary.hidden_executable — extension-less compiled binaries are not 'disguised'."
+provenance = "synthetic"

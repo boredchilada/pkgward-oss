@@ -6,6 +6,7 @@ from pathlib import Path
 from pkgsentry import intel
 from pkgsentry.adapter import Finding
 from pkgsentry.logging_setup import get_logger
+from pkgsentry.util import capabilities as caps
 
 CATEGORY = "yara"
 
@@ -30,9 +31,8 @@ def _get_rules():
     if _compiled_rules is not None and dirs == _compiled_from:
         return _compiled_rules
 
-    try:
-        import yara
-    except ImportError:
+    yara = caps.yara
+    if yara is None:
         return None
 
     rule_files: list[Path] = []

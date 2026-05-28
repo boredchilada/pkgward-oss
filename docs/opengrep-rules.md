@@ -170,10 +170,10 @@ docker run --rm --entrypoint bash -v "$PWD:/src" -w /src pkgsentry-scanner \
   tools/test_opengrep_rules.sh javascript
 ```
 
-**Coverage status:** the `javascript/` rules ship `--test` fixtures (3/3 passing). The
-`python/`, `rust/`, and `go/` rule dirs do **not** yet have fixtures (`opengrep --test`
-reports "No unit tests found" for them — non-fatal). Backfilling fixtures for those is a
-good follow-up so every rule is self-verified, not just compile-checked.
+**Coverage status:** all four rule dirs ship `--test` fixtures — `python/` (3/3),
+`rust/` (3/3), `go/` (2/2), and `javascript/` (3/3) — so every baseline rule is
+self-verified against a positive (`ruleid:`) and negative (`ok:`) case, not just
+compile-checked. Keep this up: add a fixture alongside every new rule.
 
 For a quick one-off check, you can still run a rule against an ad-hoc fixture manually:
 

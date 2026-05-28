@@ -152,14 +152,19 @@ func (s *Server) runDetonation(ctx context.Context, req DetonateRequest) Detonat
 	}
 	importEnd := time.Now().UTC()
 
-	// Trace events: read Tetragon's JSONL log filtered to the install/import
-	// time window. targetNS=0 skips PID-namespace filtering — the noise
-	// filter strips pip/cargo/npm host activity, the host is otherwise idle.
+	// Trace events: read Tetragon's JSONL log for the install/import time
+	// window, attributed to this sandbox's container(s) so concurrent
+	// detonations and host activity don't bleed in. If id capture failed, fall
+	// back to the time window alone rather than returning nothing.
+	containerIDs := sb.ContainerIDs()
+	if len(containerIDs) == 0 {
+		log.Printf("detonate: no container id captured for %s/%s; trace not container-filtered", req.Ecosystem, req.Name)
+	}
 	rawEvents := trace.CollectFromTetragonLog(
 		s.config.TetragonLogPath,
 		traceStart,
 		importEnd,
-		0,
+		containerIDs,
 	)
 	// Tag each event with its phase before rule evaluation — dyn_install_exfil
 	// and dyn_import_exfil key off TraceEvent.Phase, which the collector leaves

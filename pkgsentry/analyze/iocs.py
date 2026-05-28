@@ -20,6 +20,9 @@ _PRIVATE_OR_LOCAL = re.compile(
     rb"169\.254\.|224\.|240\.|0\.)"
 )
 _DOC_RANGE_RE = re.compile(rb"^(?:192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)")
+# Textbook placeholder IPs used in docs/examples (kept tight — real public
+# resolvers like 1.1.1.1/8.8.8.8 are left flaggable, whitelistable via intel).
+_PLACEHOLDER_IPS = frozenset({b"1.2.3.4", b"4.3.2.1"})
 
 # Benign-domain whitelist is loaded from the intel pack (baseline + overlay,
 # UNION-merged). See pkgsentry/intel/baseline/ioc_whitelist.toml for the
@@ -38,6 +41,17 @@ _TEMPLATE_URL_RE = re.compile(rb"[{%$]|^\.{2,}$|^:$|^test")
 # Markdown/RST artifacts that leak into URL captures: trailing backticks, punctuation, brackets
 _JUNK_SUFFIX_RE = re.compile(rb"[`),;'\"\]>]+$")
 
+# Placeholder hosts in docs/config examples: `http://host:port`, `http://server/...`
+_PLACEHOLDER_HOSTS = frozenset({
+    b"host", b"hostname", b"your-host", b"your_host", b"yourhost", b"server",
+    b"ip", b"ipaddress", b"ip-address", b"address", b"domain", b"yourdomain",
+    b"example", b"host1", b"host2", b"myhost",
+})
+# RFC 2606 reserved example domains (and the .example TLD).
+_PLACEHOLDER_DOMAINS = frozenset({
+    b"example.com", b"example.org", b"example.net", b"example.edu",
+})
+
 def _is_benign_url(url: bytes) -> bool:
     benign = _benign_domains()
     # Strip trailing markdown/RST junk before extracting host
@@ -45,19 +59,48 @@ def _is_benign_url(url: bytes) -> bool:
     host = cleaned.split(b"/", 1)[0].split(b":", 1)[0].lower()
     if host in benign:
         return True
+    if host in _PLACEHOLDER_HOSTS:
+        return True
     if host.startswith(b"localhost") or host.endswith(b".localhost"):
         return True
     if _TEMPLATE_URL_RE.search(host):
         return True
-    if host.endswith(b".test") or host.endswith(b".invalid") or host.endswith(b".localdomain"):
+    if host.endswith((b".test", b".invalid", b".localdomain")):
         return True
     # Also check the full URL for template variables anywhere (f-strings, Jinja, etc.)
     if b"{" in url or b"${" in url or b"{{" in url:
         return True
     base = _domain_of(cleaned)
+    if base in _PLACEHOLDER_DOMAINS:
+        return True
     return base in benign
 
-_TEXT_SUFFIXES = {".py", ".cfg", ".toml", ".ini", ".txt", ".md", ".rst", ".json", ".yml", ".yaml"}
+_TEXT_SUFFIXES = {
+    ".py", ".cfg", ".toml", ".ini", ".txt", ".md", ".rst", ".json", ".yml", ".yaml",
+    ".js", ".ts", ".mjs", ".cjs", ".jsx", ".tsx", ".rs", ".go", ".sh", ".ps1", ".bat",
+}
+
+# Documentation / attribution files: URLs and IPs here are almost always doc
+# links or example addresses, not IOCs. Skip the low/low url/ipv4 extraction for
+# them (onion + base64 blobs are still flagged — notable in any file).
+_DOC_BASENAMES = (
+    "readme", "notice", "license", "licence", "copying", "copyright",
+    "changelog", "changes", "history", "authors", "contributors", "credits", "thanks",
+    "security", "support", "code_of_conduct", "code-of-conduct", "governance",
+    "maintainers", "contributing",
+)
+_DOC_SUFFIXES = (".md", ".rst")
+
+
+def _is_doc_file(name: str) -> bool:
+    lower = name.lower()
+    # Markdown/reStructuredText is prose: URLs and IPs in it are doc links or
+    # example addresses, not IOCs. (onion + base64 blobs still fire — notable
+    # anywhere.) Named doc files without a doc extension (SECURITY, AUTHORS…)
+    # are covered by the basename prefixes.
+    if lower.endswith(_DOC_SUFFIXES):
+        return True
+    return any(lower.startswith(d) for d in _DOC_BASENAMES)
 
 
 def _scan_file(path: Path) -> list[Finding]:
@@ -67,6 +110,7 @@ def _scan_file(path: Path) -> list[Finding]:
         return []
     out: list[Finding] = []
     seen: set[tuple[str, bytes]] = set()
+    is_doc = _is_doc_file(path.name)
     for m in _URL_RE.finditer(data):
         url_body = m.group(1)
         full_url = m.group(0)
@@ -74,17 +118,21 @@ def _scan_file(path: Path) -> list[Finding]:
         if key in seen:
             continue
         seen.add(key)
-        if _is_benign_url(url_body):
+        if is_doc or _is_benign_url(url_body):
             continue
         out.append(Finding(
             rule_id="iocs.url_suspicious", category=CATEGORY, severity="low", confidence="low",
             file=path.name, line=None, evidence=full_url.decode("utf-8", errors="replace")[:200],
         ))
     for m in _IPV4_RE.finditer(data):
+        if is_doc:
+            continue
         ip = m.group(0)
         if _PRIVATE_OR_LOCAL.match(ip):
             continue
         if _DOC_RANGE_RE.match(ip):
+            continue
+        if ip in _PLACEHOLDER_IPS:
             continue
         key = ("ip", ip)
         if key in seen:

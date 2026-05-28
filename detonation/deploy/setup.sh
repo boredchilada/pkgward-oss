@@ -110,6 +110,8 @@ INTEL_OVERLAY="/home/pkgsentry/intel/private"
 cat > /etc/default/detonation-svc <<ENVEOF
 DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock
 PKGSENTRY_INTEL_PATH=$INTEL_OVERLAY
+# Max concurrent detonations. Tune to host capacity (≈1 core + network per slot).
+MAX_CONCURRENT=6
 ENVEOF
 
 # ReadWritePaths in a drop-in replaces the base unit's list, so repeat all paths.

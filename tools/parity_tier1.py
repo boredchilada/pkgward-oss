@@ -6,8 +6,8 @@ the (possibly refactored) score_and_verdict() function against them, and
 compare the result with the stored Scan.verdict / score / alert_tag.
 
 Catches scoring/threshold/chain-rule regressions WITHOUT re-fetching
-archives or re-running the analyzers. Tier 2 (parity_tier2.py) covers
-analyzer changes.
+archives or re-running the analyzers. Analyzer-side regressions are covered
+by the synthetic corpus suite (tests/test_regression_corpus.py).
 
 Run:
     python tools/parity_tier1.py

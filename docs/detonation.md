@@ -159,6 +159,17 @@ Check status:
 systemctl status tetragon detonation-svc
 ```
 
+**Restarting `detonation-svc` requires restarting the scanner.** The scanner
+container bind-mounts the API socket *file* (`/var/run/detonation/detonation.sock`),
+and the service recreates that socket (new inode) on startup, so the container's
+mount strands on the deleted inode → the worker gets `Connection refused` (jobs
+requeue, none lost). After deploying a new binary:
+
+```bash
+sudo systemctl restart detonation-svc
+docker restart pkgsentry        # re-binds the socket; never `docker compose up -d`
+```
+
 ## Verifying the deployment
 
 Health check:
@@ -252,8 +263,9 @@ install-phase connect, but sdists legitimately fetch build deps from registries,
 a registry-aware design before it can be enabled. `dyn_import_exfil` (import-phase connect) is
 active but the **`{eco}_net_allow` allowlist** (see above) drops connections to known registry
 CDNs first, so normal dependency fetches no longer false-positive — this also resolved a
-pre-existing pypi FP (packages flagged for connecting to `files.pythonhosted.org`). Non-network
-hooks are namespace-filtered to the sandbox container.
+pre-existing pypi FP (packages flagged for connecting to `files.pythonhosted.org`). All events
+are attributed to the sandbox container by its `docker` id before rules run (see "Event
+attribution" below), so concurrent detonations and host activity don't cross-contaminate.
 
 Findings from the detonation layer are returned to the scanner, merged into the package's
 finding set, and feed the re-scoring step before LLM triage.
@@ -351,9 +363,13 @@ systemd drop-in. Current prod tuning:
 | `metrics-server` | `127.0.0.1:2112` | event-loss metrics; alert on `rate(tetragon_observer_ringbuf_events_lost_total[5m]) > 0` |
 | systemd drop-in | `MemoryHigh=1G MemoryMax=2G OOMScoreAdjust=-500` | a fork-bomb sample must not OOM the tracer before the sandbox |
 
-**Do not set `enable-process-ns`** — the collector's `targetNS=0` filter drops any
-event carrying a non-zero `ns.pid_for_children`; turning ns on without a collector
-change kills all events. (Reserved for future cgroup-id correlation work.)
+**Event attribution is by container id, not PID namespace.** The host's Tetragon
+export carries no `ns` field, so the old `ns.pid_for_children` filter matched every
+container (the scanner and all concurrent sandboxes bled into each detonation's
+trace). The collector now keeps only events whose `docker` container id matches the
+ids the sandbox captured via `--cidfile` for that detonation; if capture fails it
+logs a warning and falls back to the time window alone. `enable-process-ns` is no
+longer needed and the collector does not read it.
 
 The tracing policy is loaded from `/etc/tetragon/tetragon.tp.d/` **at startup only** —
 dropping a file in after Tetragon is running does nothing until reload. Hot-reload with

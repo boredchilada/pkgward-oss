@@ -26,6 +26,8 @@ _OK_EXTENSIONS = {
 
 _OK_DIRS = {"__pycache__", ".git", "node_modules"}
 
+_DISGUISE_EXTENSIONS = {".py", ".txt", ".json", ".cfg", ".ini", ".yml", ".yaml"}
+
 
 def analyze_binary_artifacts(
     extracted_root: Path,
@@ -52,17 +54,39 @@ def analyze_binary_artifacts(
             continue
 
         for magic, label in _MAGIC_BYTES.items():
-            if header.startswith(magic):
-                disguised = p.suffix.lower() in (".py", ".txt", ".json", ".cfg", ".ini", ".yml", ".yaml", "")
+            if not header.startswith(magic):
+                continue
+            ext = p.suffix.lower()
+            if ext in _DISGUISE_EXTENSIONS:
                 out.append(Finding(
-                    rule_id="binary.hidden_executable" if disguised else "binary.compiled_artifact",
+                    rule_id="binary.hidden_executable",
                     category=CATEGORY,
-                    severity="high" if disguised else "medium",
+                    severity="high",
                     confidence="high",
                     file=rel,
                     line=None,
-                    evidence=f"{label} binary{' disguised as ' + p.suffix if disguised else ''} ({p.name})",
+                    evidence=f"{label} binary disguised as {ext} ({p.name})",
                 ))
-                break
+            elif ext == "":
+                out.append(Finding(
+                    rule_id="binary.compiled_artifact",
+                    category=CATEGORY,
+                    severity="low",
+                    confidence="high",
+                    file=rel,
+                    line=None,
+                    evidence=f"{label} binary, no extension ({p.name})",
+                ))
+            else:
+                out.append(Finding(
+                    rule_id="binary.compiled_artifact",
+                    category=CATEGORY,
+                    severity="medium",
+                    confidence="high",
+                    file=rel,
+                    line=None,
+                    evidence=f"{label} binary ({p.name})",
+                ))
+            break
 
     return out

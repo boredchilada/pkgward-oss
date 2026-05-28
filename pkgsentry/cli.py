@@ -205,3 +205,121 @@ def focus_clear_cmd(
     with sess.session_scope() as s:
         n = clear_focus(s, ecosystem)
     typer.echo(f"cleared {n} entries")
+
+
+# --- watchlist auto subcommands ---------------------------------------------
+# Manage the auto-watchlist gate: every double-confirmed malicious verdict
+# (rules + LLM agree) adds the (ecosystem, name) here at a sentinel rank, so
+# the next release is scanned at high priority. See pkgsentry.watchlist_auto.
+
+watchlist_app = typer.Typer(
+    no_args_is_help=True,
+    help="Watchlist administration (auto-added confirmed-malicious entries).",
+)
+app.add_typer(watchlist_app, name="watchlist")
+
+auto_app = typer.Typer(
+    no_args_is_help=True,
+    help="Manage auto-added confirmed-malicious entries.",
+)
+watchlist_app.add_typer(auto_app, name="auto")
+
+
+@auto_app.command("list")
+def watchlist_auto_list_cmd(
+    ecosystem: str = typer.Option(None, "--ecosystem", "-e"),
+) -> None:
+    """List auto-added (confirmed-malicious) watchlist entries."""
+    from pkgsentry.watchlist_auto import list_auto_entries
+    sess.init_db()
+    with sess.session_scope() as s:
+        entries = list_auto_entries(s, ecosystem=ecosystem)
+    for eco, name, refreshed in entries:
+        typer.echo(f"{eco}\t{name}\t{refreshed.isoformat()}")
+    typer.echo(f"# {len(entries)} entries")
+
+
+@auto_app.command("remove")
+def watchlist_auto_remove_cmd(
+    ecosystem: str = typer.Argument(..., help="pypi|crates|gomod|npm"),
+    name: str = typer.Argument(..., help="Package name (case-insensitive)."),
+) -> None:
+    """Remove a single auto-added entry (FP exit ramp). Popularity rows untouched."""
+    _check_ecosystem(ecosystem)
+    from pkgsentry.watchlist_auto import remove_auto_entry
+    sess.init_db()
+    with sess.session_scope() as s:
+        removed = remove_auto_entry(s, ecosystem, name)
+    typer.echo(f"removed: {removed}")
+
+
+@auto_app.command("purge")
+def watchlist_auto_purge_cmd(
+    older_than_days: int = typer.Option(
+        0, "--older-than-days",
+        help="Drop auto-added entries older than N days. 0 = drop all auto-added.",
+    ),
+) -> None:
+    """Bulk-prune auto-added entries. With --older-than-days 0 drops all of them."""
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import delete
+    from pkgsentry.watchlist_auto import AUTO_MALICIOUS_RANK
+    from pkgsentry.store.models import Watchlist
+
+    sess.init_db()
+    with sess.session_scope() as s:
+        q = delete(Watchlist).where(Watchlist.rank == AUTO_MALICIOUS_RANK)
+        if older_than_days > 0:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+            q = q.where(Watchlist.refreshed_at < cutoff)
+        res = s.execute(q)
+    typer.echo(f"purged {res.rowcount or 0} auto-added entries")
+
+
+@auto_app.command("backfill")
+def watchlist_auto_backfill_cmd(
+    days: int = typer.Option(
+        30, "--days", help="Look back this many days of scan history.",
+    ),
+) -> None:
+    """Walk scan history and add every package that ever produced a double-
+    confirmed (rule + LLM both malicious) verdict to the auto-watchlist.
+
+    Useful one-shot after enabling the gate so prior known-bad packages get
+    high-priority coverage going forward without waiting for a re-publish.
+    """
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import select
+    from pkgsentry.store.models import Scan, Version, Package
+    from pkgsentry.watchlist_auto import add_confirmed_malicious
+
+    sess.init_db()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    added = 0
+    refreshed = 0
+    skipped = 0
+    with sess.session_scope() as s:
+        rows = s.execute(
+            select(Package.ecosystem, Package.name)
+            .select_from(Scan)
+            .join(Version, Scan.version_id == Version.id)
+            .join(Package, Version.package_id == Package.id)
+            .where(
+                Scan.verdict == "malicious",
+                Scan.llm_verdict == "malicious",
+                Scan.finished_at >= cutoff,
+            )
+            .group_by(Package.ecosystem, Package.name)
+        ).all()
+        for eco, name in rows:
+            status = add_confirmed_malicious(s, eco, name)
+            if status == "added":
+                added += 1
+            elif status == "refreshed":
+                refreshed += 1
+            else:
+                skipped += 1
+    typer.echo(
+        f"backfilled {len(rows)} unique double-confirmed names — "
+        f"added={added} refreshed={refreshed} skipped={skipped}"
+    )

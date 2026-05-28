@@ -65,7 +65,7 @@
         <mxCell id="bg_p7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;opacity=30;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="220" y="2560" width="860" height="420" as="geometry"/>
         </mxCell>
-        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation&lt;/b&gt;  (rootless Docker + Tetragon)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
+        <mxCell id="bg_p7_label" value="&lt;b&gt;Phase 7 &amp;mdash; Detonation enqueue&lt;/b&gt;  (async; drained by detonation_worker)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#6b4e00;" vertex="1" parent="1">
           <mxGeometry x="230" y="2565" width="380" height="24" as="geometry"/>
         </mxCell>
 
@@ -435,52 +435,39 @@
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <!-- ===== PHASE 7 — DETONATION ===== -->
+        <!-- ===== PHASE 7 — DETONATION ENQUEUE (async) ===== -->
 
-        <mxCell id="d_detonate" value="&lt;b&gt;should_detonate()?&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;verdict, score,&lt;br&gt;watchlist_rank,&lt;br&gt;is_new_package&lt;/font&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+        <mxCell id="d_detonate" value="&lt;b&gt;should_detonate()?&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;brand-new OR watchlist&lt;br&gt;OR suspicious/malicious&lt;/font&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
           <mxGeometry x="520" y="2600" width="160" height="120" as="geometry"/>
         </mxCell>
         <mxCell id="e_merge_detonate" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_uni_merge" target="d_detonate" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <!-- Skip detonation -->
-        <mxCell id="n_det_skip" value="&lt;font color=&quot;#888888&quot;&gt;Skip detonation&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=2;" vertex="1" parent="1">
+        <!-- Gate: No → straight to LLM check -->
+        <mxCell id="n_det_skip" value="&lt;font color=&quot;#888888&quot;&gt;Don't enqueue&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=2;" vertex="1" parent="1">
           <mxGeometry x="810" y="2640" width="150" height="40" as="geometry"/>
         </mxCell>
         <mxCell id="e_det_no" value="No" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_detonate" target="n_det_skip" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <!-- rootless-Docker sandbox -->
-        <mxCell id="n_sandbox" value="&lt;b&gt;Send sdist to rootless-Docker sandbox&lt;/b&gt;&lt;br&gt;via UNIX socket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
-          <mxGeometry x="480" y="2760" width="240" height="50" as="geometry"/>
+        <!-- Gate: Yes → ENQUEUE only (scan does not wait) -->
+        <mxCell id="n_enqueue" value="&lt;b&gt;Enqueue &amp;rarr; DetonationQueue&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;scan finalizes on the static verdict;&lt;br&gt;detonation runs async in the worker pool&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="470" y="2760" width="300" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="e_det_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_detonate" target="n_sandbox" parent="1">
+        <mxCell id="e_det_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_detonate" target="n_enqueue" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_enqueue_verdict" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_enqueue" target="d_verdict_mal" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <!-- Tetragon -->
-        <mxCell id="n_tetragon" value="&lt;b&gt;Tetragon eBPF traces&lt;/b&gt;&lt;br&gt;&amp;rarr; behavioral rules &amp;rarr; dynamic findings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
-          <mxGeometry x="460" y="2840" width="280" height="50" as="geometry"/>
+        <!-- Async note -->
+        <mxCell id="n_async_note" value="&lt;font color=&quot;#6b4e00&quot;&gt;&lt;i&gt;Async: detonation_worker re-fetches,&lt;br&gt;detonates (sandbox + Tetragon), re-scores,&lt;br&gt;and sends a delayed alert on a flip to&lt;br&gt;malicious. Full flow: scan-pipeline.drawio&lt;/i&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="2765" width="210" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="e_sandbox_tetragon" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_sandbox" target="n_tetragon" parent="1">
-          <mxGeometry relative="1" as="geometry"/>
-        </mxCell>
-
-        <!-- Re-score -->
-        <mxCell id="n_rescore" value="&lt;b&gt;Re-score&lt;/b&gt; with dynamic findings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
-          <mxGeometry x="490" y="2920" width="220" height="40" as="geometry"/>
-        </mxCell>
-        <mxCell id="e_tetragon_rescore" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_tetragon" target="n_rescore" parent="1">
-          <mxGeometry relative="1" as="geometry"/>
-        </mxCell>
-
-        <!-- Log detonation -->
-        <mxCell id="n_log_det" value="log: &lt;b&gt;detonation_start&lt;/b&gt;&lt;br&gt;&amp;rarr; &lt;b&gt;detonation_done&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="280" y="2770" width="180" height="40" as="geometry"/>
-        </mxCell>
-        <mxCell id="e_sandbox_log" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_sandbox" target="n_log_det" parent="1">
+        <mxCell id="e_enqueue_note" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_enqueue" target="n_async_note" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
@@ -488,9 +475,6 @@
 
         <mxCell id="d_verdict_mal" value="&lt;b&gt;verdict ==&lt;br&gt;malicious?&lt;/b&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
           <mxGeometry x="545" y="3050" width="130" height="80" as="geometry"/>
-        </mxCell>
-        <mxCell id="e_rescore_verdict" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_rescore" target="d_verdict_mal" parent="1">
-          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="e_detskip_verdict" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_det_skip" target="d_verdict_mal" parent="1">
           <mxGeometry relative="1" as="geometry">

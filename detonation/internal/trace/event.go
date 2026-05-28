@@ -9,6 +9,7 @@ type TraceEvent struct {
 	Binary    string                 `json:"binary"`
 	Detail    map[string]interface{} `json:"detail"`
 	Timestamp string                 `json:"timestamp,omitempty"`
+	Docker    string                 `json:"docker,omitempty"`
 }
 
 type DynFinding struct {
