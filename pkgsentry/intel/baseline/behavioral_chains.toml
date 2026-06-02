@@ -9,11 +9,13 @@
 
 chain_ids = [
     "installer.urlopen_exec_chain",
+    "installer.npm_install_obfuscated_entrypoint",
+    "installer.npm_install_persistence_loader",
     "imports.network_subprocess_chain",
     "malware.deobfuscation_exec_chain",
     "malware.discord_webhook",
-    "malware.env_bulk_exfil",
-    "malware.pth_import_injection",
+    "malware.env_exfil_tainted",
+    "malware.pth_exec_injection",
     "dyn_install_exfil",
     "dyn_reverse_shell",
     "dyn_proc_inject",

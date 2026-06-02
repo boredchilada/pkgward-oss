@@ -30,8 +30,8 @@ A pack is a directory with this convention (every file is optional):
 ```
 intel_pack.toml                     # Manifest (name, version, extends)
 yara/                               # YARA rule files (*.yar)
-  python_malware.yar
-  rust_malware.yar
+  community_sigbase.yar             # (baseline) community signatures
+  my_rules.yar                      # (overlay) operator-supplied rules
 opengrep/                           # opengrep static-analysis rules (*.yaml)
   python/
   rust/

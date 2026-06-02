@@ -176,7 +176,20 @@ version), so `ingest/cursor.py` gates on the name first, then resolves `dist-tag
 for gated packages before enqueuing (one registry call per gated package). The seq cursor
 is stored in `ScanCursor.last_serial` and treated as opaque/forward-only; first boot
 bootstraps from the current `update_seq` (no historical backfill — the feed isn't
-time-addressable). Install analysis is a native `package.json` lifecycle-script analyzer
+time-addressable). **Resolution holdback:** because the resolve step is a second network
+call that can fail transiently (429/5xx past the built-in retries, or a timeout), the
+cursor records each gated package's `seq` and advances only up to — never past — the
+earliest package it failed to resolve this poll, so the next poll re-fetches and retries it
+instead of losing a brand-new package behind the forward-only cursor. Each name is retried
+at most `NPM_RESOLVE_MAX_ATTEMPTS` polls (default 5), then given up with an
+`npm_resolve_gave_up` warning so a genuinely-deleted package (permanent 404) can't wedge
+the feed. **Install-attack prioritization:** the resolve response also carries `scripts`
+and `version`, so a brand-new package is enqueued at `high` (jumping the often tens-of-
+thousands-deep `normal` backlog) when it declares an install lifecycle hook
+(`preinstall`/`install`/`postinstall`) or a dependency-confusion version tell
+(`99.99.99`/`9.9.9`/`10.10.10`/absurd majors) — the install hook being the on-install
+code-execution surface that dependency-confusion / lure campaigns abuse. Install analysis
+is a native `package.json` lifecycle-script analyzer
 (`installer.py`) plus shadow-mode opengrep `opengrep/javascript/` rules. The watchlist
 combines registry-search popularity + awesome-nodejs + a hardcoded `CRITICAL_INFRA` list.
 

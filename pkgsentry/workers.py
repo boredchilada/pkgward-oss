@@ -26,13 +26,21 @@ async def _worker_loop(worker_id: int, stop_event: asyncio.Event, poll_interval:
         claim_token: Optional[str] = None
         name: Optional[str] = None
         ecosystem: Optional[str] = None
-        with sess.session_scope() as s:
-            claimed = claim_next(s)
-            if claimed is not None:
-                queue_id = claimed[0].id
-                claim_token = claimed[1]
-                name = claimed[0].name
-                ecosystem = claimed[0].ecosystem
+        try:
+            with sess.session_scope() as s:
+                claimed = claim_next(s)
+                if claimed is not None:
+                    queue_id = claimed[0].id
+                    claim_token = claimed[1]
+                    name = claimed[0].name
+                    ecosystem = claimed[0].ecosystem
+        except Exception:
+            # A transient DB hiccup during claim must not kill the worker task
+            # for the lifetime of the process (run_pool does not restart it) —
+            # that would silently shrink capacity one worker at a time. Log and
+            # treat as an empty poll; the next loop retries.
+            log.exception("claim_error", worker=worker_id)
+            queue_id = None
 
         if queue_id is None:
             try:

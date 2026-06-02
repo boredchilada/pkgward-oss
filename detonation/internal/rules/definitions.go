@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"detonation/internal/honeytokens"
 	"detonation/internal/intel"
 	"detonation/internal/trace"
 )
@@ -27,20 +28,67 @@ func shellBinaries() []string {
 
 func AllRules() []Rule {
 	return []Rule{
-		// installExfil() is intentionally NOT active: it fires on any
-		// install-phase network connect, but sdists legitimately fetch build
-		// deps from registries, so it would false-positive on most packages.
-		// Deferred until it can distinguish registry traffic from real exfil
-		// (offline install or destination allowlist). The rule + its tests are
-		// retained so re-enabling is a one-line change.
+		// installExfil() is active (high severity): the per-ecosystem net_allow
+		// allowlist now drops legit registry/CDN/download-host connects before the
+		// rule sees them, so a remaining install-phase connect is exfil-shaped. It's
+		// HIGH (not critical) so a lone connect to an unlisted host corroborates
+		// rather than solo-flipping to malicious — keeping FP low.
+		installExfil(),
 		importExfil(),
 		credentialRead(),
+		honeytokenExfil(),
+		screenCaptureProbe(),
 		reverseShell(),
 		procInject(),
 		dnsExfil(),
 		envHarvest(),
 		suspiciousWrite(),
 		filelessExec(),
+	}
+}
+
+// honeytokenExfil is the canary tripwire: the sandbox seeds a broad spread of
+// realistic decoy credentials (internal/honeytokens), and if any decoy VALUE ever
+// surfaces in traced activity — an exec argument, a written path, a DNS label —
+// then a worm harvested it and is staging/exfiltrating it. Because the values are
+// unique fixed strings that never occur in real install traffic, this is near
+// zero-FP regardless of the destination, so it needs no network allowlist (unlike
+// the broad dyn_install_exfil, which leans on the network allowlist). It also names WHICH secret was taken, so
+// we learn the worm's target list.
+func honeytokenExfil() Rule {
+	canaries := honeytokens.Canaries()
+	return Rule{
+		ID: "dyn_honeytoken_exfil",
+		Evaluate: func(evt trace.TraceEvent) *trace.DynFinding {
+			// Build a haystack from the stringy parts of the event: exec args,
+			// file paths, dns names — wherever a stolen secret would appear.
+			var hay strings.Builder
+			for _, val := range evt.Detail {
+				if s, ok := val.(string); ok {
+					hay.WriteByte(' ')
+					hay.WriteString(s)
+				}
+			}
+			if hay.Len() == 0 {
+				return nil
+			}
+			h := hay.String()
+			for _, c := range canaries {
+				if strings.Contains(h, c.Value) {
+					return &trace.DynFinding{
+						RuleID:     "dyn_honeytoken_exfil",
+						Category:   "dynamic",
+						Severity:   "critical",
+						Confidence: "high",
+						Evidence: fmt.Sprintf(
+							"decoy credential %s surfaced in %s/%s during %s phase — harvested + staged for exfil",
+							c.Label, evt.Category, evt.Operation, evt.Phase,
+						),
+					}
+				}
+			}
+			return nil
+		},
 	}
 }
 
@@ -56,9 +104,9 @@ func installExfil() Rule {
 			return &trace.DynFinding{
 				RuleID:     "dyn_install_exfil",
 				Category:   "dynamic",
-				Severity:   "critical",
+				Severity:   "high",
 				Confidence: "high",
-				Evidence:   fmt.Sprintf("connect(AF_INET, %s:%d) during install phase", addr, int(port)),
+				Evidence:   fmt.Sprintf("connect(AF_INET, %s:%d) to a non-allowlisted host during install phase", addr, int(port)),
 			}
 		},
 	}
@@ -100,6 +148,71 @@ func credentialRead() Rule {
 						Severity:   "high",
 						Confidence: "high",
 						Evidence:   fmt.Sprintf("read sensitive file: %s during %s phase", path, evt.Phase),
+					}
+				}
+			}
+			return nil
+		},
+	}
+}
+
+// captureTools are screen-capture / screen-recording / input (keylog) utilities.
+// A package that probes for these during install/import is staging desktop
+// surveillance — near-zero legitimate use in a package lifecycle. Clipboard tools
+// (xclip/xsel/wl-paste) are deliberately EXCLUDED: clipboard libraries legitimately
+// probe for them, so they'd raise FP.
+// Screenshot/screen-record + input-capture (keylog) utilities. `import`
+// (ImageMagick) and `xdotool` (automation) are excluded — both have legitimate
+// build/image uses, so they'd raise FP.
+var captureTools = map[string]bool{
+	"scrot": true, "maim": true, "grim": true, "spectacle": true,
+	"gnome-screenshot": true, "ksnapshot": true, "flameshot": true,
+	"xwd": true, "slurp": true, "xinput": true,
+}
+
+func screenCaptureProbe() Rule {
+	return Rule{
+		ID: "dyn_screen_capture_probe",
+		Evaluate: func(evt trace.TraceEvent) *trace.DynFinding {
+			if evt.Category != "process" || evt.Operation != "exec" {
+				return nil
+			}
+			args, _ := evt.Detail["arguments"].(string)
+			if args == "" {
+				return nil
+			}
+			clean := func(s string) string {
+				s = strings.Trim(s, "\"'`(),;")
+				if i := strings.LastIndex(s, "/"); i >= 0 {
+					s = s[i+1:]
+				}
+				return s
+			}
+			toks := strings.Fields(args)
+			// A lookup probe: the `which`/`whereis` binary, or `command -v` / `type`.
+			probe := clean(evt.Binary) == "which" || clean(evt.Binary) == "whereis" ||
+				strings.Contains(args, "command -v") || strings.Contains(args, "type ")
+			for _, t := range toks {
+				if c := clean(t); c == "which" || c == "whereis" || c == "command" || c == "type" {
+					probe = true
+					break
+				}
+			}
+			if !probe {
+				return nil
+			}
+			for _, t := range toks {
+				name := clean(t)
+				if captureTools[name] {
+					return &trace.DynFinding{
+						RuleID:     "dyn_screen_capture_probe",
+						Category:   "dynamic",
+						Severity:   "high",
+						Confidence: "high",
+						Evidence: fmt.Sprintf(
+							"install/import enumerated screen-capture/keylogger tool %q during %s phase — desktop-surveillance staging",
+							name, evt.Phase,
+						),
 					}
 				}
 			}
@@ -253,16 +366,29 @@ func suspiciousWrite() Rule {
 				"/etc/crontab", "/etc/cron.d/",
 				"/root/.bashrc", "/root/.profile",
 				"/root/.bash_profile",
+				"/etc/systemd/",       // systemd unit / timer persistence
+				"/etc/init.d/",        // sysv init persistence
+				"/etc/ld.so.preload",  // global library injection
 			}
+			match := false
 			for _, s := range suspicious {
 				if strings.HasPrefix(path, s) {
-					return &trace.DynFinding{
-						RuleID:     "dyn_suspicious_write",
-						Category:   "dynamic",
-						Severity:   "critical",
-						Confidence: "high",
-						Evidence:   fmt.Sprintf("write to persistence path: %s during %s phase", path, evt.Phase),
-					}
+					match = true
+					break
+				}
+			}
+			// authorized_keys is user-relative (/root/.ssh, /home/*/.ssh) so it
+			// can't be prefix-matched — a write to one is an SSH backdoor-key install.
+			if !match && strings.Contains(path, ".ssh/authorized_keys") {
+				match = true
+			}
+			if match {
+				return &trace.DynFinding{
+					RuleID:     "dyn_suspicious_write",
+					Category:   "dynamic",
+					Severity:   "critical",
+					Confidence: "high",
+					Evidence:   fmt.Sprintf("write to persistence path: %s during %s phase", path, evt.Phase),
 				}
 			}
 			return nil

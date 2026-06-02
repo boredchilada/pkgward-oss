@@ -96,7 +96,6 @@ def claim_next(session: Session) -> Optional[tuple[DetonationQueue, str]]:
                         status="claimed",
                         claim_token=token,
                         claimed_at=datetime.now(timezone.utc),
-                        attempts=DetonationQueue.attempts + 1,
                     )
                 )
                 if result.rowcount == 1:

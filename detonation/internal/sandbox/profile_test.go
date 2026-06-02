@@ -22,8 +22,25 @@ func TestPyPIProfile(t *testing.T) {
 		t.Errorf("install cmd[0] = %q, want pip", install[0])
 	}
 	imp := p.ImportCmd("evil-package")
-	if imp[0] != "python" {
-		t.Errorf("import cmd[0] = %q, want python", imp[0])
+	if imp[0] != "python" || imp[1] != "-c" {
+		t.Fatalf("import cmd = %v, want python -c <script>", imp[:2])
+	}
+	script := imp[2]
+	// Must NOT do the broken `import evil-package` (hyphen = SyntaxError); must
+	// resolve the real top-level module(s) and settle IN-PROCESS so a daemon-thread
+	// payload keeps running (a shell-level sleep would let the interpreter exit
+	// and kill the thread first).
+	if strings.Contains(script, "import evil-package") {
+		t.Errorf("import script still uses the hyphenated dist name (SyntaxError):\n%s", script)
+	}
+	for _, want := range []string{"top_level.txt", "import_module", "evil-package", "DET_SETTLE_SEC", "time.sleep"} {
+		if !strings.Contains(script, want) {
+			t.Errorf("import script missing %q:\n%s", want, script)
+		}
+	}
+	// the name-mangling fallback turns evil-package -> evil_package
+	if !strings.Contains(script, `replace("-","_")`) {
+		t.Errorf("import script missing the hyphen->underscore fallback:\n%s", script)
 	}
 }
 
@@ -36,8 +53,16 @@ func TestNpmProfile(t *testing.T) {
 		t.Errorf("base image = %q", p.BaseImage)
 	}
 	install := p.InstallCmd("chalk", "5.6.2", "/sandbox/chalk-5.6.2.tgz")
-	if install[0] != "npm" {
-		t.Errorf("install cmd[0] = %q, want npm", install[0])
+	if install[0] != "sh" || install[1] != "-c" {
+		t.Fatalf("install cmd = %v, want sh -c <script>", install[:2])
+	}
+	script := install[2]
+	// must run the target's lifecycle hooks directly (so a heavy dep can't
+	// shadow the payload) and reference the mounted archive.
+	for _, want := range []string{"/sandbox/chalk-5.6.2.tgz", "postinstall", "--ignore-scripts"} {
+		if !strings.Contains(script, want) {
+			t.Errorf("install script missing %q:\n%s", want, script)
+		}
 	}
 }
 

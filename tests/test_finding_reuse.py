@@ -149,3 +149,71 @@ def test_only_unchanged_shas_carry_forward(db_session):
         {"a.js": "AAA", "b.js": "DIFFERENT"},
     )
     assert [f.rule_id for f in res] == ["yara.x"]
+
+
+def test_dedup_against_existing_findings(db_session):
+    """A whole-archive analyzer (threat-intel) that re-fires on an unchanged
+    file this run must not have its finding duplicated by carry-forward."""
+    _make_pkg_scan(
+        db_session, "npm", "dup-bad", "1.0.0",
+        sha_map={"dist/x.js": "AAAA"},
+        findings=[{"rule_id": "threat_intel.known_malicious_sha256",
+                   "file": "dist/x.js", "severity": "critical"}],
+    )
+    new_id = _make_pkg_scan(
+        db_session, "npm", "dup-bad", "1.0.1",
+        sha_map={"dist/x.js": "AAAA"},  # unchanged
+        findings=[],
+    )
+    # The current run already produced the same finding on the same file.
+    from pkgsentry.adapter import Finding as FDC
+    existing = [FDC(rule_id="threat_intel.known_malicious_sha256", category="threat_intel",
+                    severity="critical", confidence="high", file="dist/x.js", line=None,
+                    evidence="")]
+    carried = carry_forward_findings(
+        db_session, "npm", "dup-bad", new_id,
+        {"dist/x.js": "AAAA"}, existing_findings=existing,
+    )
+    assert carried == []  # not carried — already present this run
+
+
+def test_basename_fallback_does_not_match_changed_file(db_session):
+    """A prior finding on a CHANGED file must not be carried just because an
+    unchanged file in another directory shares its basename."""
+    _make_pkg_scan(
+        db_session, "npm", "ambig", "1.0.0",
+        sha_map={"a/config.js": "AAA", "b/config.js": "BBB"},
+        findings=[{"rule_id": "yara.bad", "file": "a/config.js"}],
+    )
+    # a/config.js CHANGES (AAA->ZZZ), b/config.js stays. Basenames collide.
+    new_id = _make_pkg_scan(
+        db_session, "npm", "ambig", "1.0.1",
+        sha_map={"a/config.js": "ZZZ", "b/config.js": "BBB"},
+        findings=[],
+    )
+    carried = carry_forward_findings(
+        db_session, "npm", "ambig", new_id,
+        {"a/config.js": "ZZZ", "b/config.js": "BBB"},
+    )
+    # The finding was on a/config.js which CHANGED → must not carry via the
+    # b/config.js basename collision.
+    assert carried == []
+
+
+def test_basename_fallback_still_matches_unique_unchanged(db_session):
+    """The disambiguated basename fallback still carries when the basename is
+    unique to an unchanged file (the npm package/ prefix case)."""
+    _make_pkg_scan(
+        db_session, "npm", "uniq", "1.0.0",
+        sha_map={"dist/fsProtocol.js": "AAAA"},
+        findings=[{"rule_id": "yara.rat", "file": "package/dist/fsProtocol.js"}],
+    )
+    new_id = _make_pkg_scan(
+        db_session, "npm", "uniq", "1.0.1",
+        sha_map={"dist/fsProtocol.js": "AAAA"},  # unchanged, basename unique
+        findings=[],
+    )
+    carried = carry_forward_findings(
+        db_session, "npm", "uniq", new_id, {"dist/fsProtocol.js": "AAAA"},
+    )
+    assert [f.rule_id for f in carried] == ["yara.rat"]

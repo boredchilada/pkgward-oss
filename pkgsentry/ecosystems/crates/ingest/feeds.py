@@ -2,6 +2,8 @@
 """Crates.io RSS feed ingest — polls both crates.xml (new) and updates.xml."""
 from __future__ import annotations
 
+import asyncio
+import os
 import xml.etree.ElementTree as ET
 from typing import Optional
 
@@ -214,3 +216,82 @@ async def poll_feeds_once() -> int:
                  updates=enqueued_wl, skipped=skipped,
                  focus=len(focus_names), exclusive=exclusive)
     return total
+
+
+# --- Reconciliation backstop -------------------------------------------------
+# Unlike PyPI/npm/gomod, crates has no cursor — discovery is a pure RSS snapshot.
+# A failed/slow poll, a publish burst exceeding the RSS window, or a restart
+# spanning the window silently drops every crate in that gap, permanently. This
+# periodic backstop re-derives the newest crates from the crates.io API (sort=new,
+# authoritative) and enqueues any the RSS feed missed. Additive — it only ever
+# *adds* (enqueue dedups), so it can never drop a package.
+API_NEW_URL = "https://crates.io/api/v1/crates"
+RECONCILE_PAGES = int(os.environ.get("CRATES_RECONCILE_PAGES", "3"))
+
+
+async def _fetch_new_crates(pages: int) -> list[tuple[str, str]]:
+    """Newest crates from the API (sort=new), oldest-bounded by `pages` × 100."""
+    from pkgsentry.ecosystems.crates.fetch.download import _api_limiter
+    out: list[tuple[str, str]] = []
+    async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}) as client:
+        for page in range(1, pages + 1):
+            try:
+                async with _api_limiter:
+                    resp = await client.get(
+                        API_NEW_URL,
+                        params={"sort": "new", "per_page": 100, "page": page},
+                        timeout=30.0,
+                    )
+                    await asyncio.sleep(1.0)  # crates.io 1 req/s
+                resp.raise_for_status()
+                crates = resp.json().get("crates", [])
+            except Exception as e:
+                log.warning("crates_reconcile_fetch_error", page=page, error=str(e))
+                break
+            if not crates:
+                break
+            for c in crates:
+                name = c.get("name") or ""
+                version = c.get("newest_version") or c.get("max_version") or ""
+                if name and version:
+                    out.append((name, version))
+    return out
+
+
+async def reconcile_new_crates() -> int:
+    """Enqueue brand-new crates the RSS feed may have missed. Additive backstop."""
+    items = await _fetch_new_crates(RECONCILE_PAGES)
+    if not items:
+        return 0
+    from pkgsentry.focus import load_focus_names, on_focus, gate_decision, focus_exclusive
+    exclusive = focus_exclusive()
+    enqueued = 0
+    skipped = 0
+    with sess.session_scope() as s:
+        focus_names = load_focus_names(s, ECOSYSTEM)
+        names = {n for n, _ in items}
+        known = set(s.scalars(
+            select(ScanQueue.name).where(
+                ScanQueue.ecosystem == ECOSYSTEM, ScanQueue.name.in_(names)
+            )
+        ).all())
+        for name, version in items:
+            if name in known:
+                continue
+            pri = gate_decision(
+                on_focus=on_focus(name, focus_names, ECOSYSTEM),
+                on_watchlist=False, brand_new=True, exclusive=exclusive,
+            )
+            if pri is None:
+                skipped += 1
+                continue
+            try:
+                if enqueue(s, ecosystem=ECOSYSTEM, name=name,
+                           version=version, priority=pri) is not None:
+                    enqueued += 1
+            except Exception:
+                pass
+    if enqueued or skipped:
+        log.info("crates_reconciled", enqueued=enqueued,
+                 skipped=skipped, candidates=len(items))
+    return enqueued

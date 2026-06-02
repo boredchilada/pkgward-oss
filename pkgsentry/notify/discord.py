@@ -10,6 +10,7 @@ from typing import Optional
 import httpx
 
 from pkgsentry.adapter import Finding
+from pkgsentry.enrich.downloads import format_field as _downloads_field
 from pkgsentry.llm.triage import LLMTriageResult
 from pkgsentry.logging_setup import get_logger
 
@@ -19,6 +20,7 @@ REGISTRY_URLS: dict[str, str] = {
     "pypi": "https://pypi.org/project/{name}/{version}/",
     "crates": "https://crates.io/crates/{name}/{version}",
     "gomod": "https://pkg.go.dev/{name}@{version}",
+    "npm": "https://www.npmjs.com/package/{name}/v/{version}",
 }
 
 WEBHOOK_URL_ENV = "DISCORD_WEBHOOK_URL"
@@ -59,6 +61,7 @@ def _build_embed(
     n_findings: int,
     triage: LLMTriageResult,
     top_findings: list[Finding],
+    downloads_weekly: Optional[int] = None,
 ) -> dict:
     # Grey when the LLM couldn't adjudicate (fail-open alert); red/orange when it did.
     unverified = triage.verdict not in ("malicious", "suspicious", "benign")
@@ -73,6 +76,7 @@ def _build_embed(
         {"name": "Rule Verdict", "value": f"{rule_verdict} (score: {rule_score})", "inline": True},
         {"name": "Findings", "value": str(n_findings), "inline": True},
         {"name": "Model", "value": triage.model, "inline": True},
+        {"name": "Downloads/week", "value": _downloads_field(downloads_weekly), "inline": True},
     ]
 
     reasoning = _defang(triage.reasoning[:1000]) if triage.reasoning else "No reasoning provided"
@@ -138,31 +142,69 @@ def _pick_top_findings(findings: list[Finding], limit: int = 8) -> list[Finding]
     )[:limit]
 
 
+_ALERT_MAX_ATTEMPTS = 4
+
+
+def _throttle() -> None:
+    """Stagger sends by MIN_INTERVAL without holding the lock across the sleep.
+    Reserve this send's slot under the lock, then sleep unlocked, so concurrent
+    senders (scan workers + the detonation pool) don't serialize on a held lock
+    during a malware burst."""
+    global _last_send
+    with _rate_lock:
+        now = time.monotonic()
+        target = max(now, _last_send + MIN_INTERVAL)
+        _last_send = target
+    wait = target - time.monotonic()
+    if wait > 0:
+        time.sleep(wait)
+
+
 def _post_embed(embed: dict, *, pkg_name: str, pkg_version: str) -> bool:
-    """Rate-limited webhook POST. Best-effort — never raises."""
+    """Rate-limited webhook POST with bounded retry. Best-effort — never raises.
+
+    Discord is the only signal an operator gets, so a transient failure must not
+    silently drop a real malicious-package alert. Retries timeouts / connection
+    errors / 5xx with backoff, and honors a 429 ``retry_after``. A non-retryable
+    4xx (e.g. a bad webhook URL) fails fast and loud."""
     url = os.environ.get(WEBHOOK_URL_ENV)
     if not url:
         return False
 
-    global _last_send
-    with _rate_lock:
-        now = time.monotonic()
-        wait = MIN_INTERVAL - (now - _last_send)
-        if wait > 0:
-            time.sleep(wait)
-        _last_send = time.monotonic()
-
     payload = {"username": "pkgsentry", "embeds": [embed]}
-    try:
-        resp = httpx.post(url, json=payload, timeout=WEBHOOK_TIMEOUT)
-        if resp.status_code == 204:
-            log.info("discord_alert_sent", name=pkg_name, version=pkg_version)
-            return True
-        log.warning("discord_alert_failed", status=resp.status_code, body=resp.text[:200])
-        return False
-    except Exception as e:
-        log.warning("discord_alert_error", error=str(e))
-        return False
+    for attempt in range(_ALERT_MAX_ATTEMPTS):
+        _throttle()
+        try:
+            resp = httpx.post(url, json=payload, timeout=WEBHOOK_TIMEOUT)
+            if resp.status_code == 204:
+                log.info("discord_alert_sent", name=pkg_name, version=pkg_version)
+                return True
+            if resp.status_code == 429:
+                try:
+                    retry_after = float(resp.json().get("retry_after", 1.0))
+                except Exception:
+                    retry_after = 1.0
+                log.warning("discord_alert_rate_limited", retry_after=retry_after,
+                            attempt=attempt + 1)
+                if attempt < _ALERT_MAX_ATTEMPTS - 1:
+                    time.sleep(min(retry_after, 30.0))
+                    continue
+                return False
+            if 500 <= resp.status_code < 600 and attempt < _ALERT_MAX_ATTEMPTS - 1:
+                log.warning("discord_alert_retrying", status=resp.status_code,
+                            attempt=attempt + 1)
+                time.sleep(0.5 * (2 ** attempt))
+                continue
+            # Non-retryable (4xx other than 429) — fail fast and loud.
+            log.warning("discord_alert_failed", status=resp.status_code, body=resp.text[:200])
+            return False
+        except Exception as e:
+            log.warning("discord_alert_error", error=str(e), attempt=attempt + 1)
+            if attempt < _ALERT_MAX_ATTEMPTS - 1:
+                time.sleep(0.5 * (2 ** attempt))
+                continue
+            return False
+    return False
 
 
 def send_alert(
@@ -175,6 +217,7 @@ def send_alert(
     n_findings: int,
     triage: LLMTriageResult,
     findings: list[Finding],
+    downloads_weekly: Optional[int] = None,
 ) -> bool:
     """Post a Discord webhook alert. Returns True on success, False on failure.
     Best-effort — never raises."""
@@ -189,6 +232,7 @@ def send_alert(
         n_findings=n_findings,
         triage=triage,
         top_findings=_pick_top_findings(findings),
+        downloads_weekly=downloads_weekly,
     )
     return _post_embed(embed, pkg_name=pkg_name, pkg_version=pkg_version)
 
@@ -203,6 +247,7 @@ def send_dynamic_alert(
     new_score: int,
     n_findings: int,
     findings: list[Finding],
+    downloads_weekly: Optional[int] = None,
 ) -> bool:
     """Alert for a verdict flipped to malicious by async detonation (no LLM triage).
     Best-effort — never raises."""
@@ -217,6 +262,7 @@ def send_dynamic_alert(
         {"name": "Verdict", "value": f"**{new_verdict.upper()}** (score: {new_score})", "inline": True},
         {"name": "Static verdict", "value": static_verdict, "inline": True},
         {"name": "Findings", "value": str(n_findings), "inline": True},
+        {"name": "Downloads/week", "value": _downloads_field(downloads_weekly), "inline": True},
     ]
     top = _pick_top_findings(findings)
     if top:

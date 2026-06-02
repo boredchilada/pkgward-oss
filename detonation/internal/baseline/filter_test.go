@@ -78,6 +78,28 @@ func TestFilterNpmCache(t *testing.T) {
 	}
 }
 
+func TestFilterNpmKeepsLoaderExec(t *testing.T) {
+	events := []trace.TraceEvent{
+		// the malware loader: node running a local lifecycle script -> MUST survive
+		{Phase: "install", Category: "process", Operation: "exec",
+			Detail: map[string]interface{}{"binary": "/usr/local/bin/node", "arguments": "node ./lib/core/eval.js"}},
+		// benign internal probes / npm internals -> still filtered
+		{Phase: "install", Category: "process", Operation: "exec",
+			Detail: map[string]interface{}{"binary": "/usr/local/bin/node", "arguments": "node -e require('faster-axios')"}},
+		{Phase: "install", Category: "process", Operation: "exec",
+			Detail: map[string]interface{}{"binary": "/usr/local/bin/npm", "arguments": "npm install --ignore-scripts"}},
+		{Phase: "install", Category: "process", Operation: "exec",
+			Detail: map[string]interface{}{"binary": "/usr/local/bin/node", "arguments": "node /usr/local/lib/node_modules/npm/bin/npm-cli.js"}},
+	}
+	filtered := Filter("npm", events)
+	if len(filtered) != 1 {
+		t.Fatalf("expected only the loader to survive, got %d events", len(filtered))
+	}
+	if a, _ := filtered[0].Detail["arguments"].(string); a != "node ./lib/core/eval.js" {
+		t.Errorf("wrong event kept: %q", a)
+	}
+}
+
 func TestFilterCargoRegistry(t *testing.T) {
 	events := []trace.TraceEvent{
 		{Phase: "install", Category: "file", Operation: "write",
@@ -119,10 +141,10 @@ func TestFilterNpmNpmrc(t *testing.T) {
 
 func TestResolveAllowedIPsLiteral(t *testing.T) {
 	got := resolveAllowedIPs([]string{"1.2.3.4", "  ", "2.3.4.5"})
-	if _, ok := got["1.2.3.4"]; !ok {
+	if !got.contains("1.2.3.4") {
 		t.Error("literal IP 1.2.3.4 should resolve to itself")
 	}
-	if _, ok := got["2.3.4.5"]; !ok {
+	if !got.contains("2.3.4.5") {
 		t.Error("literal IP 2.3.4.5 should resolve to itself")
 	}
 }
@@ -130,8 +152,40 @@ func TestResolveAllowedIPsLiteral(t *testing.T) {
 func TestResolveAllowedIPsLocalhost(t *testing.T) {
 	// localhost resolves from /etc/hosts (no network needed).
 	got := resolveAllowedIPs([]string{"localhost"})
-	if _, ok := got["127.0.0.1"]; !ok {
+	if !got.contains("127.0.0.1") {
 		t.Error("localhost should resolve to include 127.0.0.1")
+	}
+}
+
+func TestResolveAllowedCIDR(t *testing.T) {
+	got := resolveAllowedIPs([]string{"151.101.0.0/16", "104.16.0.0/13"})
+	// inside the Fastly /16
+	if !got.contains("151.101.64.223") {
+		t.Error("151.101.64.223 should be inside 151.101.0.0/16")
+	}
+	// inside the Cloudflare /13 (104.16.0.0 - 104.23.255.255)
+	if !got.contains("104.18.3.115") {
+		t.Error("104.18.3.115 should be inside 104.16.0.0/13")
+	}
+	// just outside the Fastly /16, and well outside Cloudflare's /13
+	if got.contains("151.102.0.1") {
+		t.Error("151.102.0.1 must NOT be inside 151.101.0.0/16")
+	}
+	if got.contains("203.0.113.5") {
+		t.Error("a TEST-NET-3 address must not match any allowed range")
+	}
+}
+
+func TestFilterCDNRangeConnectDropped(t *testing.T) {
+	// A connect to a Fastly CDN IP (npm registry front) must be filtered by the
+	// CIDR allowlist even though the exact IP isn't a resolved hostname.
+	events := []trace.TraceEvent{
+		{Phase: "install", Category: "network", Operation: "connect",
+			Detail: map[string]interface{}{"addr": "151.101.128.223", "port": float64(443)}},
+	}
+	filtered := Filter("npm", events)
+	if len(filtered) != 0 {
+		t.Errorf("connect to Fastly CDN range should be dropped, got %d events", len(filtered))
 	}
 }
 

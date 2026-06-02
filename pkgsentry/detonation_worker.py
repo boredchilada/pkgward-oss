@@ -49,6 +49,9 @@ def _requeue_or_fail(job: dict, reason: str) -> None:
         q = s.get(DetonationQueue, job["id"])
         if q is None or q.status != "claimed" or q.claim_token != job["token"]:
             return
+        # Count a real detonation FAILURE (not a claim) against the retry budget,
+        # so claim races / stale-sweeps from worker deaths don't burn it.
+        q.attempts += 1
         if q.attempts >= detonation_queue.MAX_AUTO_ATTEMPTS:
             q.status = "failed"
             q.last_error = reason[:4000]
@@ -67,10 +70,14 @@ def _finalize_detonation(job: dict, det_result) -> Optional[dict]:
     dyn_for_bump: list[Finding] = []
     with sess.session_scope() as s:
         q = s.get(DetonationQueue, job["id"])
+        if q is None or q.status != "claimed" or q.claim_token != job["token"]:
+            # A stale-claim sweep reassigned this job to another worker while this
+            # detonation ran. Bail before writing a duplicate Detonation row,
+            # re-scoring, or firing a second flip-alert.
+            return None
         scan = s.get(Scan, job["scan_id"])
         if scan is None:
-            if q is not None:
-                detonation_queue.mark_done(s, q, token=job["token"])
+            detonation_queue.mark_done(s, q, token=job["token"])
             return None
 
         det_row = Detonation(
@@ -192,7 +199,10 @@ async def _process_detonation(job: dict) -> None:
             _requeue_or_fail(job, f"timeout_after_{DETONATION_PROCESS_TIMEOUT}s")
             return
         except NoFilesError as e:
-            _mark_failed(job, f"no_files: {e}")
+            # Archive unavailability is frequently transient (registry yanked the
+            # file, mirror lag, a delete-then-restore) — retry within the bounded
+            # budget rather than permanently failing a malicious-at-scan package.
+            _requeue_or_fail(job, f"no_files: {e}")
             return
         except Exception as e:
             _requeue_or_fail(job, f"fetch_failed: {e}")
@@ -203,6 +213,12 @@ async def _process_detonation(job: dict) -> None:
 
         alert = await asyncio.to_thread(_finalize_detonation, job, det_result)
         if alert is not None and discord_notify.is_enabled():
+            try:
+                from pkgsentry.enrich import downloads as _downloads
+                alert["downloads_weekly"] = await asyncio.to_thread(
+                    _downloads.enrich, job["ecosystem"], job["name"])
+            except Exception:
+                pass
             await asyncio.to_thread(discord_notify.send_dynamic_alert, **alert)
     finally:
         for a in archives:

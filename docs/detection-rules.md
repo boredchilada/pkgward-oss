@@ -36,7 +36,12 @@ Source: `analyze/iocs.py`
 |---------|-----|------|-----------------|
 | `iocs.url_suspicious` | low | low | Non-benign URL in source (benign domain whitelist applied) |
 | `iocs.ipv4` | low | low | Non-private/non-reserved IPv4 literal |
+| `iocs.hardcoded_wan_ip_port` | high | medium | A routable IPv4 literal with an explicit `:port` (C2-beacon shape) — excludes private/loopback/link-local/doc ranges and public DNS resolvers. Malware hardcodes IP+port to dodge DNS/sinkholes |
+| `iocs.cloud_metadata_endpoint` | medium | high | Cloud metadata SSRF / credential-theft endpoint (`169.254.169.254` AWS IMDS, `169.254.170.2` ECS task-role) — flagged despite the link-local skip |
+| `iocs.encoded_url` | medium | medium | A non-benign URL found inside a decoded base64 / hex / `\xNN` blob — deliberate concealment |
+| `iocs.encoded_ip` | high | medium | A routable / C2 / cloud-metadata IP found inside a decoded base64 / hex / `\xNN` blob |
 | `iocs.onion` | high | high | Tor .onion address |
+| `iocs.oast_callback` | high | high | URL host is a known out-of-band-interaction / request-capture service (oastify.com, interact.sh, oast.*, burpcollaborator.net, webhook.site, requestbin, dnslog.cn, canarytokens, …) — near-certain exfil/C2 at install time; no legitimate install-time use |
 | `iocs.base64_blob` | medium | low | Large base64 blob (160+ chars) in string literal |
 
 ## Layer 3: Malware patterns (PyPI install-time files only)
@@ -48,12 +53,16 @@ Source: `analyze/malware_patterns.py`
 | `malware.discord_webhook` | critical | high | Discord webhook URL for exfiltration (W4SP). **Behavioral chain** |
 | `malware.telegram_bot_exfil` | critical | high | Telegram bot `/send` endpoint for exfiltration |
 | `malware.slack_webhook` | high | high | Slack incoming webhook URL |
-| `malware.pth_import_injection` | critical | high | `.pth` file with import (executes at Python startup). **Behavioral chain** |
+| `malware.pth_exec_injection` | critical | high | `.pth` import line runs a code-exec primitive at Python startup (`import os; os.system(...)`, `exec`/`b64decode`/`__import__`/socket/etc.). **Behavioral chain** |
+| `malware.pth_import_injection` | high | medium | `.pth` bare-imports a module the package does **not** ship and isn't stdlib (at-startup sideload). A bare import of a shipped module (Datadog/Sentry/OTel auto-instrument bootstrap) or stdlib is not flagged — the imported module is analyzed on its own |
+| `malware.credential_store_sweep` | critical | high | A single source file (any ecosystem) references **≥3 distinct credential stores** — `/etc/shadow`, `/proc/<pid>/environ`, k8s SA token, `~/.ssh` keys, `~/.aws/credentials`, `~/.npmrc`, browser/crypto cred files, bulk `process.env`/`os.environ` harvest. A legit lib touches one; an info-stealer sweeps many. `analyze/secret_access.py` (all ecosystems) |
+| `malware.etc_shadow_read` | high | high | Source references `/etc/shadow` (password-hash theft) |
 | `malware.pyc_bytecode_hidden` | critical/high | high/medium | Standalone `.pyc` outside `__pycache__` (critical if importlib loader present) |
 | `malware.credential_file_access` | critical | high | SSH keys, AWS creds, browser profiles, crypto wallet paths in install file |
 | `malware.deobfuscation_exec_chain` | critical | high | marshal/zlib/bz2/lzma decompress piped to exec/eval. **Behavioral chain** |
-| `malware.env_bulk_exfil` | critical | high | `os.environ` read + HTTP send in install file. **Behavioral chain** |
-| `malware.env_sensitive_exfil` | high | medium | Sensitive env var access + HTTP send in install file |
+| `malware.env_exfil_tainted` | critical | high | Intrafile taint proves an `os.environ`-derived value **flows into** an HTTP send in an install file. **Behavioral chain** |
+| `malware.env_bulk_exfil` | medium | low | `os.environ` read + HTTP send **co-occur** in an install file with no provable flow between them (corroborating signal — 8 pts, below the suspicious floor, so it never flags alone; native-wrapper build-env reads no longer auto-escalate) |
+| `malware.env_sensitive_exfil` | high | medium | Sensitive env var access + HTTP send in install file (no provable flow) |
 | `malware.whitespace_hidden_payload` | critical | high | Code hidden with 200+ leading whitespace |
 | `malware.download_command` | critical | high | PowerShell/curl/wget/certutil/bitsadmin download in install script |
 
@@ -69,9 +78,11 @@ Source: `analyze/metadata.py`, `analyze/lure_names.py`
 | `metadata.typosquat_suffix` | medium | medium | Top package name with common suffix (-python, -sdk, -api, etc.) |
 | `metadata.sdist_wheel_mismatch` | low | low | Wheel contains Python files absent from sdist |
 | `metadata.rapid_release` | medium | medium | New release < 24h after previous version |
-| `metadata.maintainer_change` | medium | high | Maintainer list changed between versions |
+| `metadata.maintainer_change` | medium | high | Maintainer list changed between versions (fires only when both current and previous releases carry author metadata — an absent current author is not read as a removal) |
+| `metadata.dependency_confusion_version` | low | medium | Version is all-nines or repeated-equal components ≥9 (`99.99.99`/`9.9.9`/`10.10.10`/`11.11.11`) — semver inflation to win a dependency-confusion resolution race. Corroborating evidence; deliberately excludes calendar versions (`2024.x`) |
 | `metadata.lure_name` | medium | medium | Name matches 2 social-engineering lure categories |
 | `metadata.lure_name_combo` | high | medium | Name matches 3+ lure categories (crypto + security + creds, etc.) |
+| `metadata.gomod_impersonating_forge_host` | high | high | Go-module path host impersonates a code forge but isn't the real domain — a forge name on a foreign domain (`github.<rand>.workers.dev`), a git-prefix on a numeric throwaway domain (`gh.173371.xyz`/`git.832008.xyz`), or a Cloudflare ephemeral host. Namespace-hijack / dependency-confusion that republishes a legit module under attacker infra. Structurally gated to module-path names (npm/pypi/crates never match) |
 
 ### Lure name categories
 
@@ -155,40 +166,22 @@ followed and scanned for network + `child_process`/eval.
 | `installer.npm_install_script_network` | high | medium | Referenced install `.js` makes a network call |
 | `installer.npm_install_script_decode_exec` | high | medium | Referenced install `.js` base64-decodes then executes |
 | `installer.npm_install_script_encoded_payload` | medium | medium | Large encoded payload in referenced install `.js` |
+| `installer.npm_install_remote_binary_drop` | high/medium | high/medium | Install `.js` downloads → writes → chmod-executes a binary. high when the download host is unrelated to the package's declared repo/homepage and isn't a known release host (GitHub/githubusercontent/npm registry/nodejs.org/…); medium when the URL is built dynamically. A native wrapper dropping its binary from its own repo / a release CDN does not fire |
+| `installer.npm_install_obfuscated_entrypoint` | critical | high | A lifecycle hook runs a local script that self-decodes (char-code / runtime-crypto `createDecipheriv`) into `eval`/`Function`. Behavioral-chain → malicious. Catches the `@redhat-cloud-services` worm's `preinstall: node index.js` (Caesar→AES→eval), invisible to the net/base64 rules because the payload is encoded |
+| `installer.npm_install_persistence_loader` | critical | high | A lifecycle hook registers **OS persistence** (systemd `--user` unit / launchd `.plist` / Windows Run-key·`.vbs` / XDG autostart / cron) **and** spawns a **detached, unref'd** background process — the resident-agent loader fingerprint. Behavioral-chain → malicious. Catches the `logger-active`/`utils-terminal` stealer family at the loader, independent of the payload's YARA signature |
+| `installer.npm_install_persistence` | high | high | Lifecycle hook registers OS persistence (above), without the detached-spawn half |
+| `installer.npm_install_detached_spawn` | high | medium | Lifecycle hook spawns a detached, unref'd background process (keeps a dropped payload resident after install exits) |
 | `installer.npm_suspicious_bin` | low | low | `bin` entry points to a `.sh`/`.ps1`/`.exe`/… script |
 
 ## Layer 7: YARA signature matching (all ecosystems)
 
-Source: `analyze/yara_scan.py` + rules in `yara_rules/`
+Source: `analyze/yara_scan.py` + baseline rules in `pkgsentry/intel/baseline/yara/`.
 
-Rule IDs are emitted as `yara.{rule_name}`. Severity/confidence are set per-rule via YARA metadata.
-
-### python_malware.yar (11 rules)
-
-| rule_id | Sev | Conf | What it detects |
-|---------|-----|------|-----------------|
-| `yara.w4sp_stealer_discord_harvest` | critical | high | W4SP/VVS Discord token harvesting |
-| `yara.stealer_browser_credential_theft` | critical | high | Chrome/Firefox credential/cookie theft |
-| `yara.crypto_wallet_stealer` | critical | high | Cryptocurrency wallet data theft |
-| `yara.staged_payload_exec` | critical | high | Remote code download + exec/eval |
-| `yara.staged_subprocess_shell` | high | medium | Remote download + subprocess shell=True |
-| `yara.base64_exec_chain` | high | high | Base64 decode piped to exec/eval |
-| `yara.reverse_shell_pattern` | critical | high | Reverse shell indicators |
-| `yara.pyarmor_obfuscation` | medium | high | PyArmor obfuscated code (used by VVS Stealer) |
-| `yara.ssh_key_exfiltration` | critical | high | SSH private key read + exfiltration |
-| `yara.environment_credential_harvest` | critical | high | Bulk env var harvesting + HTTP exfil |
-| `yara.dns_exfiltration` | high | medium | DNS-based data exfiltration pattern |
-
-### rust_malware.yar (6 rules)
-
-| rule_id | Sev | Conf | What it detects |
-|---------|-----|------|-----------------|
-| `yara.rust_buildrs_network_exec` | critical | high | build.rs network + exec (YARA-level) |
-| `yara.rust_buildrs_env_harvest` | high | high | build.rs sensitive env reads (YARA-level) |
-| `yara.rust_buildrs_outdir_escape` | high | medium | build.rs OUT_DIR escape (YARA-level) |
-| `yara.rust_obfuscated_include_bytes` | high | medium | include_bytes! of executable (YARA-level) |
-| `yara.rust_encoded_payload_buildrs` | medium | medium | Encoded payload in build.rs (YARA-level) |
-| `yara.rust_typosquat_indicator` | medium | low | Crate name resembles popular crate |
+Rule IDs are emitted as `yara.{rule_name}`; severity/confidence come from each rule's
+YARA metadata. The baseline ships community signatures (adapted from
+[Neo23x0/signature-base](https://github.com/Neo23x0/signature-base) under their own
+licenses — see `NOTICE`) plus a small first-party rule. Operators add their own
+private YARA via `$PKGSENTRY_INTEL_PATH/yara/`, UNION-merged over the baseline at load.
 
 ### community_sigbase.yar (11 rules)
 
@@ -205,6 +198,12 @@ Rule IDs are emitted as `yara.{rule_name}`. Severity/confidence are set per-rule
 | `yara.sigbase_reversed_b64_executable` | high | high | Reversed base64-encoded executable |
 | `yara.community_dyndns_c2` | medium | medium | Dynamic DNS domain for C2 |
 | `yara.community_ip_lookup_recon` | low | medium | External IP lookup service (recon) |
+
+### python_baseline.yar (1 rule)
+
+| rule_id | Sev | Conf | What it detects |
+|---------|-----|------|-----------------|
+| `yara.base64_exec_chain` | high | high | Base64 decode piped to `exec`/`eval` |
 
 ## Layer 8: Version diff (all ecosystems)
 
@@ -269,11 +268,11 @@ Baseline rule set (11 rules, deliberately small):
 
 Source: `detonation/internal/rules/definitions.go` (Go sandbox service)
 
-Package is installed/imported in a rootless-Docker sandbox with Tetragon eBPF tracing on the host. The collector (`internal/trace/collector.go`) parses the Tetragon JSONL log into `TraceEvent`s, tags them with the install/import phase by time window (`AssignPhase`), and the Go rules engine evaluates them. Tetragon policy: `detonation/deploy/tetragon-policy.yaml`. Detonation now runs for PyPI, Crates, and Go modules.
+Package is installed/imported in a rootless-Docker sandbox with Tetragon eBPF tracing on the host. The collector (`internal/trace/collector.go`) parses the Tetragon JSONL log into `TraceEvent`s, tags them with the install/import phase by time window (`AssignPhase`), and the Go rules engine evaluates them. Tetragon policy: `detonation/deploy/tetragon-policy.yaml`. Detonation now runs for PyPI, Crates, Go modules, and npm.
 
 | rule_id | Sev | Conf | What it detects |
 |---------|-----|------|-----------------|
-| `dyn_install_exfil` | critical | high | Network connect() during install phase. **DEFERRED — not in `AllRules()`**: fires on any install-phase connect, but sdists fetch build deps from registries → FPs. Re-enable with offline install or a destination allowlist. |
+| `dyn_install_exfil` | high | high | Network `connect()` during install to a **non-allowlisted** host. The per-ecosystem `net_allow` (registry/CDN hostnames + CIDR ranges) drops legit dependency fetches first, so a remaining connect is exfil-shaped. **Behavioral chain.** |
 | `dyn_import_exfil` | high | high | Network connect() during import phase |
 | `dyn_credential_read` | high | high | Read of sensitive file (SSH keys, cloud creds, /etc/shadow) via openat path-prefix hook |
 | `dyn_reverse_shell` | critical | high | Shell spawned with open socket. **Behavioral chain.** Dormant — needs socket-fd tracking on exec (not yet wired) |
@@ -282,6 +281,8 @@ Package is installed/imported in a rootless-Docker sandbox with Tetragon eBPF tr
 | `dyn_env_harvest` | high | high | Read of another process's environment via `/proc/<pid>/environ` (excludes /proc/self) |
 | `dyn_suspicious_write` | critical | high | Write to persistence path (crontab, /etc/systemd, .bashrc, authorized_keys) via `security_file_permission` MAY_WRITE hook |
 | `dyn_fileless_exec` | critical / medium | high / medium | `execveat(AT_EMPTY_PATH)` fileless execution (critical); `memfd_create` anonymous executable memory (medium) |
+| `dyn_honeytoken_exfil` | critical | high | A bind-mounted decoy credential (the honeytoken set planted in the sandbox home) is read **and** its value subsequently leaves the box — proof of credential theft, not just a read |
+| `dyn_screen_capture_probe` | critical | high | Execution of a screen-capture utility (`screencapture`/`import`/`scrot`/…) during install/import — screenshot exfil probe |
 
 Trace events are attributed to the detonation's own sandbox container by the Tetragon
 `docker` container id (captured per phase via `docker run --cidfile`), so concurrent
@@ -319,43 +320,71 @@ Source: `analyze/binary.py`
 |---------|-----|------|-----------------|
 | `binary.hidden_executable` | high | high | ELF/PE/Mach-O binary with .py/.txt/.json extension |
 | `binary.compiled_artifact` | medium | high | Compiled binary without expected extension |
+| `binary.packed_executable` | critical/high/medium | high | Run-time-packed executable. critical = commercial protector (Themida/VMProtect/Enigma — no static unpacker); high = UPX that couldn't be unpacked; medium = UPX successfully unpacked + payload re-analyzed. Packed payloads are unpacked via `upx -d` (decompress-only, never executed) and written back as `<name>.upx_unpacked` so all analyzers see the real payload |
+
+---
+
+## Source obfuscation / custom encoding (all ecosystems)
+
+Source: `analyze/obfuscation.py`. Catches the obfuscation family the base64/entropy
+heuristics miss — custom radix alphabets (base85/basE91/z85 and shuffled variants
+decode through hand-rolled loops, not `atob`, and emit punctuation-heavy output
+with no long base64 run) and CJK identifier renaming (defeats human review without
+raising file entropy). Scans install-reachable source (`.js/.mjs/.cjs/.ts/.py`…).
+
+| rule_id | Sev | Conf | What it detects |
+|---------|-----|------|-----------------|
+| `obfuscation.rotating_alphabet_codec` | high | high | >=2 distinct ~85–91-char, near-all-unique-printable string literals in one file = a base85/basE91 "rotating alphabets" packer |
+| `obfuscation.custom_alphabet_codec` | low | medium | Exactly one such radix-alphabet literal (could be a legitimate codec library) |
+| `obfuscation.nonascii_identifiers` | medium | medium | >=8 distinct non-ASCII (hiragana/katakana/CJK) identifiers after stripping strings + comments (so CJK-authored libraries don't false-positive) |
+| `obfuscation.homoglyph_identifiers` | medium | medium | >=1 confusable identifier after stripping strings + comments: a token mixing ASCII Latin with Cyrillic/Greek (`rеquests` with a Cyrillic `е`) or containing fullwidth-Latin. Requires the *mix* (or fullwidth) so legit pure-Cyrillic (Russian) / pure-Greek (scientific `α`/`β`) identifiers don't false-positive |
+| `obfuscation.charcode_eval` | high | high | A char-code decode (`String.fromCharCode` / `.charCodeAt` / a long decimal `[n,n,…]` array) feeding `eval`/`Function` (JS self-decoding packer — the `@redhat-cloud-services` worm layer 1) |
+| `obfuscation.decrypt_then_exec` | high | high | A runtime crypto-decrypt (`createDecipheriv`) feeding `eval`/`Function` (staged self-decoding payload — the worm's AES-128-GCM stage) |
+
+The alphabet/CJK passes scan files up to `PKGSENTRY_OBFUSCATION_MAX_MB` (10); the
+cheap `eval`+charcode/crypto packer scan runs up to `PKGSENTRY_OBFUSCATION_PACKER_MAX_MB`
+(32), so a multi-MB hand-packed install file isn't skipped.
 
 ---
 
 ## Behavioral chain rules
 
-These rule IDs auto-escalate the verdict to malicious regardless of score. Defined in `detect/rules.py`:
+These rule IDs auto-escalate the verdict to malicious regardless of score. The
+canonical list is `intel/baseline/behavioral_chains.toml` (overlay-extendable):
 
 - `installer.urlopen_exec_chain`
+- `installer.npm_install_obfuscated_entrypoint`
+- `installer.npm_install_persistence_loader`
 - `imports.network_subprocess_chain`
 - `malware.deobfuscation_exec_chain`
 - `malware.discord_webhook`
-- `malware.env_bulk_exfil`
-- `malware.pth_import_injection`
+- `malware.env_exfil_tainted`
+- `malware.pth_exec_injection`
 - `dyn_install_exfil`
 - `dyn_reverse_shell`
 - `dyn_proc_inject`
 
 ## Ecosystem coverage matrix
 
-| Rule prefix | PyPI | Crates.io | Go modules |
-|-------------|------|-----------|------------|
-| `imports.*` | Yes | - | - |
-| `iocs.*` | Yes | Yes | Yes |
-| `malware.*` | Yes | - | - |
-| `metadata.*` | Yes | Yes | Yes |
-| `installer.*` | Yes | - | - |
-| `crates.*` | - | Yes | - |
-| `gomod.*` | - | - | Yes |
-| `yara.{python}` | Yes | - | - |
-| `yara.{rust}` | - | Yes | - |
-| `entropy.*` | Yes | Yes | Yes |
-| `binary.*` | Yes | Yes | Yes |
-| `version_diff.*` | Yes | Yes | Yes |
-| `intel.*` | Yes | Yes | Yes |
-| `dyn_*` | Yes | Yes | Yes |
-| `opengrep.*` | Yes | Yes | Yes |
-| `fetch.*` | Yes | Yes | Yes |
+| Rule prefix | PyPI | Crates.io | Go modules | npm |
+|-------------|------|-----------|------------|-----|
+| `imports.*` | Yes | - | - | - |
+| `iocs.*` | Yes | Yes | Yes | Yes |
+| `malware.*` | Yes | - | - | - |
+| `metadata.*` | Yes | Yes | Yes | Yes |
+| `installer.*` | Yes | - | - | Yes (`installer.npm_*`, `package.json` lifecycle scripts) |
+| `crates.*` | - | Yes | - | - |
+| `gomod.*` | - | - | Yes | - |
+| `yara.{python}` | Yes | - | - | - |
+| `yara.{rust}` | - | Yes | - | - |
+| `entropy.*` | Yes | Yes | Yes | Yes |
+| `binary.*` | Yes | Yes | Yes | Yes |
+| `obfuscation.*` | Yes | Yes | Yes | Yes |
+| `version_diff.*` | Yes | Yes | Yes | Yes |
+| `intel.*` | Yes | Yes | Yes | Yes |
+| `dyn_*` | Yes | Yes | Yes | Yes |
+| `opengrep.*` | Yes | Yes | Yes | Yes (`opengrep/javascript`) |
+| `fetch.*` | Yes | Yes | Yes | Yes |
 
 ---
 
@@ -369,7 +398,7 @@ These rule IDs auto-escalate the verdict to malicious regardless of score. Defin
 
 | Category | Count |
 |----------|-------|
-| Static rule IDs | 60 |
+| Static rule IDs | 64 |
 | YARA rules (via `yara.{name}`) | 28 |
 | Dynamic sandbox rules | 8 |
 | Threat intel (via `intel.{campaign}`) | 1+ per campaign |

@@ -25,6 +25,25 @@ log = logging.getLogger(__name__)
 SSDEEP_THRESHOLD = 70
 TLSH_THRESHOLD = 120
 
+# Promoted fingerprints (operator confirmed the family is a real campaign) get a
+# TIGHTER fuzzy threshold than the curated baseline pack, because each is a single
+# payload rather than a hand-tuned family signature.
+PROMOTED_SSDEEP_THRESHOLD = 88
+PROMOTED_TLSH_THRESHOLD = 40
+
+
+def _is_auto(entry: ThreatIntelHash) -> bool:
+    """Auto-seeded, UNREVIEWED fingerprint. These match on EXACT sha256 only —
+    fuzzy (ssdeep/TLSH) is skipped for them. Reason: a fuzzy match on an unreviewed
+    seed cascades false positives (a seeded FP fuzzy-matches a benign lookalike,
+    whose verdict then auto-seeds *it* — exactly the chain-signer/@comment-io mess).
+    Fuzzy power is opt-in via `threatintel promote`."""
+    return (entry.source or "") == "auto"
+
+
+def _is_promoted(entry: ThreatIntelHash) -> bool:
+    return (entry.source or "") == "promoted"
+
 # Per-campaign TLSH override. Lower than the global default for campaigns whose
 # fingerprint is short or structurally common enough that the loose 120 default
 # false-positives on unrelated small modules. Validated reskins for these
@@ -82,10 +101,13 @@ def check_file(
 
     if caps.HAS_PPDEEP and ssdeep_hash:
         for entry in intel:
+            if _is_auto(entry):
+                continue  # unreviewed: exact sha256 only (handled above)
             if not entry.ssdeep or not _pattern_ok(entry, name):
                 continue
             similarity = caps.ppdeep.compare(ssdeep_hash, entry.ssdeep)
-            if similarity >= SSDEEP_THRESHOLD:
+            ssdeep_thr = PROMOTED_SSDEEP_THRESHOLD if _is_promoted(entry) else SSDEEP_THRESHOLD
+            if similarity >= ssdeep_thr:
                 return ThreatMatch(
                     tier="ssdeep", score=float(similarity),
                     campaign=entry.campaign, label=entry.label,
@@ -95,10 +117,13 @@ def check_file(
 
     if caps.HAS_TLSH and tlsh_hash and tlsh_hash not in ("TNULL", ""):
         for entry in intel:
+            if _is_auto(entry):
+                continue  # unreviewed: exact sha256 only (handled above)
             if not entry.tlsh or entry.tlsh == "TNULL" or not _pattern_ok(entry, name):
                 continue
             dist = caps.tlsh.diff(tlsh_hash, entry.tlsh)
-            threshold = _CAMPAIGN_TLSH_THRESHOLD.get(entry.campaign, TLSH_THRESHOLD)
+            default_thr = PROMOTED_TLSH_THRESHOLD if _is_promoted(entry) else TLSH_THRESHOLD
+            threshold = _CAMPAIGN_TLSH_THRESHOLD.get(entry.campaign, default_thr)
             if dist <= threshold:
                 return ThreatMatch(
                     tier="tlsh", score=float(dist),

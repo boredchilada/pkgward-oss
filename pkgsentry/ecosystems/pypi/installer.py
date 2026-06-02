@@ -61,19 +61,42 @@ def _exec_eats_call(tree: ast.Module) -> list[ast.Call]:
     return hits
 
 
+_SUBPROCESS_FUNCS = {
+    "Popen", "run", "call", "check_call", "check_output",
+    "getoutput", "getstatusoutput",
+}
+
+
 def _subprocess_calls(tree: ast.Module) -> list[ast.Call]:
+    # Resolve how subprocess is bound in this file so bare/aliased calls aren't
+    # missed: `from subprocess import run` -> bare run() is a subprocess call;
+    # `import subprocess as sp` -> sp.run(). Gating on the actual import keeps a
+    # package's own local run()/call() from false-positiving.
+    name_aliases: set[str] = set()       # bare names bound to subprocess callables
+    mod_aliases: set[str] = {"subprocess"}  # module names resolving to subprocess
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "subprocess":
+            for a in node.names:
+                if a.name in _SUBPROCESS_FUNCS:
+                    name_aliases.add(a.asname or a.name)
+        elif isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name == "subprocess":
+                    mod_aliases.add(a.asname or "subprocess")
     hits = []
     for stmt in tree.body:
         for node in ast.walk(stmt):
-            if isinstance(node, ast.Call):
-                full = _call_name(node)
-                tail = full.split(".")[-1]
-                if full.startswith("subprocess.") or tail in {"Popen", "run", "call", "check_call", "check_output"}:
-                    if full.startswith("subprocess.") or "subprocess" in full:
-                        hits.append(node)
-                        continue
-                    if tail == "Popen":
-                        hits.append(node)
+            if not isinstance(node, ast.Call):
+                continue
+            full = _call_name(node)
+            if not full:
+                continue
+            parts = full.split(".")
+            tail = parts[-1]
+            if len(parts) >= 2 and parts[0] in mod_aliases and tail in _SUBPROCESS_FUNCS:
+                hits.append(node)
+            elif len(parts) == 1 and (tail == "Popen" or tail in name_aliases):
+                hits.append(node)
     return hits
 
 

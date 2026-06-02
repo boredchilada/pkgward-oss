@@ -218,6 +218,146 @@ watchlist_app = typer.Typer(
 )
 app.add_typer(watchlist_app, name="watchlist")
 
+scope_app = typer.Typer(
+    no_args_is_help=True,
+    help="Scope-watchlist: watch a whole org (npm @scope / gomod path prefix / pypi name prefix).",
+)
+app.add_typer(scope_app, name="scope")
+
+
+@scope_app.command("list")
+def scope_list_cmd(
+    ecosystem: str = typer.Option(None, "--ecosystem", "-e"),
+) -> None:
+    """List watched scopes (optionally filtered by ecosystem)."""
+    from sqlalchemy import select
+    from pkgsentry.store.models import WatchlistScope
+    sess.init_db()
+    with sess.session_scope() as s:
+        q = select(WatchlistScope).order_by(WatchlistScope.ecosystem, WatchlistScope.scope)
+        if ecosystem:
+            q = q.where(WatchlistScope.ecosystem == ecosystem)
+        rows = s.scalars(q).all()
+        for r in rows:
+            typer.echo(f"{r.ecosystem}\t{r.scope}\t{r.source}")
+        typer.echo(f"# {len(rows)} scopes")
+
+
+@scope_app.command("add")
+def scope_add_cmd(
+    ecosystem: str = typer.Argument(..., help="npm|gomod|pypi"),
+    scope: str = typer.Argument(..., help="@org (npm) / path prefix (gomod) / name prefix (pypi)"),
+) -> None:
+    """Watch a scope: every package + release under it is scanned at high priority."""
+    from pkgsentry import scope_watchlist
+    sess.init_db()
+    with sess.session_scope() as s:
+        status = scope_watchlist.add_scope(s, ecosystem, scope, source="manual")
+    typer.echo(f"{status}: {ecosystem} {scope}")
+
+
+@scope_app.command("remove")
+def scope_remove_cmd(
+    ecosystem: str = typer.Argument(..., help="npm|gomod|pypi"),
+    scope: str = typer.Argument(..., help="The scope to stop watching."),
+) -> None:
+    """Stop watching a scope."""
+    from pkgsentry import scope_watchlist
+    sess.init_db()
+    with sess.session_scope() as s:
+        n = scope_watchlist.remove_scope(s, ecosystem, scope)
+    typer.echo(f"removed: {n}")
+
+
+@scope_app.command("seed")
+def scope_seed_cmd() -> None:
+    """(Re)seed the baseline vendor scopes (idempotent)."""
+    from pkgsentry import scope_watchlist
+    sess.init_db()
+    with sess.session_scope() as s:
+        added = scope_watchlist.seed_baseline(s)
+    typer.echo(f"seeded: {added} new scopes")
+
+
+threatintel_app = typer.Typer(
+    no_args_is_help=True,
+    help="Threat-intel fingerprints — auto-seeded from confirmed-malicious catches.",
+)
+app.add_typer(threatintel_app, name="threatintel")
+
+
+@threatintel_app.command("backfill")
+def threatintel_backfill_cmd(
+    limit: int = typer.Option(0, "--limit", help="Cap scans processed (0 = all)."),
+) -> None:
+    """Seed fingerprints from ALL historically double-confirmed-malicious scans."""
+    from pkgsentry import threat_intel_auto
+    sess.init_db()
+    with sess.session_scope() as s:
+        scans, seeded = threat_intel_auto.backfill(s, limit=limit or None)
+    typer.echo(f"backfill: {scans} malicious scans processed, {seeded} new fingerprints seeded")
+
+
+@threatintel_app.command("backfill-tlsh")
+def threatintel_backfill_tlsh_cmd() -> None:
+    """Fill missing TLSH on auto-seeded fingerprints by re-hashing vaulted archives."""
+    from pkgsentry import threat_intel_auto
+    sess.init_db()
+    with sess.session_scope() as s:
+        archives, updated = threat_intel_auto.backfill_tlsh_from_vault(s)
+    typer.echo(f"tlsh backfill: {archives} vault archives read, {updated} fingerprints gained TLSH")
+
+
+@threatintel_app.command("candidates")
+def threatintel_candidates_cmd() -> None:
+    """List auto-seeded campaigns awaiting review (exact-SHA-256-only until promoted)."""
+    from pkgsentry import threat_intel_auto
+    sess.init_db()
+    with sess.session_scope() as s:
+        cands = threat_intel_auto.candidates(s)
+    for campaign, n in cands:
+        typer.echo(f"{n}\t{campaign}")
+    typer.echo(f"# {len(cands)} candidate campaigns")
+
+
+@threatintel_app.command("promote")
+def threatintel_promote_cmd(
+    campaign: str = typer.Argument(..., help="campaign (auto:eco:name) or bare package name"),
+) -> None:
+    """Promote a confirmed-bad campaign to FUZZY matching (ssdeep/TLSH). Until
+    promoted, auto-seeded fingerprints match on exact SHA-256 only (zero-FP)."""
+    from pkgsentry import threat_intel_auto
+    sess.init_db()
+    with sess.session_scope() as s:
+        n = threat_intel_auto.promote(s, campaign)
+    typer.echo(f"promoted: {n} fingerprints -> fuzzy matching enabled")
+
+
+@threatintel_app.command("remove")
+def threatintel_remove_cmd(
+    campaign: str = typer.Argument(..., help="campaign (auto:eco:name) or bare package name"),
+) -> None:
+    """Remove a campaign's fingerprints — the FP exit-ramp for the moat. Use when a
+    seed is a false positive (e.g. a since-fixed rule auto-seeded a benign package
+    and it now self-confirms). Re-evaluated by current rules on next scan; add the
+    name to WATCHLIST_AUTO_BLOCKLIST to stop re-seeding."""
+    from pkgsentry import threat_intel_auto
+    sess.init_db()
+    with sess.session_scope() as s:
+        n = threat_intel_auto.remove(s, campaign)
+    typer.echo(f"removed: {n} fingerprints for {campaign!r}")
+
+
+@threatintel_app.command("stats")
+def threatintel_stats_cmd() -> None:
+    """Show threat-intel fingerprint counts (auto exact-only / promoted fuzzy / total)."""
+    from pkgsentry import threat_intel_auto
+    sess.init_db()
+    with sess.session_scope() as s:
+        st = threat_intel_auto.stats(s)
+    typer.echo(f"fingerprints: {st['auto']} auto (exact-only) / {st['promoted']} promoted (fuzzy) / {st['total']} total")
+
+
 auto_app = typer.Typer(
     no_args_is_help=True,
     help="Manage auto-added confirmed-malicious entries.",

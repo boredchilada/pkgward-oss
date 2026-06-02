@@ -198,6 +198,36 @@ def file_list_mismatch(sdist_files: list[str], wheel_files: list[str]) -> list[F
     return out
 
 
+def _dependency_confusion_version(version: str) -> bool:
+    """All-nines (9.9.9, 99.99.99) or repeated-equal components >=9 (10.10.10,
+    11.11.11) — version-inflation to win a semver resolution race against an
+    internal package. Deliberately tighter than the npm cursor's priority check:
+    no ``major>=99`` branch, so calendar versions like 2024.1.1 don't false-fire."""
+    core = version.strip().lstrip("v").split("-", 1)[0].split("+", 1)[0]
+    parts = core.split(".")
+    if len(parts) < 2 or not all(p.isdigit() for p in parts):
+        return False
+    if all(set(p) == {"9"} for p in parts):
+        return True
+    nums = [int(p) for p in parts]
+    return len(set(nums)) == 1 and nums[0] >= 9
+
+
+def _dep_confusion_finding(version: str) -> Optional[Finding]:
+    if not version or not _dependency_confusion_version(version):
+        return None
+    return Finding(
+        rule_id="metadata.dependency_confusion_version",
+        category=CATEGORY,
+        severity="low",
+        confidence="medium",
+        file="",
+        line=None,
+        evidence=f"version {version!r} fits dependency-confusion version inflation "
+                 f"(absurd/patterned semver to win a resolution race)",
+    )
+
+
 def _rapid_release(prev: Optional[datetime]) -> Optional[Finding]:
     if prev is None:
         return None
@@ -216,7 +246,11 @@ def _rapid_release(prev: Optional[datetime]) -> Optional[Finding]:
 
 
 def _maintainer_change(now_list: list[str], prev_list: list[str]) -> Optional[Finding]:
-    if not prev_list:
+    # Need both sides populated to compare. When the current release simply has
+    # no author metadata (common on some ecosystems/registries), an empty
+    # now_list would otherwise read as "every maintainer was removed" — a
+    # spurious medium finding on an ownership change that didn't happen.
+    if not prev_list or not now_list:
         return None
     now_set = {m.lower() for m in now_list}
     prev_set = {m.lower() for m in prev_list}
@@ -235,6 +269,52 @@ def _maintainer_change(now_list: list[str], prev_list: list[str]) -> Optional[Fi
     return None
 
 
+# Known-legit Go module / forge hosts — a github-looking host NOT resolving to one
+# of these (or a real forge registrable domain) is a namespace-hijack proxy.
+_LEGIT_FORGE_HOSTS = frozenset({
+    "github.com", "gitlab.com", "bitbucket.org", "gitea.com", "codeberg.org",
+    "gitee.com", "git.sr.ht", "code.gitea.io", "code.forgejo.org",
+    "git.kernel.org", "android.googlesource.com",
+})
+import re as _re
+# NOTE: a bare forge name as a subdomain (gitlab.arm.com, gitea.unbound.se,
+# github.mycompany.com) is NOT a reliable signal — self-hosted GitLab/Gitea and
+# GitHub Enterprise legitimately use <forge>.<org>.<tld>. Only two host shapes are
+# high-fidelity malicious:
+#   1. a git-ish prefix on a *numeric throwaway* domain — gh.173371.xyz / git.832008.xyz
+_NUMERIC_FORGE = _re.compile(r"^(?:gh|git|github|gitlab|hub|go)\.\d{3,}\.", _re.IGNORECASE)
+#   2. a Cloudflare ephemeral host (workers.dev / pages.dev) — never a legit module origin
+_EPHEMERAL_HOST = _re.compile(r"\.(?:workers\.dev|pages\.dev)(?:$|/)", _re.IGNORECASE)
+
+
+def _gomod_impersonating_host(name: str) -> Optional[Finding]:
+    """A Go module path whose host *impersonates* a code forge (github.<rand>.workers.dev,
+    gh.<digits>.xyz) but isn't the real domain — namespace-hijack / dependency-confusion
+    that republishes a legit module under attacker-controlled infra. Structurally gated
+    to module-path-shaped names (host.tld/path), so npm/pypi/crates names never match."""
+    if "/" not in name:
+        return None
+    host = name.split("/", 1)[0].lower().strip()
+    if not host or "." not in host or host in _LEGIT_FORGE_HOSTS:
+        return None
+    # a real registrable forge domain (e.g. raw.github.com style) is fine
+    if host.endswith((".github.com", ".gitlab.com", ".bitbucket.org", ".googlesource.com")):
+        return None
+    reason = None
+    if _EPHEMERAL_HOST.search(host) and any(k in host for k in ("github", "gitlab", "gh", "git")):
+        reason = "code-forge name on a Cloudflare ephemeral host (workers.dev/pages.dev)"
+    elif _NUMERIC_FORGE.match(host):
+        reason = "git-prefix on a numeric throwaway domain"
+    if reason is None:
+        return None
+    return Finding(
+        rule_id="metadata.gomod_impersonating_forge_host", category=CATEGORY,
+        severity="high", confidence="high", file=None, line=None,
+        evidence=f"Go module host '{host}' impersonates a code forge ({reason}) — "
+                 f"namespace-hijack / dependency-confusion republishing a module under attacker infra",
+    )
+
+
 def analyze_metadata(ctx: MetadataContext) -> list[Finding]:
     out: list[Finding] = []
     rr = _rapid_release(ctx.previous_release_at)
@@ -246,4 +326,10 @@ def analyze_metadata(ctx: MetadataContext) -> list[Finding]:
     out.extend(typosquat_distance(ctx.name, ctx.watchlist_top_names))
     out.extend(file_list_mismatch(ctx.sdist_files, ctx.wheel_files))
     out.extend(analyze_lure_name(ctx.name))
+    dc = _dep_confusion_finding(ctx.version)
+    if dc:
+        out.append(dc)
+    ih = _gomod_impersonating_host(ctx.name)
+    if ih:
+        out.append(ih)
     return out

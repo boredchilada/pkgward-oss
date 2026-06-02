@@ -152,8 +152,9 @@ async def test_worker_no_double_alert_when_static_already_malicious(tmp_path, mo
 
 
 @pytest.mark.asyncio
-async def test_worker_fast_fails_yanked_package(tmp_path, monkeypatch):
+async def test_worker_retries_then_fails_yanked_package(tmp_path, monkeypatch):
     from pkgsentry.adapter import NoFilesError
+    from pkgsentry.detonation_queue import MAX_AUTO_ATTEMPTS
 
     monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'d.db'}")
     sess.reset_engine()
@@ -169,14 +170,19 @@ async def test_worker_fast_fails_yanked_package(tmp_path, monkeypatch):
         "ecosystem": "npm", "name": "evilpkg", "version": "1.0.0",
         "archive_kind": "npm_tarball", "static_verdict": "clean",
     }
-    with sess.session_scope() as s:
-        s.get(DetonationQueue, detq_id).status = "claimed"
 
-    await dw._process_detonation(job)
+    # Archive unavailability is treated as TRANSIENT: retried (pending), counting
+    # against the bounded budget — not a permanent fail on the first miss.
+    for i in range(1, MAX_AUTO_ATTEMPTS + 1):
+        with sess.session_scope() as s:
+            s.get(DetonationQueue, detq_id).status = "claimed"
+        await dw._process_detonation(job)
+        with sess.session_scope() as s:
+            detq = s.get(DetonationQueue, detq_id)
+            assert detq.attempts == i
+            assert detq.status == ("failed" if i == MAX_AUTO_ATTEMPTS else "pending")
 
     with sess.session_scope() as s:
-        detq = s.get(DetonationQueue, detq_id)
-        assert detq.status == "failed"          # permanent: not requeued
         assert s.query(Detonation).filter_by(scan_id=scan_id).count() == 0
 
 

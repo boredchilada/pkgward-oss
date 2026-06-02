@@ -523,3 +523,48 @@ def test_triage_passes_ecosystem(monkeypatch, tmp_path: Path):
     assert "Rust" in system_content
     assert "PyPI" not in system_content
     _reset_budget_for_tests()
+
+
+def _truncated_clear_response(verdict="benign"):
+    return {
+        "id": "trunc", "object": "chat.completion", "model": "z-ai/glm-5.1",
+        "choices": [{"message": {"role": "assistant", "content": json.dumps({
+            "verdict": verdict, "confidence": 0.8, "reasoning": "x",
+            "iocs": [], "agrees_with_rules": False,
+        })}, "finish_reason": "length"}],
+        "usage": {"prompt_tokens": 100, "completion_tokens": 20, "cost": 0.001},
+    }
+
+
+def test_triage_rejects_truncated_clearing_verdict(monkeypatch, tmp_path: Path):
+    """A length-truncated benign/suspicious verdict must NOT clear a rule-malicious
+    package — it retries and fails open rather than silently suppressing an alert."""
+    fake, completions = _seq_openai([_truncated_clear_response("benign")])
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", fake)
+    monkeypatch.setattr(triage_mod, "MAX_RETRIES", 2)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-fake")
+    _reset_budget_for_tests()
+
+    out = triage(pkg_name="x", pkg_version="1.0", rule_verdict="malicious",
+                 findings=[], extracted_root=tmp_path)
+    assert out.verdict == "error"     # NOT "benign" — fail open
+    assert completions.calls == 3     # retried all attempts
+    _reset_budget_for_tests()
+
+
+def test_triage_accepts_truncated_malicious(monkeypatch, tmp_path: Path):
+    """A truncated MALICIOUS verdict is still accepted (we alert anyway)."""
+    resp = _truncated_clear_response("malicious")
+    fake, completions = _seq_openai([resp])
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", fake)
+    monkeypatch.setattr(triage_mod, "MAX_RETRIES", 2)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-fake")
+    _reset_budget_for_tests()
+
+    out = triage(pkg_name="x", pkg_version="1.0", rule_verdict="malicious",
+                 findings=[], extracted_root=tmp_path)
+    assert out.verdict == "malicious"
+    assert completions.calls == 1      # accepted on the first try
+    _reset_budget_for_tests()

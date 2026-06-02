@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"detonation/internal/honeytokens"
 )
 
 type SandboxConfig struct {
@@ -34,6 +36,7 @@ type SandboxConfig struct {
 	MemoryLimitMB int
 	NetworkMode   string
 	WorkDir       string
+	DecoyHome     string // host dir of the shared decoy-credential tree, bind-mounted ro
 }
 
 func newID() string {
@@ -86,6 +89,11 @@ func (c *SandboxConfig) DockerRunArgs(image string, cmd []string, cidFile string
 		"--workdir=" + c.WorkDir,
 		"-v", mountSpec,
 	}
+	// Plant decoy credentials so environment-aware worms harvest (honeytokens.go):
+	// env vars + the shared decoy home bind-mounted read-only. Both are invisible
+	// to the value-canary (env isn't argv; files are mounted, not written in-guest).
+	args = append(args, decoyEnvArgs()...)
+	args = append(args, decoyFileMounts(c.DecoyHome, c.WorkDir)...)
 	if cidFile != "" {
 		args = append(args, "--cidfile="+cidFile)
 	}
@@ -123,6 +131,13 @@ func New(ecosystem, archivePath, baseDir string) (*Sandbox, error) {
 	// RootfsPath retained but unused under docker runtime — kept so any
 	// future native-runsc path can reuse it without an API break.
 	cfg.RootfsPath = filepath.Join(baseDir, "overlays", cfg.ID)
+	// Shared decoy-credential home, materialized once and reused across every
+	// detonation (fixed decoys). Best-effort: a worm still meets the env decoys
+	// even if the file tree can't be written.
+	cfg.DecoyHome = filepath.Join(baseDir, "decoy-home")
+	if err := honeytokens.MaterializeHome(cfg.DecoyHome); err != nil {
+		cfg.DecoyHome = ""
+	}
 	return &Sandbox{
 		Config:  cfg,
 		profile: profile,

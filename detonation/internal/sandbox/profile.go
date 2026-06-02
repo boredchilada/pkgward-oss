@@ -21,7 +21,35 @@ var profiles = map[string]*Profile{
 			return []string{"pip", "install", "--no-deps", "--no-cache-dir", archivePath}
 		},
 		ImportCmd: func(name string) []string {
-			return []string{"python", "-c", "import " + name}
+			// `import <dist-name>` is a SyntaxError for the (very common) hyphenated
+			// names and simply wrong whenever the module != dist name (sklearn,
+			// yaml, bs4), so the import-time payload never ran — ~91% of pypi
+			// detonations failed import with exit 1 and saw nothing. Resolve the
+			// distribution's ACTUAL top-level module(s) from top_level.txt (mangled
+			// name as fallback) and import each, then settle so an import-time
+			// background/daemon thread completes its network calls and is traced
+			// (mirrors the npm settle window). PyPI names cannot contain quotes, so
+			// embedding name in a double-quoted literal is safe.
+			// The settle MUST be inside the python process: an import-time payload
+			// typically runs in a daemon thread, which is killed the instant the
+			// interpreter exits (right after import returns). A shell-level sleep
+			// keeps the container alive but not the python process, so the thread
+			// never gets to connect/exfil. Sleeping in-process keeps the daemon
+			// thread running so Tetragon traces its network/file activity.
+			py := "import importlib, os, time\n" +
+				"try:\n" +
+				"    from importlib.metadata import distribution\n" +
+				"    tops=(distribution(\"" + name + "\").read_text(\"top_level.txt\") or \"\").split()\n" +
+				"except Exception:\n" +
+				"    tops=[]\n" +
+				"if not tops:\n" +
+				"    tops=[\"" + name + "\".replace(\"-\",\"_\").replace(\".\",\"_\")]\n" +
+				"for t in tops:\n" +
+				"    try: importlib.import_module(t)\n" +
+				"    except Exception: pass\n" +
+				"try: time.sleep(int(os.environ.get(\"DET_SETTLE_SEC\",\"10\")))\n" +
+				"except Exception: pass\n"
+			return []string{"python", "-c", py}
 		},
 		ExtraPackages: []string{"gcc", "libc6-dev", "make"},
 	},
@@ -31,7 +59,35 @@ var profiles = map[string]*Profile{
 		InstallTimeoutSec: 120,
 		ImportTimeoutSec:  30,
 		InstallCmd: func(name, version, archivePath string) []string {
-			return []string{"npm", "install", "--ignore-scripts=false", "--no-audit", "--no-fund", archivePath}
+			// Run the package's OWN lifecycle hooks directly instead of
+			// `npm install <tarball>`. The latter spends the install budget
+			// resolving the dependency tree first, so a heavy/native dep (e.g.
+			// `sharp` downloading prebuilt libvips) can run out the timeout
+			// before the target's postinstall ever fires — shadowing an
+			// install-hook payload from the tracer (exactly how baileys-mbuilder
+			// evaded dynamic capture). Mirrors pypi's `--no-deps`: trace the
+			// target's install behavior, not its dependencies'. Deps are placed
+			// best-effort with scripts OFF and time-bounded, so a hook that needs
+			// them still has them, but a slow dep can't hide the payload. Archive
+			// path is single-quoted (npm names / our basenames never contain a
+			// single quote); the loop reads each script body from package.json
+			// and runs pre/install/post in order so Tetragon traces whatever
+			// they exec/connect/write.
+			script := "set +e\n" +
+				"mkdir -p /sandbox/pkg && cd /sandbox/pkg\n" +
+				"tar xzf '" + archivePath + "' --strip-components=1\n" +
+				"timeout 60 npm install --ignore-scripts --no-audit --no-fund --no-package-lock >/dev/null 2>&1\n" +
+				"for h in preinstall install postinstall; do\n" +
+				"  s=$(node -e \"try{var x=(require('./package.json').scripts||{})['$h']||'';process.stdout.write(x)}catch(e){}\")\n" +
+				"  if [ -n \"$s\" ]; then echo \"[det] $h: $s\"; sh -c \"$s\"; fi\n" +
+				"done\n" +
+				// Settle window: many loaders spawn the real payload DETACHED and
+				// exit immediately (logger-active: `node utils.js` -> detached
+				// --bg agent that does the credential sweep). Without this the
+				// container is torn down before the payload acts, so we stay alive
+				// to keep tracing it. Bounded well under InstallTimeoutSec.
+				"sleep \"${DET_SETTLE_SEC:-10}\"\n"
+			return []string{"sh", "-c", script}
 		},
 		ImportCmd: func(name string) []string {
 			return []string{"node", "-e", "require('" + name + "')"}

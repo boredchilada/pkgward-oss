@@ -87,6 +87,18 @@ def _record_call(cost_usd: float) -> None:
         _call_times.append(time.time())
 
 
+# Fallback cost estimate when the provider doesn't report `usage.cost` (some
+# routes don't): without this, every call records $0, `_spent_usd` never grows,
+# and the MAX_USD hard stop never trips. Rough per-1K-token rates, env-tunable.
+_EST_PROMPT_USD_PER_1K = float(os.environ.get("PKGSENTRY_LLM_EST_PROMPT_USD_PER_1K", "0.0005"))
+_EST_COMPLETION_USD_PER_1K = float(os.environ.get("PKGSENTRY_LLM_EST_COMPLETION_USD_PER_1K", "0.0015"))
+
+
+def _estimate_cost(prompt_tokens: int, completion_tokens: int) -> float:
+    return ((prompt_tokens or 0) / 1000.0) * _EST_PROMPT_USD_PER_1K + \
+           ((completion_tokens or 0) / 1000.0) * _EST_COMPLETION_USD_PER_1K
+
+
 def get_budget_status() -> dict:
     """Snapshot of the in-process LLM budget — for CLI/stats and tests."""
     with _budget_lock:
@@ -595,6 +607,14 @@ def triage(
     current_max_tokens = MAX_RESPONSE_TOKENS
 
     for attempt in range(MAX_RETRIES + 1):
+        # Re-check the budget before EACH paid call (not just once before the
+        # loop): with retries, a single finding-heavy package can otherwise make
+        # several calls past the cap before any spend is recorded.
+        blocked = _check_budget()
+        if blocked:
+            last_err = f"budget: {blocked}"
+            log.warning("llm_budget_blocked", reason=blocked, attempt=attempt + 1)
+            break
         try:
             resp = client.chat.completions.create(
                 model=model,
@@ -605,6 +625,9 @@ def triage(
                 extra_body={"usage": {"include": True}},
             )
         except Exception as e:
+            # A real upstream call was made (and may have cost) — count it against
+            # the per-hour rate cap so a retry-storm of errors throttles correctly.
+            _record_call(0.0)
             last_err = f"LLM call failed: {e}"
             log.warning("llm_triage_retry", attempt=attempt + 1, attempts=MAX_RETRIES + 1,
                         reason="call_failed", error=str(e))
@@ -615,9 +638,17 @@ def triage(
         content = (choice.get("message") or {}).get("content", "")
         finish_reason = choice.get("finish_reason")
         usage = last_raw.get("usage") or {}
-        total_prompt += usage.get("prompt_tokens", 0) or 0
-        total_completion += usage.get("completion_tokens", 0) or 0
-        total_cost += float(usage.get("cost") or 0.0)
+        p_tok = usage.get("prompt_tokens", 0) or 0
+        c_tok = usage.get("completion_tokens", 0) or 0
+        attempt_cost = float(usage.get("cost") or 0.0)
+        if attempt_cost <= 0.0:
+            attempt_cost = _estimate_cost(p_tok, c_tok)
+        total_prompt += p_tok
+        total_completion += c_tok
+        total_cost += attempt_cost
+        # Record cost + the call tick per attempt so concurrent workers see spend
+        # promptly and the hourly counter reflects real API pressure.
+        _record_call(attempt_cost)
 
         cleaned = (content or "").strip()
         if cleaned.startswith("```"):
@@ -641,11 +672,22 @@ def triage(
                         reason="invalid_verdict", verdict=cand_verdict, finish_reason=finish_reason)
             continue
 
+        # A response truncated by `length` that happens to parse but CLEARS a
+        # rule-malicious package (benign/suspicious) could silently suppress a
+        # real alert. Don't trust a clearing verdict from a cut-off reply —
+        # escalate + retry; if retries run out, parsed stays None → fail-open.
+        if finish_reason == "length" and cand_verdict in ("benign", "suspicious"):
+            last_err = "clearing verdict from length-truncated response"
+            log.warning("llm_triage_retry", attempt=attempt + 1, attempts=MAX_RETRIES + 1,
+                        reason="truncated_clear", verdict=cand_verdict)
+            if current_max_tokens < MAX_RESPONSE_TOKENS_CEILING:
+                current_max_tokens = min(int(current_max_tokens * 1.5), MAX_RESPONSE_TOKENS_CEILING)
+            continue
+
         parsed = candidate
         break
 
     latency_ms = int((time.monotonic() - started) * 1000)
-    _record_call(total_cost)
 
     if parsed is None:
         log.warning("llm_triage_error", pkg=f"{pkg_name}=={pkg_version}",

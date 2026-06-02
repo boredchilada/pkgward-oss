@@ -154,3 +154,38 @@ def test_list_auto_entries(db_session):
     # ecosystem filter
     only_npm = list_auto_entries(db_session, ecosystem="npm")
     assert {n for _, n, _ in only_npm} == {"x"}
+
+
+def test_insert_race_savepoint_preserves_sibling_writes(db_session, monkeypatch):
+    """A concurrent worker inserting the same (ecosystem, name) between our
+    SELECT and INSERT raises IntegrityError. The insert is SAVEPOINT-scoped
+    (begin_nested), so the rollback must NOT discard a sibling write already
+    pending in the caller's scan-finalize transaction.
+
+    Regression: the prior code called a bare ``session.rollback()`` here, which
+    would have discarded the entire confirmed-malicious scan (findings, verdict,
+    queue mark-done) on this race — a silent detection loss.
+    """
+    # Conflicting auto row already committed at the DB level (the worker that
+    # won the race).
+    db_session.add(Watchlist(ecosystem="npm", name="raced", rank=AUTO_MALICIOUS_RANK))
+    db_session.commit()
+
+    # Sibling write in a fresh transaction, pending (flushed, uncommitted) —
+    # stands in for the scan/findings the pipeline persisted before calling
+    # add_confirmed_malicious in the same session.
+    db_session.add(Watchlist(ecosystem="pypi", name="sibling-scan-row", rank=7))
+    db_session.flush()
+
+    # Force the existing-lookup to miss, reproducing the SELECT-then-conflicting-
+    # INSERT race window.
+    monkeypatch.setattr(db_session, "scalar", lambda *a, **k: None)
+    res = add_confirmed_malicious(db_session, "npm", "raced", scan_id=99)
+    assert res == "already_popularity"
+    monkeypatch.undo()
+
+    # The sibling write must survive the savepoint rollback.
+    db_session.commit()
+    assert db_session.scalar(
+        select(Watchlist).where(Watchlist.name == "sibling-scan-row")
+    ) is not None

@@ -130,6 +130,30 @@ async def _async_run(workers: int, duration: int, focus_file: Optional[str] = No
     sess.init_db()
     intel.load()
 
+    # Seed the baseline scope-watchlist (idempotent; official vendor scopes per
+    # ecosystem). Operator additions + auto-escalate entries are preserved.
+    try:
+        from pkgsentry import scope_watchlist
+        if scope_watchlist.is_enabled():
+            with sess.session_scope() as s:
+                added = scope_watchlist.seed_baseline(s)
+            if added:
+                log.info("scope_watchlist_seeded", added=added)
+    except Exception as e:
+        log.warning("scope_watchlist_seed_failed", error=str(e))
+
+    # Seed the intel-pack threat-intel fingerprints into the matchable
+    # threat_intel_hash table (upsert; never clobbers auto-seeded rows). Without
+    # this the baseline/overlay known-malicious fingerprints live only in memory
+    # and check_file (which queries the table) never matches them.
+    try:
+        from pkgsentry.store import seed_intel
+        added, updated = seed_intel.seed()
+        if added or updated:
+            log.info("threat_intel_seeded", added=added, updated=updated)
+    except Exception as e:
+        log.warning("threat_intel_seed_failed", error=str(e))
+
     from pkgsentry.util.capabilities import log_capabilities
     log_capabilities()
 
@@ -176,6 +200,15 @@ async def _async_run(workers: int, duration: int, focus_file: Optional[str] = No
                 log.info("stale_claims_swept", count=n)
 
     scheduler.add_job(_sweep_stale_job, "interval", minutes=2, id="claim_sweep")
+
+    def _queue_prune_job():
+        from pkgsentry.queue import prune_terminal
+        with sess.session_scope() as s:
+            n = prune_terminal(s)
+            if n:
+                log.info("scan_queue_pruned", count=n)
+
+    scheduler.add_job(_queue_prune_job, "interval", hours=6, id="queue_prune")
 
     det_enabled = get_detonation_client().is_enabled()
     det_cluster = det_enabled or os.environ.get("DETONATION_ENABLED", "0") != "0"

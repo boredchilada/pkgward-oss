@@ -15,6 +15,7 @@ from pkgsentry.store import session as sess
 from pkgsentry.store.models import Package, ScanCursor, ScanQueue
 from pkgsentry.util.user_agent import user_agent
 from pkgsentry.ecosystems.gomod.ingest.watchlist import is_watchlist
+from pkgsentry import scope_watchlist
 
 log = get_logger("gomod.cursor")
 
@@ -118,6 +119,11 @@ async def poll_index_once() -> int:
     total_skipped = 0
     skipped_gate = 0
     max_cursor = cursor
+    # Earliest brand-new entry we could NOT confirm enqueued (deadlock give-up /
+    # race). The persisted cursor is held just before it so the next poll
+    # re-examines it — without this, a forward-only timestamp cursor advances past
+    # a dropped brand-new module and it is never rescanned.
+    held_cursor: Optional[int] = None
     from pkgsentry.focus import load_focus_names, on_focus, focus_exclusive
     exclusive = focus_exclusive()
 
@@ -128,6 +134,7 @@ async def poll_index_once() -> int:
 
         with sess.session_scope() as s:
             focus_names = load_focus_names(s, ECOSYSTEM)  # preloaded once per page
+            watch_scopes = scope_watchlist.load_scopes(s, ECOSYSTEM)
             for entry in entries:
                 path = entry.get("Path", "")
                 version = entry.get("Version", "")
@@ -135,7 +142,16 @@ async def poll_index_once() -> int:
                 if not path or not version or not timestamp:
                     continue
 
-                entry_cursor = _ts_to_cursor(timestamp)
+                try:
+                    entry_cursor = _ts_to_cursor(timestamp)
+                except (ValueError, TypeError):
+                    # A single malformed timestamp from the upstream index must
+                    # not raise out of the page loop — that rolls back the whole
+                    # page's enqueues and re-aborts every poll on the same poison
+                    # row (a wedged feed). Skip-and-log, like _parse_ndjson does
+                    # for bad JSON. Cursor does not advance past a row we skip.
+                    log.warning("gomod_bad_timestamp", path=path, timestamp=timestamp[:64])
+                    continue
                 if entry_cursor > max_cursor:
                     max_cursor = entry_cursor
 
@@ -157,7 +173,10 @@ async def poll_index_once() -> int:
                         total_enqueued += 1
                     continue
 
-                on_watchlist = is_watchlist(s, path) is not None
+                on_watchlist = (
+                    is_watchlist(s, path) is not None
+                    or scope_watchlist.is_scope_watchlisted(s, ECOSYSTEM, path, scopes=watch_scopes)
+                )
 
                 if on_foc or on_watchlist:
                     # Focus or watchlist: enqueue every version (supply-chain monitoring).
@@ -198,13 +217,29 @@ async def poll_index_once() -> int:
                     if row is not None:
                         total_enqueued += 1
                         total_enqueued_new += 1
+                    elif held_cursor is None or entry_cursor < held_cursor:
+                        # Brand-new module we couldn't confirm enqueued — hold the
+                        # cursor before it. `already_known` gates it next poll if a
+                        # racer won, so this can't dedup-wedge.
+                        held_cursor = entry_cursor
 
         if len(entries) < DEFAULT_LIMIT:
             break
-        since = _cursor_to_since(max_cursor)
+        next_since = _cursor_to_since(max_cursor)
+        if next_since == since:
+            # A full page sharing one timestamp at cursor resolution would make
+            # `since=max_cursor` re-fetch the identical page forever. Step past it
+            # (a rare, bounded skip) rather than wedge the feed.
+            log.warning("gomod_cursor_stalled", since=since, page=len(entries))
+            max_cursor += 1
+            next_since = _cursor_to_since(max_cursor)
+        since = next_since
 
-    if max_cursor > cursor:
-        set_last_cursor(max_cursor)
+    final_cursor = max_cursor
+    if held_cursor is not None:
+        final_cursor = min(final_cursor, held_cursor - 1)
+    if final_cursor > cursor:
+        set_last_cursor(final_cursor)
 
     if total_enqueued or total_skipped or skipped_gate:
         log.info(
@@ -238,6 +273,7 @@ def pull_since_beginning(days: int) -> int:
             if not entries:
                 break
             with sess.session_scope() as s:
+                watch_scopes = scope_watchlist.load_scopes(s, ECOSYSTEM)
                 for entry in entries:
                     path = entry.get("Path", "")
                     version = entry.get("Version", "")
@@ -249,7 +285,10 @@ def pull_since_beginning(days: int) -> int:
                         max_cursor = entry_cursor
                     if not scan_pseudo and _is_pseudo_version(version):
                         continue
-                    on_watchlist = is_watchlist(s, path) is not None
+                    on_watchlist = (
+                        is_watchlist(s, path) is not None
+                        or scope_watchlist.is_scope_watchlisted(s, ECOSYSTEM, path, scopes=watch_scopes)
+                    )
                     if on_watchlist:
                         if enqueue(s, ecosystem=ECOSYSTEM, name=path,
                                    version=version, priority="high") is not None:

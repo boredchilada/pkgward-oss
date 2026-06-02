@@ -46,12 +46,20 @@ def _window_days() -> int:
     return int(os.environ.get("PKGSENTRY_FINDING_REUSE_DAYS", "7"))
 
 
+def _norm_path(p: str) -> str:
+    """Strip the npm ``package/`` archive prefix so Finding.file (which some
+    analyzers record with the prefix) lines up with FileHash.file_path (stored
+    without it)."""
+    return p[len("package/"):] if p.startswith("package/") else p
+
+
 def carry_forward_findings(
     session: Session,
     ecosystem: str,
     name: str,
     current_scan_id: int,
     current_hashes: dict[str, str],
+    existing_findings: list[AdapterFinding] | None = None,
 ) -> list[AdapterFinding]:
     """Return findings to carry forward from the most-recent prior scan of
     `(ecosystem, name)` for files whose `(path, sha256)` are unchanged.
@@ -60,6 +68,10 @@ def carry_forward_findings(
     scan's files (build from ``all_file_hashes``).
     `current_scan_id`: excluded from the lookup so we don't self-match a row
     that was just inserted.
+    `existing_findings`: findings already produced by this run's analyzers
+    (e.g. threat-intel, which scans every file regardless of `changed_files`).
+    A prior finding with the same ``(rule_id, normalized file)`` is skipped so
+    we don't persist or double-score the same finding twice.
 
     Returns an empty list when there's no prior scan in the TTL window or no
     SHA-stable files. Never raises into the pipeline (best-effort).
@@ -103,9 +115,27 @@ def carry_forward_findings(
         # Finding.file and FileHash.file_path don't always match cleanly: npm
         # tarballs store hashes under the normalized path (no leading "package/"),
         # but several analyzers record `file` as the relative path *with* the
-        # leading prefix, or as basename-only (iocs). Match flexibly: exact
-        # normalized path, prefix-stripped path, then basename fallback.
+        # leading prefix, or as basename-only (iocs). Match: exact normalized
+        # path, prefix-stripped path, then a *disambiguated* basename fallback.
         unchanged_basenames = {p.rsplit("/", 1)[-1] for p in unchanged_paths}
+        # A basename is only safe to match on if it does NOT also belong to a
+        # file that changed this release. Otherwise a finding on a changed file
+        # (dir_a/x.js) would be wrongly carried because an unchanged file
+        # (dir_b/x.js) happens to share the basename — violating the
+        # SHA-unchanged guarantee.
+        changed_basenames = {
+            p.rsplit("/", 1)[-1]
+            for p, sha in current_hashes.items()
+            if prior_hashes.get(p) != sha
+        }
+        safe_basenames = unchanged_basenames - changed_basenames
+
+        # Dedup key set from findings this run's analyzers already produced, so
+        # a whole-archive analyzer (threat-intel) and the carry-forward don't
+        # both contribute the same finding.
+        seen: set[tuple[str, str]] = {
+            (f.rule_id, _norm_path(f.file or "")) for f in (existing_findings or [])
+        }
 
         prior_findings = session.scalars(
             select(FindingRow).where(FindingRow.scan_id == prior_scan_id)
@@ -114,17 +144,19 @@ def carry_forward_findings(
         for f in prior_findings:
             if not f.file:
                 continue
-            f_norm = f.file
-            for prefix in ("package/", ):
-                if f_norm.startswith(prefix):
-                    f_norm = f_norm[len(prefix):]
-                    break
-            if f_norm in unchanged_paths or f_norm.rsplit("/", 1)[-1] in unchanged_basenames:
-                out.append(AdapterFinding(
-                    rule_id=f.rule_id, category=f.category, severity=f.severity,
-                    confidence=f.confidence, file=f.file, line=f.line,
-                    evidence=f.evidence or "",
-                ))
+            f_norm = _norm_path(f.file)
+            matched = f_norm in unchanged_paths or f_norm.rsplit("/", 1)[-1] in safe_basenames
+            if not matched:
+                continue
+            key = (f.rule_id, f_norm)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(AdapterFinding(
+                rule_id=f.rule_id, category=f.category, severity=f.severity,
+                confidence=f.confidence, file=f.file, line=f.line,
+                evidence=f.evidence or "",
+            ))
         return out
     except Exception as e:
         log.warning("findings_carry_forward_failed",

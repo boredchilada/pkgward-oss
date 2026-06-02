@@ -73,7 +73,38 @@ def reset_engine() -> None:
 
 
 def init_db() -> None:
-    Base.metadata.create_all(get_engine())
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+    _ensure_columns(engine)
+
+
+# Lightweight additive migrations: `create_all` creates missing TABLES but never
+# adds a COLUMN to an existing one. Each entry is idempotent (Postgres ADD COLUMN
+# IF NOT EXISTS; SQLite is covered by create_all on fresh DBs / PRAGMA check).
+_ADDITIVE_COLUMNS = (
+    ("file_hash", "tlsh", "VARCHAR(128)"),
+    ("package", "downloads_weekly", "BIGINT"),
+    ("package", "downloads_fetched_at", "TIMESTAMPTZ"),
+)
+
+
+def _ensure_columns(engine) -> None:
+    from sqlalchemy import text
+    dialect = engine.dialect.name
+    try:
+        with engine.begin() as conn:
+            for table, column, coltype in _ADDITIVE_COLUMNS:
+                if dialect == "postgresql":
+                    conn.execute(text(
+                        f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {coltype}'
+                    ))
+                elif dialect == "sqlite":
+                    cols = {r[1] for r in conn.execute(text(f'PRAGMA table_info({table})'))}
+                    if column not in cols:
+                        conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {coltype}'))
+    except Exception:
+        # best-effort: a missing column surfaces loudly at insert time anyway
+        pass
 
 
 @contextmanager

@@ -68,13 +68,106 @@ _JS_DECODE = re.compile(
     r"Buffer\.from\([^)]*['\"]base64['\"]|\batob\s*\(",
 )
 
+# Self-decoding packer inside a referenced install script: a char-code decode
+# (String.fromCharCode / charCodeAt / a long decimal array) or a runtime
+# crypto-decrypt (createDecipheriv), whose output is run through eval/Function
+# (_JS_EXEC). The @redhat-cloud-services worm hid curl->download-bun->exec behind
+# Caesar(char-codes) -> AES-128-GCM -> eval, so the visible install file had only
+# a bare `eval(` and no network/base64 — invisible to every rule above.
+_JS_CHARCODE_DECODE = re.compile(
+    r"\bString\.fromCharCode\b|\.charCodeAt\s*\(|(?:\d{1,4}\s*,\s*){40,}",
+)
+_JS_CRYPTO_DECRYPT = re.compile(r"\bcreateDecipher(?:iv)?\s*\(")
+
+# Install-time OS persistence registration: systemd user unit, launchd plist,
+# Windows Run-key / VBS autostart, XDG autostart, cron. An install hook that
+# registers persistence is staging a resident agent — near-zero legitimate use in
+# an npm lifecycle script. (logger-active / utils-terminal loader does all three.)
+_JS_PERSISTENCE = re.compile(
+    r"LaunchAgents|LaunchDaemons|\blaunchctl\b|\.plist\b"
+    r"|systemd[/\\]user|\bsystemctl\b"
+    r"|CurrentVersion\\+Run|HKEY_CURRENT_USER|\bwscript\b|\.vbs\b"
+    r"|[/\\]\.config[/\\]autostart"
+    r"|\bcrontab\b|/etc/cron",
+    re.IGNORECASE,
+)
+# A detached, unref'd background spawn — the loader pattern that keeps a dropped
+# payload running after the installer process exits.
+_JS_DETACHED_SPAWN = re.compile(r"detached\s*:\s*true", re.IGNORECASE)
+
 # Large encoded blob (base64 run or \xNN escape run).
 _ENCODED_PAYLOAD = re.compile(
     r"[A-Za-z0-9+/]{200,}={0,2}|(?:\\x[0-9a-fA-F]{2}){50,}",
 )
 
+# --- Remote-binary "dropper" chain: download -> write-to-disk -> make-executable.
+# A native-wrapper that downloads its prebuilt binary at install does this too,
+# so the host (below) is what separates the norm from a payload drop.
+_JS_WRITE = re.compile(
+    r"createWriteStream|writeFileSync?\b|\.pipe\s*\(|\bpipeline\s*\(|fs\.write\b",
+    re.IGNORECASE,
+)
+# chmod that sets an executable bit: chmodSync(x, 0o755) / chmod +x / chmod 755.
+_JS_CHMOD_EXEC = re.compile(
+    r"chmod(?:Sync)?\s*\([^)]*0o?[0-7]*[1357][0-7]{2}"
+    # symbolic / fs.constants exec bits (chmodSync(p, fs.constants.S_IRWXU) etc.) —
+    # evades the numeric-octal match; part of the multi-signal dropper chain so safe.
+    r"|chmod(?:Sync)?\s*\([^)]*S_I(?:RWX|X)(?:USR|GRP|OTH)?"
+    r"|\bchmod\s+\+x\b"
+    r"|\bchmod\s+0?[0-7]*[1357][0-7]{2}\b",
+    re.IGNORECASE,
+)
+_URL_HOST = re.compile(r"https?://([A-Za-z0-9.\-]+)", re.IGNORECASE)
+
+# Universal release hosts a native wrapper may legitimately pull a binary from,
+# independent of the package's own repo. Subdomain-matched (endswith ".<host>").
+_TRUSTED_RELEASE_HOSTS = frozenset({
+    "github.com", "githubusercontent.com", "codeload.github.com",
+    "registry.npmjs.org", "npmjs.org", "npmmirror.com", "registry.yarnpkg.com",
+    "nodejs.org", "github.io", "gitlab.com", "bitbucket.org",
+})
+
+
+def _declared_hosts(data: dict) -> set[str]:
+    """Hosts the package itself points at (repository / homepage / bugs)."""
+    hosts: set[str] = set()
+    fields: list[str] = []
+    for key in ("repository", "bugs"):
+        v = data.get(key)
+        if isinstance(v, str):
+            fields.append(v)
+        elif isinstance(v, dict) and isinstance(v.get("url"), str):
+            fields.append(v["url"])
+    if isinstance(data.get("homepage"), str):
+        fields.append(data["homepage"])
+    for f in fields:
+        m = _URL_HOST.search(f)
+        if m:
+            hosts.add(m.group(1).lower())
+        elif f.startswith("gitlab:"):
+            hosts.add("gitlab.com")
+        elif f.startswith("bitbucket:"):
+            hosts.add("bitbucket.org")
+        elif f.startswith("github:") or re.match(r"^[\w-]+/[\w.-]+$", f):
+            hosts.add("github.com")
+    return hosts
+
+
+def _host_trusted(host: str, declared_hosts: set[str]) -> bool:
+    host = host.lower()
+    for t in _TRUSTED_RELEASE_HOSTS:
+        if host == t or host.endswith("." + t):
+            return True
+    for d in declared_hosts:
+        if host == d or host.endswith("." + d) or d.endswith("." + host):
+            return True
+    return False
+
 # Reference to a local script file in a command, e.g. `node ./scripts/x.js`.
-_LOCAL_SCRIPT_REF = re.compile(r"(?:^|\s)(?:\./)?([\w./-]+\.[cm]?js)\b")
+# Local script a hook runs. Includes TypeScript (.ts/.mts/.cts/.tsx) — npm packages
+# routinely run install hooks via `tsx`/`ts-node` (e.g. `postinstall: tsx setup.ts`),
+# and an attacker can ship the payload as .ts to evade a .js-only follow.
+_LOCAL_SCRIPT_REF = re.compile(r"(?:^|\s)(?:\./)?([\w./-]+\.(?:[cm]?jsx?|[cm]?tsx?))\b")
 
 _SUSPICIOUS_BIN_EXT = {".sh", ".ps1", ".bat", ".cmd", ".exe", ".dll", ".so", ".bin"}
 
@@ -188,8 +281,11 @@ def _analyze_script(name: str, script: str, rel: str) -> list[Finding]:
     return findings
 
 
-def _analyze_referenced_js(script: str, pkg_dir: Path, rel_prefix: str) -> list[Finding]:
+def _analyze_referenced_js(
+    script: str, pkg_dir: Path, rel_prefix: str, declared_hosts: set[str] | None = None
+) -> list[Finding]:
     """Scan local .js files invoked by a lifecycle script."""
+    declared_hosts = declared_hosts or set()
     findings: list[Finding] = []
     for m in _LOCAL_SCRIPT_REF.finditer(script):
         ref = m.group(1)
@@ -226,12 +322,79 @@ def _analyze_referenced_js(script: str, pkg_dir: Path, rel_prefix: str) -> list[
                 category=CATEGORY, severity="high", confidence="medium",
                 file=rel, evidence="install script JS decodes base64 then executes",
             ))
+        # Obfuscated self-decoding entrypoint: a hook executing a local script
+        # that reconstructs code at runtime (char-code / crypto-decrypt) and
+        # eval/Function's it. Install-time + obfuscated = malware-grade, even when
+        # the network/exec payload is hidden inside the encoded stage.
+        if has_exec and (_JS_CHARCODE_DECODE.search(content) or _JS_CRYPTO_DECRYPT.search(content)):
+            findings.append(Finding(
+                rule_id="installer.npm_install_obfuscated_entrypoint",
+                category=CATEGORY, severity="critical", confidence="high",
+                file=rel,
+                evidence=(
+                    "install hook runs a local script that self-decodes "
+                    "(char-code / runtime-crypto) into eval/Function"
+                ),
+            ))
+        # Resident-agent loader: an install script that registers OS persistence
+        # AND detaches a background process is the dropper/loader fingerprint —
+        # stable across payload variants (catches the family even when the payload
+        # blob evades YARA). The combination is near-zero-FP; each alone is high.
+        has_persist = bool(_JS_PERSISTENCE.search(content))
+        has_detached = bool(_JS_DETACHED_SPAWN.search(content))
+        if has_persist and has_detached:
+            findings.append(Finding(
+                rule_id="installer.npm_install_persistence_loader",
+                category=CATEGORY, severity="critical", confidence="high",
+                file=rel,
+                evidence="install hook registers OS persistence + detaches a background process (resident-agent loader)",
+            ))
+        else:
+            if has_persist:
+                findings.append(Finding(
+                    rule_id="installer.npm_install_persistence",
+                    category=CATEGORY, severity="high", confidence="high",
+                    file=rel,
+                    evidence="install hook registers OS persistence (systemd/launchd/Run-key/autostart/cron)",
+                ))
+            if has_detached:
+                findings.append(Finding(
+                    rule_id="installer.npm_install_detached_spawn",
+                    category=CATEGORY, severity="high", confidence="medium",
+                    file=rel,
+                    evidence="install hook spawns a detached, unref'd background process",
+                ))
         if _ENCODED_PAYLOAD.search(content):
             findings.append(Finding(
                 rule_id="installer.npm_install_script_encoded_payload",
                 category=CATEGORY, severity="medium", confidence="medium",
                 file=rel, evidence="large encoded payload in install script JS",
             ))
+
+        # Remote-binary dropper: download -> write-to-disk -> make-executable.
+        # Native wrappers do this from their own repo / a known release host;
+        # a payload drop pulls the binary from an unrelated host (and may defer
+        # the exec to the `bin` wrapper, evading the net+exec rule above).
+        if has_net and _JS_WRITE.search(content) and _JS_CHMOD_EXEC.search(content):
+            hosts = {h.lower() for h in _URL_HOST.findall(content)}
+            untrusted = sorted(h for h in hosts if not _host_trusted(h, declared_hosts))
+            if untrusted:
+                findings.append(Finding(
+                    rule_id="installer.npm_install_remote_binary_drop",
+                    category=CATEGORY, severity="high", confidence="high",
+                    file=rel,
+                    evidence=(
+                        "install script downloads + chmod-executes a binary from a host "
+                        f"unrelated to the package repo: {', '.join(untrusted[:3])}"
+                    ),
+                ))
+            elif not hosts:
+                findings.append(Finding(
+                    rule_id="installer.npm_install_remote_binary_drop",
+                    category=CATEGORY, severity="medium", confidence="medium",
+                    file=rel,
+                    evidence="install script downloads + chmod-executes a binary from a dynamic URL",
+                ))
     return findings
 
 
@@ -264,6 +427,7 @@ def _analyze_manifest(path: Path, extracted_root: Path) -> list[Finding]:
     pkg_dir = path.parent
     rel_prefix = (str(pkg_dir.relative_to(extracted_root)) + "/") if pkg_dir != extracted_root else ""
 
+    declared_hosts = _declared_hosts(data)
     findings: list[Finding] = []
     scripts = data.get("scripts")
     if isinstance(scripts, dict):
@@ -272,7 +436,7 @@ def _analyze_manifest(path: Path, extracted_root: Path) -> list[Finding]:
             if not isinstance(script, str) or not script.strip():
                 continue
             findings.extend(_analyze_script(hook, script, rel))
-            findings.extend(_analyze_referenced_js(script, pkg_dir, rel_prefix))
+            findings.extend(_analyze_referenced_js(script, pkg_dir, rel_prefix, declared_hosts))
 
     findings.extend(_analyze_bin(data.get("bin"), rel))
     return findings

@@ -7,11 +7,13 @@ from pkgsentry.queue import (
     MAX_AUTO_ATTEMPTS,
     STALE_CLAIM_TIMEOUT_SECONDS,
     _eco_weights,
+    _is_lock_timeout,
     _weighted_order,
     claim_next,
     enqueue,
     mark_done,
     mark_failed,
+    prune_terminal,
     sweep_stale_claims,
 )
 from pkgsentry.store.models import ScanQueue
@@ -68,6 +70,19 @@ def test_mark_done_and_failed(db_session):
     mark_failed(db_session, row2, "boom", token=token2)
     assert row2.status == "failed"
     assert row2.last_error == "boom"
+
+
+def test_mark_failed_strips_nul_from_error(db_session):
+    # Package-controlled bytes can carry a NUL into an exception message; Postgres
+    # TEXT rejects NUL, which would crash the failure handler and wedge the row.
+    enqueue(db_session, ecosystem="pypi", name="nul", version="1", priority="normal")
+    result = claim_next(db_session)
+    assert result is not None
+    row, token = result
+    mark_failed(db_session, row, "bad\x00bytes\x00here", token=token)
+    assert row.status == "failed"
+    assert "\x00" not in (row.last_error or "")
+    assert row.last_error == "badbyteshere"
 
 
 def test_enqueue_skips_done_by_default(db_session):
@@ -129,7 +144,7 @@ def test_enqueue_skips_permanently_failed(db_session):
 
 def test_sweep_stale_claim_retries_under_max(db_session):
     now = datetime.now(timezone.utc)
-    claimed_at = now - timedelta(minutes=20)
+    claimed_at = now - timedelta(seconds=STALE_CLAIM_TIMEOUT_SECONDS + 60)
     row = ScanQueue(
         ecosystem="pypi", name="a", version="1.0", priority="normal",
         status="claimed", attempts=1, claimed_at=claimed_at,
@@ -146,7 +161,7 @@ def test_sweep_stale_claim_retries_under_max(db_session):
 
 def test_sweep_stale_claim_fails_at_max(db_session):
     now = datetime.now(timezone.utc)
-    claimed_at = now - timedelta(minutes=20)
+    claimed_at = now - timedelta(seconds=STALE_CLAIM_TIMEOUT_SECONDS + 60)
     row = ScanQueue(
         ecosystem="pypi", name="a", version="1.0", priority="normal",
         status="claimed", attempts=MAX_AUTO_ATTEMPTS, claimed_at=claimed_at,
@@ -233,3 +248,99 @@ def test_claim_next_backlog_dominates_but_floor_protects(db_session):
     assert counts["npm"] / total > 0.55, counts
     # pypi still served — the floor protects it from full starvation.
     assert counts["pypi"] >= 5, counts
+
+
+# ── deadlock-retry on concurrent ScanQueue inserts (0.5.2) ──────────
+# Postgres can pick our INSERT as a deadlock victim when concurrent pollers
+# contend on the unique index. enqueue() must retry (savepoint recovers) and,
+# if it can't win, skip the item rather than crash the whole poll cycle.
+import pytest
+from sqlalchemy.exc import OperationalError
+
+import pkgsentry.queue as q
+
+
+def _op_err(msg: str) -> OperationalError:
+    return OperationalError("INSERT INTO scan_queue ...", {}, Exception(msg))
+
+
+def test_is_deadlock_detects_message():
+    assert q._is_deadlock(_op_err("deadlock detected")) is True
+    assert q._is_deadlock(_op_err("statement timeout")) is False
+
+
+def _flush_raising_on_insert(db_session, exc_factory, *, fail_times=None):
+    """Return a flush() replacement that raises (from exc_factory) only when a
+    ScanQueue INSERT is actually pending — i.e. at enqueue's begin_nested flush,
+    not the earlier dedup SELECT's autoflush. ``fail_times=None`` = always fail
+    on insert; an int caps how many insert-flushes raise before succeeding."""
+    real_flush = db_session.flush
+    state = {"n": 0}
+
+    def flush(*a, **k):
+        pending_insert = any(isinstance(o, ScanQueue) for o in db_session.new)
+        if pending_insert and (fail_times is None or state["n"] < fail_times):
+            state["n"] += 1
+            raise exc_factory()
+        return real_flush(*a, **k)
+
+    return flush, state
+
+
+def test_enqueue_retries_then_succeeds_on_deadlock(db_session, monkeypatch):
+    monkeypatch.setattr(q.time, "sleep", lambda *_: None)
+    flush, state = _flush_raising_on_insert(
+        db_session, lambda: _op_err("deadlock detected"), fail_times=1)
+    monkeypatch.setattr(db_session, "flush", flush)
+    row = q.enqueue(db_session, ecosystem="pypi", name="dl", version="1.0")
+    assert row is not None
+    assert state["n"] == 1  # first insert deadlocked, retry succeeded
+
+
+def test_enqueue_gives_up_after_retries_without_crashing(db_session, monkeypatch):
+    monkeypatch.setattr(q, "ENQUEUE_DEADLOCK_RETRIES", 2)
+    monkeypatch.setattr(q.time, "sleep", lambda *_: None)
+    flush, state = _flush_raising_on_insert(
+        db_session, lambda: _op_err("deadlock detected"))
+    monkeypatch.setattr(db_session, "flush", flush)
+    # Must NOT raise — the poll cycle keeps going, item skipped (re-listed next poll).
+    row = q.enqueue(db_session, ecosystem="pypi", name="dl2", version="1.0")
+    assert row is None
+    assert state["n"] == 3  # initial + 2 retries
+
+
+def test_enqueue_reraises_non_deadlock_operational_error(db_session, monkeypatch):
+    monkeypatch.setattr(q.time, "sleep", lambda *_: None)
+    flush, _ = _flush_raising_on_insert(
+        db_session, lambda: _op_err("connection reset by peer"))
+    monkeypatch.setattr(db_session, "flush", flush)
+    with pytest.raises(OperationalError):
+        q.enqueue(db_session, ecosystem="pypi", name="dl3", version="1.0")
+
+
+def test_prune_terminal_deletes_old_keeps_recent(db_session):
+    now = datetime.now(timezone.utc)
+    old_done = ScanQueue(ecosystem="pypi", name="old", version="1", priority="normal",
+                         status="done", finished_at=now - timedelta(days=30))
+    old_failed = ScanQueue(ecosystem="pypi", name="oldf", version="1", priority="normal",
+                           status="failed", finished_at=now - timedelta(days=30))
+    recent_done = ScanQueue(ecosystem="pypi", name="recent", version="1", priority="normal",
+                            status="done", finished_at=now - timedelta(days=1))
+    pending = ScanQueue(ecosystem="pypi", name="pend", version="1", priority="normal",
+                        status="pending")
+    db_session.add_all([old_done, old_failed, recent_done, pending])
+    db_session.flush()
+
+    deleted = prune_terminal(db_session, older_than_days=14, now=now)
+    assert deleted == 2
+    remaining = {r.name for r in db_session.scalars(select(ScanQueue)).all()}
+    assert remaining == {"recent", "pend"}  # recent done + pending survive
+
+
+def test_is_lock_timeout_matches_statement_timeout():
+    class _Op(Exception):
+        pass
+    assert _is_lock_timeout(_Op("canceling statement due to statement timeout"))
+    assert _is_lock_timeout(_Op("canceling statement due to lock timeout"))
+    assert not _is_lock_timeout(_Op("deadlock detected"))
+    assert not _is_lock_timeout(_Op("some other error"))

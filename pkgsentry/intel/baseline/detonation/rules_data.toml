@@ -23,8 +23,19 @@ sensitive_path_prefixes = [
     "/.docker/config.json",
     "/root/.kube/config",
     "/.kube/config",
+    "/.pypirc",
+    "/.config/gh/",
+    "/.config/gcloud/",
+    "/.config/solana/",
+    "/.ethereum/",
+    "/root/.env",
+    "/.git-credentials",
     "/etc/shadow",
 ]
+# NOTE: /.netrc deliberately NOT a sensitive path — pip/requests/urllib auto-read
+# ~/.netrc for HTTP auth during a normal install, so it false-fired dyn_credential_read
+# on benign packages (langchain/ollama/google-adk class). The .netrc decoy is still
+# planted + Tetragon-traced, but a single read of it is not credential theft.
 
 # Env var prefixes whose read during install/import is flagged.
 sensitive_env_prefixes = [

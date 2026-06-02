@@ -36,6 +36,16 @@ spec:
                 - "/root/.cargo/credentials"
                 - "/root/.docker/config.json"
                 - "/root/.kube"
+                # honeytoken decoys in the bind-mounted decoy home — trace reads so
+                # dyn_credential_read fires when a worm sweeps them.
+                - "/root/.pypirc"
+                - "/root/.netrc"
+                - "/root/.git-credentials"
+                - "/root/.config/gh"
+                - "/root/.config/gcloud"
+                - "/root/.config/solana"
+                - "/root/.ethereum"
+                - "/root/.env"
                 - "/etc/shadow"
                 - "/etc/passwd"
         - matchNamespaces:

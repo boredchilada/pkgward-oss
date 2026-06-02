@@ -34,6 +34,13 @@ class Package(Base):
     ecosystem: Mapped[str] = mapped_column(String(32), nullable=False, default="pypi")
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    # Estimated weekly downloads (exact for npm/pypi, ~90d-derived estimate for
+    # crates, NULL for gomod/unknown). Surfaced in alerts for blast-radius triage;
+    # refreshed at alert time with a TTL. See pkgsentry/enrich/downloads.py.
+    downloads_weekly: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    downloads_fetched_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     __table_args__ = (
         UniqueConstraint("ecosystem", "name", name="uq_package_ecosystem_name"),
         Index("ix_package_name", "name"),
@@ -216,6 +223,31 @@ class FocusList(Base):
     )
 
 
+class WatchlistScope(Base):
+    """Watched package SCOPES (e.g. npm ``@redhat-cloud-services``).
+
+    Every package and every new version under a watched scope is ingested +
+    scanned at **high** priority — closing the gap where an established
+    (non-top-N) org package's compromised version bump is skipped by the gate.
+    Seeded with official high-blast-radius vendor scopes; extended at runtime when
+    one package in a scope is double-confirmed malicious (sibling-worm defense).
+    ``scope`` is stored normalized: lowercase, leading ``@``, no trailing slash.
+    """
+
+    __tablename__ = "watchlist_scope"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ecosystem: Mapped[str] = mapped_column(String(32), nullable=False, default="npm")
+    scope: Mapped[str] = mapped_column(String(128), nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default="baseline")
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    refreshed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("ecosystem", "scope", name="uq_watchlistscope_ecosystem_scope"),
+        Index("ix_watchlistscope_ecosystem", "ecosystem"),
+    )
+
+
 class FileHash(Base):
     __tablename__ = "file_hash"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -224,6 +256,7 @@ class FileHash(Base):
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     ssdeep: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    tlsh: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     entropy: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     __table_args__ = (

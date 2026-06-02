@@ -1,0 +1,9 @@
+ecosystem = "pypi"
+name = "libfoo-native"
+version = "2.1.0"
+label = "good"
+expected_verdict = "clean"
+expect_rules = ["malware.env_bulk_exfil"]
+forbid_rules = ["malware.env_exfil_tainted"]
+notes = "FP guard for the env taint-gate: a native wrapper reads the build environment AND makes an unrelated HTTP call, but no env value flows into the send. env_bulk_exfil fires as a corroborating `medium` (8 pts, below the suspicious floor) so the package stays clean; it must NOT escalate to the critical taint-confirmed rule (the scrapli/eqr false-malicious class)."
+provenance = "synthetic"

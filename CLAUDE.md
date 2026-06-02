@@ -178,7 +178,7 @@ inert. See `docs/detonation.md` → "Event attribution".)
 
 ### Detection layers
 
-~115 rules across 12 layers. Full catalog: `docs/detection-rules.md`.
+~115 rules across 13 layers. Full catalog: `docs/detection-rules.md`.
 
 1. `analyze/imports.py` — AST import analysis
 2. `analyze/iocs.py` — URLs, IPs, onion, base64 (with benign domain whitelist)
@@ -193,6 +193,7 @@ inert. See `docs/detonation.md` → "Event attribution".)
 10. `analyze/threat_intel.py` — known-malicious fingerprints (SHA256, ssdeep, TLSH)
 11. `detonate/` — rootless-Docker sandbox + Tetragon eBPF dynamic analysis (all ecosystems)
 12. `analyze/opengrep_scan.py` — opengrep static analysis with intrafile taint tracking (all ecosystems). Shadow mode default-on via `OPENGREP_SHADOW=1`.
+13. `analyze/obfuscation.py` — custom-encoding (base85/basE91/z85 radix alphabets) + non-ASCII / homoglyph identifier obfuscation + JS self-decoding packers (char-code→eval, runtime crypto-decrypt→eval) (all ecosystems); catches packers the base64/entropy heuristics miss. Caps via `PKGSENTRY_OBFUSCATION_MAX_MB` / `PKGSENTRY_OBFUSCATION_PACKER_MAX_MB`.
 
 ### Scoring
 

@@ -134,39 +134,45 @@ def add_confirmed_malicious(
     if name.lower() in _blocklist().get(ecosystem, set()):
         log.info("watchlist_auto_blocklisted", ecosystem=ecosystem, name=name, scan_id=scan_id)
         return "blocklisted"
-    try:
-        existing = session.scalar(
-            select(Watchlist).where(
-                Watchlist.ecosystem == ecosystem,
-                func.lower(Watchlist.name) == name.lower(),
-            )
+    existing = session.scalar(
+        select(Watchlist).where(
+            Watchlist.ecosystem == ecosystem,
+            func.lower(Watchlist.name) == name.lower(),
         )
-        if existing is not None:
-            if existing.rank == AUTO_MALICIOUS_RANK:
-                existing.refreshed_at = datetime.now(timezone.utc)
-                session.flush()
-                log.info("watchlist_auto_refreshed",
-                         ecosystem=ecosystem, name=name, scan_id=scan_id)
-                return "refreshed"
-            # Already on the popularity watchlist — leave the real rank alone.
-            return "already_popularity"
-        if _rate_limited(ecosystem):
-            log.warning("watchlist_auto_rate_limited",
-                        ecosystem=ecosystem, name=name,
-                        cap_per_hour=_max_adds_per_hour())
-            return "rate_limited"
-        session.add(Watchlist(
-            ecosystem=ecosystem, name=name, rank=AUTO_MALICIOUS_RANK,
-            refreshed_at=datetime.now(timezone.utc),
-        ))
-        session.flush()
-        log.info("watchlist_auto_added",
-                 ecosystem=ecosystem, name=name, scan_id=scan_id,
-                 rank=AUTO_MALICIOUS_RANK)
-        return "added"
-    except IntegrityError:
-        session.rollback()
+    )
+    if existing is not None:
+        if existing.rank == AUTO_MALICIOUS_RANK:
+            existing.refreshed_at = datetime.now(timezone.utc)
+            session.flush()
+            log.info("watchlist_auto_refreshed",
+                     ecosystem=ecosystem, name=name, scan_id=scan_id)
+            return "refreshed"
+        # Already on the popularity watchlist — leave the real rank alone.
         return "already_popularity"
+    if _rate_limited(ecosystem):
+        log.warning("watchlist_auto_rate_limited",
+                    ecosystem=ecosystem, name=name,
+                    cap_per_hour=_max_adds_per_hour())
+        return "rate_limited"
+    # SAVEPOINT-scoped insert. This runs inside the caller's scan-finalize
+    # transaction; a concurrent worker may insert the same (ecosystem, name)
+    # between our SELECT above and this INSERT. begin_nested() confines the
+    # IntegrityError rollback to the savepoint so the caller's already-persisted
+    # scan/findings survive — a bare session.rollback() here would discard the
+    # entire confirmed-malicious scan. Mirrors queue.enqueue().
+    try:
+        with session.begin_nested():
+            session.add(Watchlist(
+                ecosystem=ecosystem, name=name, rank=AUTO_MALICIOUS_RANK,
+                refreshed_at=datetime.now(timezone.utc),
+            ))
+            session.flush()
+    except IntegrityError:
+        return "already_popularity"
+    log.info("watchlist_auto_added",
+             ecosystem=ecosystem, name=name, scan_id=scan_id,
+             rank=AUTO_MALICIOUS_RANK)
+    return "added"
 
 
 def prune_expired(session: Session) -> int:

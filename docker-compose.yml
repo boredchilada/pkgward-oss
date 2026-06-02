@@ -27,6 +27,15 @@ services:
       - SCANNER_INGEST=1
       - DETONATION_SOCKET=/var/run/detonation/detonation.sock
       - PKGSENTRY_INTEL_PATH=/app/intel/private
+      # npm structurally out-paces one host, so cap its claim share harder and
+      # give gomod/pypi/crates a bigger equal floor (they CAN stay current).
+      # High-priority line-jumpers are unaffected (they beat all normal backlog).
+      - SCHED_MAX_ECO_SHARE=0.5
+      - SCHED_RESERVED_FRACTION=0.5
+      # FP-exit ramp: never auto-watchlist these as malicious (known false
+      # positives pending the real rule fix — see docs/internal/deferred-backlog.md).
+      # scrapli: native-wrapper env_bulk_exfil FP (build-env read + lib download).
+      - WATCHLIST_AUTO_BLOCKLIST=pypi:scrapli,pypi:simtooreal-agent
     deploy:
       resources:
         limits:

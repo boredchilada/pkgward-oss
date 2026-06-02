@@ -33,6 +33,38 @@ ALLOW_UNCOVERED = frozenset({
     "iocs.ipv4",
     "iocs.onion",
     "iocs.base64_blob",
+    # Hardcoded-C2 / SSRF IP signals + decode-and-rescan (base64/hex/\xNN). Unit-
+    # tested in test_iocs; corpus samples are a follow-up.
+    "iocs.hardcoded_wan_ip_port",
+    "iocs.cloud_metadata_endpoint",
+    "iocs.encoded_url",
+    "iocs.encoded_ip",
+    # OAST/OOB-interaction callback domain (high). Unit-tested in test_iocs;
+    # public corpus sample is a follow-up.
+    "iocs.oast_callback",
+    # Run-time-packer detection (UPX high / commercial-protector critical).
+    # Unit-tested in test_binary; real packed-binary corpus sample is a follow-up.
+    "binary.packed_executable",
+    # Source-obfuscation / custom-encoding (base85/basE91 + CJK identifiers).
+    # Unit-tested in test_obfuscation; real obfuscated-loader corpus sample is a
+    # follow-up (the live npm sample is held inert in the private vault).
+    "obfuscation.rotating_alphabet_codec",
+    "obfuscation.custom_alphabet_codec",
+    "obfuscation.nonascii_identifiers",
+    "obfuscation.homoglyph_identifiers",
+    # Self-decoding-packer family (char-code/crypto -> eval) + the npm install-hook
+    # obfuscated entrypoint. Unit-tested in test_obfuscation / test_npm_installer;
+    # the live @redhat-cloud-services worm sample is held inert in the private vault.
+    "obfuscation.charcode_eval",
+    "obfuscation.decrypt_then_exec",
+    "installer.npm_install_obfuscated_entrypoint",
+    # Resident-agent loader (install-time persistence + detached spawn) — catches
+    # the logger-active / utils-terminal stealer family at the loader, independent
+    # of the payload YARA signature. Unit-tested in test_npm_installer; live sample
+    # in the private vault.
+    "installer.npm_install_persistence_loader",
+    "installer.npm_install_persistence",
+    "installer.npm_install_detached_spawn",
     # Entropy / binary heuristics — need crafted high-entropy / embedded-binary
     # fixtures; deferred to the private corpus.
     "entropy.obfuscated_payload",
@@ -41,6 +73,12 @@ ALLOW_UNCOVERED = frozenset({
     # malware_patterns not yet sampled publicly.
     "malware.telegram_bot_exfil",
     "malware.slack_webhook",
+    # Credential-store-sweep (info-stealer harvest). Unit-tested in
+    # test_secret_access; corpus sample is a follow-up.
+    "malware.credential_store_sweep",
+    "malware.etc_shadow_read",
+    # .pth chain-gate: pth_import_injection is the high bare-sideload case
+    # (pth_exec_injection + env_bulk_exfil + env_exfil_tainted are now corpus-pinned).
     "malware.pth_import_injection",
     "malware.pyc_bytecode_hidden",
     "malware.env_sensitive_exfil",
@@ -48,6 +86,8 @@ ALLOW_UNCOVERED = frozenset({
     # metadata variants not yet sampled (need prev-version / file-list context).
     "metadata.rapid_release",
     "metadata.maintainer_change",
+    "metadata.dependency_confusion_version",
+    "metadata.gomod_impersonating_forge_host",
     "metadata.sdist_wheel_mismatch",
     "metadata.lure_name",
     "metadata.typosquat_separator",
@@ -81,6 +121,7 @@ ALLOW_UNCOVERED = frozenset({
     "installer.npm_install_script_net_exec",
     "installer.npm_install_script_decode_exec",
     "installer.npm_install_script_encoded_payload",
+    "installer.npm_install_remote_binary_drop",
     "installer.npm_suspicious_bin",
     # pypi installer variant beyond urlopen_exec_chain / os_system.
     "installer.subprocess_at_install",

@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
+import shutil
 import tarfile
 import zipfile
 from pathlib import Path
 from typing import Optional
+
+_COPY_CHUNK = 1024 * 1024  # 1 MB — stream members, never read one whole into RAM
 
 DEFAULT_MAX_BYTES = 500 * 1024 * 1024  # 500 MB
 DEFAULT_MAX_FILES = 25_000
@@ -57,7 +60,7 @@ def _extract_tar(arc: Path, out: Path, max_files: int, max_total_bytes: int) -> 
             if src is None:
                 continue
             with open(dest, "wb") as out_f:
-                out_f.write(src.read())
+                shutil.copyfileobj(src, out_f, _COPY_CHUNK)
 
 
 def _extract_zip(arc: Path, out: Path, max_files: int, max_total_bytes: int) -> None:
@@ -78,7 +81,7 @@ def _extract_zip(arc: Path, out: Path, max_files: int, max_total_bytes: int) -> 
                 raise ExtractionError(f"archive too large: {total} > {max_total_bytes}")
             dest.parent.mkdir(parents=True, exist_ok=True)
             with z.open(info) as src, open(dest, "wb") as out_f:
-                out_f.write(src.read())
+                shutil.copyfileobj(src, out_f, _COPY_CHUNK)
 
 
 def safe_extract(
@@ -89,6 +92,15 @@ def safe_extract(
     max_total_bytes: int = DEFAULT_MAX_BYTES,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
+    # Refuse to start extracting onto a near-full disk: a partial extraction that
+    # dies on ENOSPC mid-write leaves junk and a confusing failure. Require room
+    # for the worst case (the total-size cap) plus a small margin.
+    try:
+        free = shutil.disk_usage(out_dir).free
+        if free < max_total_bytes + 64 * 1024 * 1024:
+            raise ExtractionError(f"insufficient disk: {free} free < cap {max_total_bytes}")
+    except OSError:
+        pass  # disk_usage failed — proceed; the write path will surface ENOSPC
     name = archive.name.lower()
     if name.endswith((".tar.gz", ".tgz", ".tar.bz2", ".tar", ".crate")):
         _extract_tar(archive, out_dir, max_files, max_total_bytes)

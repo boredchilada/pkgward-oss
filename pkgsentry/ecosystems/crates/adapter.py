@@ -42,6 +42,9 @@ class CratesAdapter(EcosystemAdapter):
         scheduler.add_job(cf.poll_focus_releases, "interval", seconds=300, id="crates_focus")
         if not focus_exclusive():
             scheduler.add_job(watchlist.refresh_watchlist, "interval", weeks=1, id="crates_watchlist_refresh")
+            # Backstop: crates has no cursor, so a missed/failed RSS window drops
+            # crates permanently. Reconcile against the authoritative API.
+            scheduler.add_job(feeds.reconcile_new_crates, "interval", minutes=15, id="crates_reconcile")
 
     async def boot(self) -> None:
         from pkgsentry.ecosystems.crates.ingest import feeds, watchlist

@@ -62,28 +62,76 @@ gomod_exec_noise = [
     "/tar",
 ]
 
-# Per-ecosystem network destination allowlist (hostnames resolved to IPs at
-# detonation time, or literal IPs). Connections to these expected registry /
-# CDN endpoints are dropped before the network exfil rules run, so normal
-# dependency fetches don't false-positive as dyn_install_exfil/dyn_import_exfil.
+# Per-ecosystem network destination allowlist. Entries may be hostnames (resolved
+# to IPs at detonation time), literal IPs, or CIDR ranges. Connections to these
+# expected registry / CDN endpoints are dropped before the network exfil rules
+# run, so normal dependency fetches don't false-positive as
+# dyn_install_exfil/dyn_import_exfil.
+#
+# CIDR ranges cover the CDN fronts whose IPs rotate faster than per-detonation DNS
+# resolution can track — the dominant dyn_install_exfil FP source (mined from the
+# trace_event table: 700+ install-phase connects to a single Fastly IP, etc.).
+# Tradeoff (intentional): a C2 hosted *on* one of these shared CDNs is dropped at
+# the dynamic layer; the static IOC/opengrep layers still see the exfil URL in
+# source, so the package is not blind. Ranges are scoped per-ecosystem to the
+# CDN its registry actually sits behind, not blanket cloud allowlisting.
+#   Fastly       151.101.0.0/16, 146.75.0.0/16, 199.232.0.0/16  (PyPI/pythonhosted, npm)
+#   Cloudflare   104.16.0.0/13                                   (npm, jsdelivr, unpkg, crates)
+#   Google       142.250.0.0/15, 64.233.160.0/19, 192.178.0.0/15 (Go module proxy)
+#   AWS CloudFront 3.160.0.0/14                                  (S3-backed release assets)
 pypi_net_allow = [
     "pypi.org",
     "files.pythonhosted.org",
+    "github.com",
+    "objects.githubusercontent.com",
+    "raw.githubusercontent.com",
+    "151.101.0.0/16",   # Fastly (pythonhosted/pypi front)
+    "146.75.0.0/16",    # Fastly
+    "199.232.0.0/16",   # Fastly
 ]
 
 npm_net_allow = [
     "registry.npmjs.org",
     "registry.yarnpkg.com",
+    "github.com",
+    "codeload.github.com",
+    "objects.githubusercontent.com",
+    "raw.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+    "nodejs.org",
+    "registry.npmmirror.com",
+    "npmmirror.com",
+    "cdn.jsdelivr.net",
+    "unpkg.com",
+    "yarnpkg.com",
+    "104.16.0.0/13",    # Cloudflare (npmjs/jsdelivr/unpkg front)
+    "151.101.0.0/16",   # Fastly
+    "146.75.0.0/16",    # Fastly
+    "199.232.0.0/16",   # Fastly
+    "3.160.0.0/14",     # AWS CloudFront (release assets)
 ]
 
 crates_net_allow = [
     "crates.io",
     "static.crates.io",
     "index.crates.io",
+    "github.com",
+    "objects.githubusercontent.com",
+    "codeload.github.com",
+    "104.16.0.0/13",    # Cloudflare (crates.io front)
+    "3.160.0.0/14",     # AWS CloudFront (static.crates.io)
 ]
 
 gomod_net_allow = [
     "proxy.golang.org",
     "sum.golang.org",
     "storage.googleapis.com",
+    "github.com",
+    "objects.githubusercontent.com",
+    "gopkg.in",
+    "golang.org",
+    "goproxy.io",
+    "142.250.0.0/15",   # Google (proxy.golang.org / googleapis front)
+    "64.233.160.0/19",  # Google
+    "192.178.0.0/15",   # Google
 ]

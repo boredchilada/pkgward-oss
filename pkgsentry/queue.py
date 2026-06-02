@@ -3,20 +3,65 @@ from __future__ import annotations
 
 import os
 import random
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import func, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
+from pkgsentry.logging_setup import get_logger
 from pkgsentry.store.models import ScanQueue
+
+log = get_logger("queue")
 
 _PRIORITY_ORDER = {"high": 0, "normal": 1, "low": 2}
 
 MAX_AUTO_ATTEMPTS = 3
-STALE_CLAIM_TIMEOUT_SECONDS = 900
+# How many times claim_next re-tries the same ecosystem when it loses the claim
+# CAS to another worker, before moving on. Bounds the work per claim while still
+# letting workers drain a hot backlog under contention instead of idling.
+_CLAIM_CAS_RETRIES = 5
+
+# Terminal (done/failed) rows are kept this many days, then pruned. Without this,
+# scan_queue grows unbounded across "all new packages" on four ecosystems — the
+# per-claim pending-count aggregate and the unique-index dedup on every ingest
+# INSERT both degrade as dead rows accumulate. Retention must exceed any window
+# in which a (eco,name,version) could realistically reappear in a feed and want
+# re-dedup; 14 days is comfortably past that.
+QUEUE_RETENTION_DAYS = int(os.environ.get("PKGSENTRY_QUEUE_RETENTION_DAYS", "14"))
+# Must be comfortably LARGER than workers.PROCESS_TIMEOUT_SECONDS (900). If they
+# are equal, a package still legitimately processing at the timeout boundary can
+# be reclaimed by the stale-claim sweeper at the same instant the worker's own
+# timeout fires — two writers racing the same row, and a re-claim re-scans the
+# package (wasted work + duplicate detonation enqueue). 2x leaves clear daylight.
+STALE_CLAIM_TIMEOUT_SECONDS = 1800
+
+# Concurrent ingest pollers (pypi/npm/gomod/crates feeds + watchlist refresh) all
+# INSERT into ScanQueue and can deadlock on the unique index. Postgres aborts one
+# txn as the victim; begin_nested()'s ROLLBACK TO SAVEPOINT recovers it, so a
+# bounded retry usually wins on the next attempt. After this many retries we skip
+# the item (it is re-listed on the next poll) rather than crash the poll cycle.
+ENQUEUE_DEADLOCK_RETRIES = int(os.environ.get("PKGSENTRY_ENQUEUE_DEADLOCK_RETRIES", "3"))
+
+
+def _is_deadlock(exc: Exception) -> bool:
+    return "deadlock detected" in str(getattr(exc, "orig", None) or exc).lower()
+
+
+def _is_lock_timeout(exc: Exception) -> bool:
+    """statement_timeout / lock_timeout: a transient under-load condition, not a
+    fatal DB error. Postgres surfaces these as OperationalError too, so without
+    this they'd hit the bare `raise` and crash the whole poll cycle — the same
+    failure the deadlock retry was added to prevent, just a different subclass."""
+    s = str(getattr(exc, "orig", None) or exc).lower()
+    return (
+        "canceling statement due to" in s
+        or "lock timeout" in s
+        or "could not obtain lock" in s
+    )
 
 # Backlog-weighted ecosystem selection. Reserved fraction is split equally
 # among non-empty ecosystems (the floor — guarantees no ecosystem starves);
@@ -120,20 +165,37 @@ def enqueue(
                 session.flush()
                 return existing
 
-    row = ScanQueue(
-        ecosystem=ecosystem,
-        name=name,
-        version=version,
-        priority=priority,
-        status="pending",
-    )
-    try:
-        with session.begin_nested():
-            session.add(row)
-            session.flush()
-    except IntegrityError:
-        return None
-    return row
+    for attempt in range(ENQUEUE_DEADLOCK_RETRIES + 1):
+        # Fresh row each attempt: a savepoint rollback expunges the prior one.
+        row = ScanQueue(
+            ecosystem=ecosystem,
+            name=name,
+            version=version,
+            priority=priority,
+            status="pending",
+        )
+        try:
+            with session.begin_nested():
+                session.add(row)
+                session.flush()
+            return row
+        except IntegrityError:
+            # A concurrent insert of the same (eco, name, version) won the race.
+            return None
+        except OperationalError as e:
+            # Deadlock victim on the ScanQueue unique index. The savepoint rolled
+            # back, so retry; a concurrent poller has committed by now and we
+            # either succeed or hit the IntegrityError path above.
+            if _is_deadlock(e) and attempt < ENQUEUE_DEADLOCK_RETRIES:
+                time.sleep(0.05 * (attempt + 1))
+                continue
+            if _is_deadlock(e) or _is_lock_timeout(e):
+                log.warning("enqueue_lock_giveup",
+                            ecosystem=ecosystem, name=name, version=version,
+                            reason="deadlock" if _is_deadlock(e) else "lock_timeout")
+                return None
+            raise
+    return None
 
 
 def claim_next(session: Session) -> Optional[tuple[ScanQueue, str]]:
@@ -162,17 +224,24 @@ def claim_next(session: Session) -> Optional[tuple[ScanQueue, str]]:
         counts = {r[0]: int(r[1]) for r in rows}
         weights = _eco_weights(ecosystems, counts)
         for eco in _weighted_order(ecosystems, weights):
-            row = session.scalars(
-                select(ScanQueue)
-                .where(
-                    ScanQueue.status == "pending",
-                    ScanQueue.priority == prio,
-                    ScanQueue.ecosystem == eco,
-                )
-                .order_by(ScanQueue.enqueued_at.asc())
-                .limit(1)
-            ).first()
-            if row is not None:
+            # Retry the SAME ecosystem on a CAS race: the row we lost is now
+            # 'claimed', so the next select returns the next-oldest pending row.
+            # Without this, N workers colliding on the head of a big backlog (the
+            # npm case) all fall through to idle even though hundreds of claimable
+            # rows remain — the scheduler under-drains exactly under load.
+            for _ in range(_CLAIM_CAS_RETRIES):
+                row = session.scalars(
+                    select(ScanQueue)
+                    .where(
+                        ScanQueue.status == "pending",
+                        ScanQueue.priority == prio,
+                        ScanQueue.ecosystem == eco,
+                    )
+                    .order_by(ScanQueue.enqueued_at.asc())
+                    .limit(1)
+                ).first()
+                if row is None:
+                    break  # this ecosystem drained — move to the next
                 result = session.execute(
                     update(ScanQueue)
                     .where(ScanQueue.id == row.id, ScanQueue.status == "pending")
@@ -187,7 +256,7 @@ def claim_next(session: Session) -> Optional[tuple[ScanQueue, str]]:
                     session.flush()
                     session.refresh(row)
                     return row, token
-                session.expire(row)
+                session.expire(row)  # lost the race; try the next-oldest here
     return None
 
 
@@ -206,10 +275,32 @@ def mark_failed(session: Session, row: ScanQueue, error: str, token: Optional[st
     if token is not None and row.claim_token != token:
         return False
     row.status = "failed"
-    row.last_error = error
+    # Error text can embed package-controlled bytes (an archive member name in an
+    # exception message, etc.). Postgres TEXT rejects NUL (0x00), so an unstripped
+    # NUL here would raise inside the failure handler itself and leave the row
+    # stuck 'claimed' until the stale sweep. Strip defensively.
+    row.last_error = error.replace("\x00", "") if error else error
     row.finished_at = datetime.now(timezone.utc)
     session.flush()
     return True
+
+
+def prune_terminal(
+    session: Session, *, older_than_days: Optional[int] = None,
+    now: Optional[datetime] = None,
+) -> int:
+    """Delete done/failed rows older than the retention window. Returns the count."""
+    days = older_than_days if older_than_days is not None else QUEUE_RETENTION_DAYS
+    current = now or datetime.now(timezone.utc)
+    cutoff = current - timedelta(days=days)
+    result = session.execute(
+        delete(ScanQueue).where(
+            ScanQueue.status.in_(("done", "failed")),
+            ScanQueue.finished_at.is_not(None),
+            ScanQueue.finished_at < cutoff,
+        )
+    )
+    return result.rowcount or 0
 
 
 def sweep_stale_claims(session: Session, *, now: Optional[datetime] = None) -> int:
