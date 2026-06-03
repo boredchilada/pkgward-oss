@@ -61,7 +61,7 @@ Source: `analyze/malware_patterns.py`
 | `malware.credential_file_access` | critical | high | SSH keys, AWS creds, browser profiles, crypto wallet paths in install file |
 | `malware.deobfuscation_exec_chain` | critical | high | marshal/zlib/bz2/lzma decompress piped to exec/eval. **Behavioral chain** |
 | `malware.env_exfil_tainted` | critical | high | Intrafile taint proves an `os.environ`-derived value **flows into** an HTTP send in an install file. **Behavioral chain** |
-| `malware.env_bulk_exfil` | medium | low | `os.environ` read + HTTP send **co-occur** in an install file with no provable flow between them (corroborating signal — 8 pts, below the suspicious floor, so it never flags alone; native-wrapper build-env reads no longer auto-escalate) |
+| `malware.env_bulk_exfil` | medium | low | `os.environ` read + HTTP send **co-occur** in an install file with no provable flow between them (a low-weight corroborating signal that never flags on its own; native-wrapper build-env reads no longer auto-escalate) |
 | `malware.env_sensitive_exfil` | high | medium | Sensitive env var access + HTTP send in install file (no provable flow) |
 | `malware.whitespace_hidden_payload` | critical | high | Code hidden with 200+ leading whitespace |
 | `malware.download_command` | critical | high | PowerShell/curl/wget/certutil/bitsadmin download in install script |
@@ -224,7 +224,7 @@ Source: `analyze/threat_intel.py`
 |---------|-----|------|-----------------|
 | `intel.{campaign}` | critical | high | File matches known-malicious fingerprint (SHA256 exact, ssdeep >= 70%, or TLSH distance <= 120). Campaign name is substituted dynamically. |
 
-Current campaigns: **TrapDoor** (Sui/Move/Aptos/Solana wallet stealer, 3 variant hashes covering 7 crates.io packages).
+The baseline ships **no** fingerprints (`hashes/known_malicious.jsonl` is empty). Campaign rows appear under `intel.{campaign}` only when an intel pack that provides fingerprints is loaded; the campaign name is substituted from that pack.
 
 ## Layer 12: opengrep static analysis (all ecosystems)
 
@@ -399,7 +399,7 @@ canonical list is `intel/baseline/behavioral_chains.toml` (overlay-extendable):
 | Category | Count |
 |----------|-------|
 | Static rule IDs | 64 |
-| YARA rules (via `yara.{name}`) | 28 |
-| Dynamic sandbox rules | 8 |
-| Threat intel (via `intel.{campaign}`) | 1+ per campaign |
-| **Total distinct rule IDs** | **~96** |
+| YARA rules (baseline, via `yara.{name}`) | 12 |
+| Dynamic sandbox rules | 11 (2 dormant) |
+| Threat intel (via `intel.{campaign}`) | 0 in baseline; added by a loaded intel pack |
+| **Total distinct rule IDs (baseline)** | **~87** |

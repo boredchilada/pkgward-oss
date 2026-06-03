@@ -1,10 +1,14 @@
 pkgsentry
 Copyright 2026 Michel Verbel
 
-This product includes software developed under the GNU Affero General Public License v3.0
-(LICENSE). Portions of the public baseline intel pack include or adapt
-content from the following open-source projects; attribution and license
-terms are preserved at the source-file level.
+The engine (this repository) is licensed under the GNU Affero General Public License v3.0
+(LICENSE).
+
+The baseline intel pack (pkgsentry/intel/baseline/) is licensed separately under the
+permissive Apache-2.0 license (declared in pkgsentry/intel/baseline/intel_pack.toml) so its
+detection signatures can be freely reused. Portions of that pack include or adapt content
+from the open-source projects listed below; those attributions and their own license terms
+are preserved at the source-file level and must remain intact.
 
 YARA rules in pkgsentry/intel/baseline/yara/community_sigbase.yar are adapted
 from Neo23x0/signature-base, used under the Detection Rule License (DRL) 1.1:

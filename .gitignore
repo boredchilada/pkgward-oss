@@ -61,8 +61,8 @@ qc.py
 detonation/detonation-svc
 detonation/bin/
 
-# Home-dir dotfiles + harness state — this tree lives in a home dir on the
-# prod scanner host (/home/pkgsentry); these are not part of the project.
+# Home-dir dotfiles + harness state that can appear when this tree lives in a
+# home directory; not part of the project.
 .bashrc
 .bash_profile
 .bash_logout

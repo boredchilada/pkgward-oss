@@ -60,7 +60,7 @@ Reference for implementing and maintaining ecosystem adapters.
 
 ### Metadata & Download
 - API base: `https://crates.io/api/v1`
-- **Required header:** `User-Agent: pypi-scanner/1.0 (contact: email@example.com)`
+- **Required header:** `User-Agent: pkgsentry (contact: <PKGSENTRY_CONTACT_EMAIL>)` — the contact identifier is set via the `PKGSENTRY_CONTACT_EMAIL` env var.
 - Crate info: `GET /crates/{name}`
 - Version info: `GET /crates/{name}/{version}`
 - Search: `GET /crates?q={query}&sort={sort}&per_page={n}&page={p}`

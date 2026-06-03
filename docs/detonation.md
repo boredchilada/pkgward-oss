@@ -213,7 +213,7 @@ A private overlay extends the baseline (UNION merge) — point the service at it
 `PKGSENTRY_INTEL_PATH` env var (set in `/etc/default/detonation-svc`):
 
 ```
-PKGSENTRY_INTEL_PATH=/home/pkgsentry/intel/private
+PKGSENTRY_INTEL_PATH=/path/to/your/intel/pack
 ```
 
 The service reads `$PKGSENTRY_INTEL_PATH/detonation/{rules_data,noise_baseline}.toml`. Operators
@@ -221,19 +221,20 @@ pin extra/private domains and observed registry IPs there (the npm/pypi/crates/g
 be mined from the `trace_event` table — see `docs/operations.md`). Successful load logs
 `intel_loaded source=baseline+overlay`.
 
-### SELinux gotcha (prod, Enforcing)
+### SELinux gotcha (SELinux Enforcing)
 
-`detonation-svc` runs as `init_t`; files under `/home/pkgsentry/intel/private` are `user_home_t`.
-SELinux **denies a system service reading user-home content**, so the overlay silently fails to
-load (`permission denied` → `source=baseline`) even though Unix perms and a `sudo -u detonation`
-read both succeed. Diagnose with `ausearch -m avc -ts recent | grep detonation-svc`.
+`detonation-svc` runs as `init_t`. If your intel pack lives under a user's home directory, its
+files are labelled `user_home_t`, and SELinux **denies a system service reading user-home
+content** — so the overlay silently fails to load (`permission denied` → `source=baseline`) even
+though Unix perms and a `sudo -u <svc-user>` read both succeed. Diagnose with
+`ausearch -m avc -ts recent | grep detonation-svc`.
 
-The fix applied in prod (keeps a single private-intel source of truth):
+The fix (keeps a single private-intel source of truth — substitute your own pack path):
 
 ```bash
 # 1. relabel the private intel tree to shared-read content
-semanage fcontext -a -t public_content_t "/home/pkgsentry/intel/private(/.*)?"
-restorecon -Rv /home/pkgsentry/intel/private
+semanage fcontext -a -t public_content_t "$PKGSENTRY_INTEL_PATH(/.*)?"
+restorecon -Rv "$PKGSENTRY_INTEL_PATH"
 # 2. allow init_t to read public_content_t (minimal, scoped — NOT user_home_t)
 semodule -i detonation/deploy/selinux/detonation_intel_read.pp
 systemctl restart detonation-svc   # expect: intel_loaded source=baseline+overlay
@@ -258,9 +259,9 @@ events (see `docs/detection-rules.md` Layer 10 for severity/confidence):
 | `dyn_suspicious_write` | write to a persistence path (`/etc/cron`, `.bashrc`, authorized_keys) |
 | `dyn_fileless_exec` | `execveat(AT_EMPTY_PATH)` / `memfd_create` |
 
-`dyn_install_exfil` (network connect during install) is **deferred** — it fires on any
-install-phase connect, but sdists legitimately fetch build deps from registries, so it needs
-a registry-aware design before it can be enabled. `dyn_import_exfil` (import-phase connect) is
+`dyn_install_exfil` (network connect during install) is **active**: the **`{eco}_net_allow`
+allowlist** (see above) drops install-phase connects to known registry/CDN hosts first, so only
+a connect to a non-allowlisted host — exfil-shaped — fires it. `dyn_import_exfil` (import-phase connect) is
 active but the **`{eco}_net_allow` allowlist** (see above) drops connections to known registry
 CDNs first, so normal dependency fetches no longer false-positive — this also resolved a
 pre-existing pypi FP (packages flagged for connecting to `files.pythonhosted.org`). All events
@@ -349,7 +350,7 @@ Behavioral rule hits are stored as regular `Finding` rows with `category = 'dyna
 and rule IDs like `dyn_install_exfil`, `dyn_reverse_shell`, `dyn_proc_inject`. They sit
 alongside static analysis findings in the same table, queryable the same way.
 
-## Tetragon configuration (prod)
+## Tetragon configuration
 
 Daemon options live in `/etc/tetragon/tetragon.conf.d/` (one file per flag) and a
 systemd drop-in. Current prod tuning:

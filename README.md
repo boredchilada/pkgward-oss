@@ -2,7 +2,9 @@
 
 Multi-ecosystem malware scanner for package registries. Watches PyPI, crates.io, the Go module proxy, and npm for both supply-chain compromises on popular packages and lure / social-engineering attacks on brand-new names.
 
-> Runs against the live PyPI, crates.io, Go module proxy, and npm feeds. The baseline intel pack ships in-tree and catches obvious malware; operational detection comes from a tuned private overlay (see [Engine + intel pack](#engine--intel-pack)).
+When someone publishes a malicious package to one of these registries — a typosquat of a popular library, a hijacked release, or a fresh `wallet-checker`-style lure — pkgsentry aims to catch it shortly after it goes live. For each new release it downloads the package, runs a stack of static checks over the code, optionally executes it in an isolated sandbox to see what it actually does, and flags anything that looks like credential theft, a backdoor, or a dropper.
+
+> **Status: beta.** It runs continuously against the live feeds today, but it is maintained by one person and the open-source detection content is deliberately minimal. The baseline that ships here catches obviously-malicious inputs; the strongest, tuned detection lives in a separate **private intel pack** you supply (see [Engine + intel pack](#engine--intel-pack)). Think of this repo as a capable scanning *engine* you bring your own detection signatures to — much like ClamAV — rather than a turnkey product.
 
 ## What it catches
 
@@ -28,19 +30,21 @@ RSS / XML-RPC / NDJSON feeds          watchlist
                  extract           -> per-file SHA-256 / entropy / ssdeep
                  code-diff vs prev -> only analyze changed files
                  static analyzers  -> findings
-                 detonate (all)    -> rootless Docker + Tetragon dynamic trace
+                 detonate          -> isolated sandbox (optional), trace behaviour
                  score             -> rule + chain + watchlist verdict
-                 LLM triage        -> cost-gated, only on suspicious / malicious
+                 LLM triage        -> second opinion, only on suspicious / malicious
                  alert             -> Discord webhook
 ```
 
-A dozen static-analysis layers (AST imports, IOC extraction, install-time malware patterns, sdist/wheel diff, ecosystem-specific install scripts incl. npm `package.json` lifecycle scripts, YARA, opengrep taint rules, version diff, threat-intel fingerprint matching) plus an optional rootless-Docker + Tetragon detonation sandbox across all four ecosystems. See `docs/detection-rules.md` for the rule catalog.
+A dozen static-analysis layers (AST import analysis, IOC extraction, install-time malware patterns, sdist/wheel diff, ecosystem-specific install scripts including npm `package.json` lifecycle scripts, YARA signatures, opengrep taint rules — which run in shadow / non-scoring mode by default, version diff, and threat-intel fingerprint matching by fuzzy hash) plus an optional **detonation** sandbox across all four ecosystems.
+
+*Detonation* means installing or importing the package inside a locked-down, rootless-Docker container and recording the system calls it makes (via Tetragon eBPF tracing) — so a payload that only reveals itself at runtime still gets caught. It is **off in the default quickstart** and needs a separately-deployed service on a Linux host (see [Detonation](docs/detonation.md)). See `docs/detection-rules.md` for the full rule catalog.
 
 **Focus mode** — point the scanner at your own dependencies instead of (or in addition to) the live feeds: `pkgsentry focus load <file>`, or `pkgsentry run -f <file>` to scan *only* your dependency list. See `docs/operations.md`.
 
 ## Engine + intel pack
 
-The engine is open-source (this repo, AGPL-3.0). The detection content — YARA rules, hash fingerprints, scoring thresholds, LLM prompt text, behavioral chain definitions — is loaded at runtime from an **intel pack**. A minimal **baseline pack** ships in-tree and is enough to demonstrate the engine works against obviously malicious test inputs. Operators with their own tuned threat intel can plug in a **private overlay pack** via the `PKGSENTRY_INTEL_PATH` env var.
+The engine is open-source (this repo, **AGPL-3.0**). The detection content — YARA rules, hash fingerprints, scoring thresholds, LLM prompt text, behavioral chain definitions — is loaded at runtime from an **intel pack**. A minimal **baseline pack** ships in-tree, licensed more permissively under **Apache-2.0** so its signatures can be freely reused (third-party YARA rules keep their own licenses — see `NOTICE`), and is enough to demonstrate the engine works against obviously malicious test inputs. Operators with their own tuned threat intel can plug in a **private overlay pack** via the `PKGSENTRY_INTEL_PATH` env var.
 
 Overlay semantics:
 
@@ -78,7 +82,7 @@ For dynamic analysis (rootless Docker + Tetragon sandbox, all ecosystems) you ne
 | [Operations](docs/operations.md) | Running in production, logs, queue stats, debugging |
 | [Intel pack](docs/intel-pack.md) | Building and loading private detection overlays |
 | [Detonation](docs/detonation.md) | Deploying the rootless-Docker + Tetragon sandbox |
-| [Detection rules](docs/detection-rules.md) | Full rule catalog across 12 detection layers |
+| [Detection rules](docs/detection-rules.md) | Full rule catalog across 13 detection layers |
 | [Regression testing](docs/regression-testing.md) | Known-bad/known-good corpus suite to catch detection regressions |
 | [Ecosystems](docs/ecosystems-reference.md) | API reference and attack surface per ecosystem |
 
@@ -91,7 +95,7 @@ For dynamic analysis (rootless Docker + Tetragon sandbox, all ecosystems) you ne
 | Go modules | ~9K (GitHub stars + awesome-go + critical infra) | NDJSON index, brand-new detection via DB | NDJSON cursor | yes |
 | npm | top-N (registry-search popularity + awesome-nodejs + critical infra) | CouchDB `_changes` feed, brand-new detection via DB | `_changes` seq cursor | yes |
 
-> All four ecosystems share the same ingest → analyze → score → detonate → triage flow. npm install-time analysis parses `package.json` lifecycle scripts (`preinstall`/`install`/`postinstall`/`prepare`) and detonation runs `npm install` with scripts enabled under Tetragon tracing.
+> All four ecosystems share the same ingest → analyze → score → detonate → triage flow. The **Detonation** column above marks ecosystems the sandbox *supports* — detonation itself is optional, requires the separately-deployed sandbox service on a BTF-enabled Linux host, and is off in the standalone quickstart (see [Detonation](docs/detonation.md)). npm install-time analysis parses `package.json` lifecycle scripts (`preinstall`/`install`/`postinstall`/`prepare`); when detonation is enabled it runs `npm install` with scripts under Tetragon tracing.
 
 ## Comparison
 
@@ -120,4 +124,4 @@ Disclosures: see `SECURITY.md`. Please do not file a public issue for an active 
 
 ## License
 
-AGPL-3.0 — see `LICENSE` and `NOTICE`.
+The engine (this repo) is **AGPL-3.0** — see `LICENSE`. The baseline intel pack (`pkgsentry/intel/baseline/`) is licensed permissively under **Apache-2.0** so its detection signatures can be freely reused; see `NOTICE`.

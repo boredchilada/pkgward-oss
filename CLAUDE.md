@@ -1,6 +1,6 @@
 # pkgsentry
 
-Multi-ecosystem package malware scanner. Monitors PyPI, Crates.io, and Go modules for malicious packages — both supply-chain attacks on popular packages (top-10K watchlist) and lure/social-engineering packages (all new uploads).
+Multi-ecosystem package malware scanner. Monitors PyPI, Crates.io, Go modules, and npm for malicious packages — both supply-chain attacks on popular packages (top-N watchlist) and lure/social-engineering packages (all new uploads).
 
 ## Quick reference
 
@@ -42,7 +42,7 @@ with sess.session_scope() as s:
 ## Tests
 
 ```bash
-python -m pytest tests/ -x -q          # Python (459 tests)
+python -m pytest tests/ -x -q          # Python suite
 cd detonation && go test ./... -v       # Go
 tools/test_opengrep_rules.sh            # opengrep rules via `--test` fixtures (all 4 langs)
 python -m pytest tests/test_regression_corpus.py tests/test_rule_coverage.py -q  # detection regression suite
@@ -103,14 +103,14 @@ docker run --rm --entrypoint bash   -v "$PWD:/src" -w /src pkgsentry-scanner too
 
 **Ingest** (focus list + watchlist + all new packages, per-ecosystem feeds/cursor) → **Queue** (backlog-weighted cross-ecosystem scheduling, see "Queue scheduling" below) → **Workers** → **Download** + SHA256 verify → **Extract** + hash (streamed SHA-256 always; entropy + ssdeep + TLSH only on files ≤ `PKGSENTRY_HASH_FULL_MAX_MB`) → **Code-diff** vs previous version → **Analyze** → **Score** → **LLM triage** (cost-gated, on static-malicious, retried on bad JSON) → **Discord alert** (fail-open: rule-malicious alerts unless the LLM explicitly clears it; alerts where the LLM couldn't adjudicate are tagged `llm_unverified`); the scan finalizes on the static verdict and **enqueues** detonation (`DetonationQueue`) instead of running it inline.
 
-**Detonation is async** (`pkgsentry/detonation_worker.py`, since 0.5.1): a separate worker pool drains `DetonationQueue` → **Detonate** (all ecosystems) → **Re-score** → **delayed Discord alert** if the verdict flips to malicious. This keeps the scan pipeline from blocking on the detonation service's concurrency cap. See `docs/internal/detonation-decouple-0.5.1.md` and `docs/diagrams/scan-pipeline.drawio`.
+**Detonation is async** (`pkgsentry/detonation_worker.py`, since 0.5.1): a separate worker pool drains `DetonationQueue` → **Detonate** (all ecosystems) → **Re-score** → **delayed Discord alert** if the verdict flips to malicious. This keeps the scan pipeline from blocking on the detonation service's concurrency cap. See `docs/diagrams/scan-pipeline.drawio`.
 
 ### Intel pack
 
 All tunable detection data is loaded from an intel pack at process start (`pkgsentry.intel.load()` in `runtime.py`). See `docs/intel-pack.md` for full reference.
 
 ```
-pkgsentry/intel/baseline/        # ships in tree, AGPL-3.0 (third-party YARA under their own licenses, see NOTICE)
+pkgsentry/intel/baseline/        # ships in tree, Apache-2.0 (third-party YARA under their own licenses, see NOTICE)
   intel_pack.toml                # manifest
   yara/                          # community + baseline YARA rules
   hashes/known_malicious.jsonl   # empty in baseline
@@ -171,14 +171,11 @@ once at load time. The gate check is centralized in `focus.gate_decision()` and 
 in the four gated ingest consumers. With `PKGSENTRY_FOCUS_EXCLUSIVE=1` the scanner ingests
 **only** focus packages (watchlist + brand-new gates and the watchlist refresh/seed jobs
 are skipped); an empty focus list in this mode logs `focus_exclusive_empty` and the
-scanner idles by design. (Detonation trace events are attributed to the sandbox by the
-Tetragon `docker` container id, not PID namespace — this host's Tetragon export emits no
-`ns` data, so namespace-based filtering, in both the collector and the tracing policy, is
-inert. See `docs/detonation.md` → "Event attribution".)
+scanner idles by design.
 
 ### Detection layers
 
-~115 rules across 13 layers. Full catalog: `docs/detection-rules.md`.
+Detection spans 13 layers. See `docs/detection-rules.md` for the full rule catalog and counts.
 
 1. `analyze/imports.py` — AST import analysis
 2. `analyze/iocs.py` — URLs, IPs, onion, base64 (with benign domain whitelist)
@@ -222,7 +219,7 @@ cd detonation && make build           # Cross-compile for Linux
 
 **Components:**
 - `internal/trace/` — TraceEvent types + Tetragon JSON collector (PID namespace filtering)
-- `internal/rules/` — 8 behavioral rules + dedup engine
+- `internal/rules/` — 11 behavioral rules (2 dormant) + dedup engine
 - `internal/baseline/` — noise filter: per-ecosystem file/exec noise **+ network allowlist** (`{eco}_net_allow`). Hostnames resolved to IPs at filter time; connects to registry/CDN destinations are dropped so normal dependency fetches don't false-positive as `dyn_import_exfil`/`dyn_install_exfil`. Tune via the intel overlay (see below).
 - `internal/sandbox/` — Docker container orchestration + per-ecosystem profiles
 - `internal/api/` — HTTP server (`/api/v1/health`, `/api/v1/detonate`)

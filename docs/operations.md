@@ -185,7 +185,7 @@ pkgsentry loads detection content from an intel pack at startup.
 **Baseline only** (default, no config needed):
 
 ```
-pkgsentry/intel/baseline/   — ships in-tree, AGPL-3.0
+pkgsentry/intel/baseline/   — ships in-tree, Apache-2.0
 ```
 
 **Private overlay** (operator-supplied):

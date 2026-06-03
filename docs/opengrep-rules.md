@@ -6,7 +6,7 @@ The opengrep layer (`pkgsentry/analyze/opengrep_scan.py`) runs the [opengrep](ht
 
 | Tree | Path | Audience | License |
 |------|------|----------|---------|
-| Baseline (ships with the engine) | `pkgsentry/intel/baseline/opengrep/{python,rust,go,javascript}/*.yaml` | Public OSS users | AGPL-3.0 |
+| Baseline (ships with the engine) | `pkgsentry/intel/baseline/opengrep/{python,rust,go,javascript}/*.yaml` | Public OSS users | Apache-2.0 |
 | Private overlay (operator-supplied) | `$PKGSENTRY_INTEL_PATH/opengrep/{python,rust,go,javascript}/*.yaml` | Single deployment | Operator's choice |
 
 The two directories are **UNION-merged** at process start — same semantics as the YARA dirs. Both sets of rules run on every scan; baseline rules are not replaced by overlay rules, they coexist. Rule IDs must be globally unique across both sets.
@@ -248,7 +248,7 @@ Breaking it down:
 2. `opengrep scan --validate -f <rule>` — parses cleanly.
 3. Build a triggering fixture, `opengrep scan --json -f <rule> <fixture>` — confirm it matches.
 4. Build a benign fixture that looks superficially similar (e.g. a setup.py that uses `urlopen` for a legitimate download but never feeds it to exec), confirm it does NOT match.
-5. Commit + push to Gitea. Deploy to prod ([release-flow doc](maintainer-release-flow.md)). Soak under `OPENGREP_SHADOW=1`.
+5. Commit, deploy, and soak the new rule under `OPENGREP_SHADOW=1` (shadow mode — findings are recorded but excluded from scoring).
 6. Watch the shadow-finding count for the new rule. If FP rate is acceptable, the rule earns its place when the global shadow→cutover happens.
 
 ## References

@@ -32,10 +32,9 @@ services:
       # High-priority line-jumpers are unaffected (they beat all normal backlog).
       - SCHED_MAX_ECO_SHARE=0.5
       - SCHED_RESERVED_FRACTION=0.5
-      # FP-exit ramp: never auto-watchlist these as malicious (known false
-      # positives pending the real rule fix — see docs/internal/deferred-backlog.md).
-      # scrapli: native-wrapper env_bulk_exfil FP (build-env read + lib download).
-      - WATCHLIST_AUTO_BLOCKLIST=pypi:scrapli,pypi:simtooreal-agent
+      # Deployment-specific tuning — e.g. WATCHLIST_AUTO_BLOCKLIST, the false-positive
+      # exit-ramp (comma-separated "eco:name" entries never auto-watchlisted) — lives
+      # in .env so it stays out of version control. See .env.example.
     deploy:
       resources:
         limits:

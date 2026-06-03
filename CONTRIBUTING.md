@@ -98,7 +98,7 @@ The intel pack format is defined in `pkgsentry/intel/pack.py` and validated in `
 
 ## DCO (Developer Certificate of Origin)
 
-We use the DCO instead of a CLA. The DCO is a simple statement that you wrote the code (or have the right to contribute it) and that you agree to license it under the project's Apache 2.0 license.
+We use the DCO instead of a CLA. The DCO is a simple statement that you wrote the code (or have the right to contribute it) and that you agree to license it under the project's AGPL-3.0 license.
 
 To sign off:
 ```bash
@@ -130,4 +130,4 @@ For security issues, see [SECURITY.md](SECURITY.md). Do not file public issues f
 
 ## License
 
-By contributing, you agree your contribution is licensed under the [Apache License 2.0](LICENSE).
+By contributing, you agree your contribution is licensed under the [GNU AGPL-3.0](LICENSE).

@@ -364,18 +364,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   dataflow between them. That co-occurrence is the native-wrapper FP shape (read
   build-env for compiler flags, separately download a prebuilt binary) and it was
   pinning false `malicious` verdicts — which then poisoned the auto-watchlist and
-  the fingerprint moat (confirmed on scrapli / eqr / `@comment-io/cli`). Split in
+  the fingerprint moat (confirmed on several native-wrapper packages). Split in
   two: **`malware.env_exfil_tainted`** (critical + chain) fires only when a light
   intrafile AST taint pass proves an `os.environ`-derived value *flows into* the
   send; **`malware.env_bulk_exfil`** is demoted to `medium` (de-chained) for the
-  remaining co-occurrence-without-flow case — 8 pts stays below the suspicious
-  floor, so it corroborates other findings but never single-handedly flags or
+  remaining co-occurrence-without-flow case — a low-weight corroborating signal, so
+  it supports other findings but never single-handedly flags or
   pages. A real env-stealer (the value reaches the request body)
   still verdicts malicious; the build-env-read FP no longer does. `analyze/malware_patterns.py`.
 - **`malware.pth_import_injection` is now chain-gated — APM `.pth` files no longer
   auto-malicious.** Any `.pth` containing an `import` line fired `critical` + chain,
   matching every legit auto-instrument bootstrap (Datadog / Sentry / OpenTelemetry /
-  coverage.py) — confirmed FPs on `simtooreal-agent`, `sha67`. Split: a `.pth`
+  coverage.py) — confirmed FPs on legitimate auto-instrument packages. Split: a `.pth`
   *import line that runs a code-exec primitive at startup* (`import os; os.system(...)`,
   `exec`/`b64decode`/`__import__`/socket/…) is **`malware.pth_exec_injection`**
   (critical + chain — the real injection technique); a *bare* `import <module>` is
@@ -578,8 +578,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `pkgsentry watchlist auto {list,remove,purge,backfill}` CLI. The four
   ecosystem `refresh_watchlist` paths now skip auto-rank rows so popularity
   refresh can't evict them. Disabled with `WATCHLIST_AUTO_MALICIOUS=0`. See
-  `docs/operations.md` → "Auto-watchlist (confirmed-malicious gate)" and
-  `docs/internal/detection-hardening-2026-05.md`.
+  `docs/operations.md` → "Auto-watchlist (confirmed-malicious gate)".
 - **Finding carry-forward for confirmed-malicious re-publishes.** When a
   package on the auto-watchlist publishes a new version that mostly re-uses
   files from the prior one (a version bump + a handful of changed files, as
@@ -877,7 +876,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   names (crypto × credential combinations, AI × security-theater, etc.) while ignoring single
   legitimate categories.
 - **Threat-intel hash matching** — three-tier lookup: exact SHA256, ssdeep fuzzy (≥70%), TLSH
-  distance (≤120). TrapDoor campaign fingerprints seeded.
+  distance (≤120). Campaign fingerprints load from the intel pack; the baseline ships none.
 - **Code-diff scanning** — per-file SHA256 hashes stored across scans; only changed/new files are
   analyzed on version updates.
 - **Fair cross-ecosystem queue scheduling** — `claim_next()` rotates ecosystems within each

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/boredchilada/pkgsentry-oss/blob/main/SECURITY.md
+    about: Please report vulnerabilities privately — do NOT open a public issue.
+  - name: Documentation
+    url: https://github.com/boredchilada/pkgsentry-oss/tree/main/docs
+    about: Setup, operations, detection rules, and ecosystem references.

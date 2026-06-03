@@ -33,7 +33,7 @@ We'll acknowledge receipt within 72 hours, give you a tracking handle, and keep 
 
 ## Disclosure history
 
-This file tracks resolved security reports. Empty as of v0.1.0 — first public release.
+This file tracks resolved security reports. Empty so far.
 
 ## PGP / encrypted communications
 
