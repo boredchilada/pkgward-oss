@@ -207,8 +207,10 @@ async def poll_feeds_once() -> int:
             try:
                 enqueue(s, ecosystem=ECOSYSTEM, name=name, version=version, priority=pri)
                 enqueued_wl += 1
-            except Exception:
-                pass
+            except Exception as e:
+                # Don't silently drop a watchlisted (high-value) crate update — surface
+                # it. The crates_reconcile job re-derives recent crates as the backstop.
+                log.warning("crates_wl_enqueue_failed", name=name, version=version, error=str(e))
 
     total = enqueued_new + enqueued_wl
     if total or skipped:

@@ -8,38 +8,54 @@ import (
 	"detonation/internal/trace"
 )
 
-// installExfil is intentionally excluded from AllRules() (see definitions.go),
-// so these tests exercise the rule function directly to keep its logic covered
-// for when it is re-enabled with a better design.
-func TestInstallExfil(t *testing.T) {
-	evt := trace.TraceEvent{
-		Phase:     "install",
-		Category:  "network",
-		Operation: "connect",
-		Detail:    map[string]interface{}{"addr": "45.33.32.156", "port": float64(443)},
+// install/import exfil are a CHAIN: a network egress convicts as exfil only when a
+// secret was touched in the same run (run_sensitive_access, set by the engine).
+// A lone external egress emits a low, non-convicting dyn_install_egress note; a
+// connect to sandbox infra (private/loopback, e.g. the DNS forwarder) emits nothing.
+func extConnect(phase string, sensitive bool) trace.TraceEvent {
+	d := map[string]interface{}{"addr": "45.33.32.156", "port": float64(443)}
+	if sensitive {
+		d["run_sensitive_access"] = true // the engine sets this when a secret was read
 	}
+	return trace.TraceEvent{Phase: phase, Category: "network", Operation: "connect", Detail: d}
+}
 
-	f := installExfil().Evaluate(evt)
-	if f == nil {
-		t.Fatal("expected dyn_install_exfil to match")
-	}
-	if f.RuleID != "dyn_install_exfil" {
-		t.Errorf("rule_id = %q, want dyn_install_exfil", f.RuleID)
+func TestExfilChainConvictsOnSecretPlusEgress(t *testing.T) {
+	f := installExfil().Evaluate(extConnect("install", true))
+	if f == nil || f.RuleID != "dyn_install_exfil" {
+		t.Fatalf("secret access + external egress must convict as dyn_install_exfil, got %+v", f)
 	}
 	if f.Severity != "high" {
 		t.Errorf("severity = %q, want high", f.Severity)
 	}
 }
 
-func TestInstallExfilSkipsImport(t *testing.T) {
-	evt := trace.TraceEvent{
-		Phase:     "import",
-		Category:  "network",
-		Operation: "connect",
-		Detail:    map[string]interface{}{"addr": "45.33.32.156", "port": float64(443)},
+func TestExfilChainLoneEgressIsLowNote(t *testing.T) {
+	f := installExfil().Evaluate(extConnect("install", false))
+	if f == nil || f.RuleID != "dyn_install_egress" {
+		t.Fatalf("lone external egress must be the low dyn_install_egress note, got %+v", f)
 	}
+	if f.Severity != "low" {
+		t.Errorf("severity = %q, want low (must not convict)", f.Severity)
+	}
+}
 
-	if f := installExfil().Evaluate(evt); f != nil {
+func TestExfilChainIgnoresSandboxInfra(t *testing.T) {
+	// 172.17.0.2:53 is the DNS forwarder on the Docker bridge — infra, not egress.
+	for _, addr := range []string{"172.17.0.2", "127.0.0.1", "10.0.0.5", "192.168.1.1"} {
+		evt := trace.TraceEvent{
+			Phase: "install", Category: "network", Operation: "connect",
+			Detail: map[string]interface{}{"addr": addr, "port": float64(53),
+				"run_sensitive_access": true}, // even WITH a secret read, infra isn't egress
+		}
+		if f := installExfil().Evaluate(evt); f != nil {
+			t.Errorf("connect to sandbox infra %s must not produce a finding, got %+v", addr, f)
+		}
+	}
+}
+
+func TestInstallExfilSkipsImport(t *testing.T) {
+	if f := installExfil().Evaluate(extConnect("import", true)); f != nil {
 		t.Error("dyn_install_exfil should NOT match import phase")
 	}
 }
@@ -56,25 +72,34 @@ func TestInstallExfilActive(t *testing.T) {
 	}
 }
 
-func TestImportExfil(t *testing.T) {
-	evt := trace.TraceEvent{
-		Phase:     "import",
-		Category:  "network",
-		Operation: "connect",
-		Detail:    map[string]interface{}{"addr": "192.168.1.1", "port": float64(8080)},
+func TestImportExfilChain(t *testing.T) {
+	// no secret -> low egress note
+	f := importExfil().Evaluate(extConnect("import", false))
+	if f == nil || f.RuleID != "dyn_import_egress" || f.Severity != "low" {
+		t.Fatalf("lone import egress must be the low dyn_import_egress note, got %+v", f)
 	}
+	// secret + egress -> convict
+	f = importExfil().Evaluate(extConnect("import", true))
+	if f == nil || f.RuleID != "dyn_import_exfil" || f.Severity != "high" {
+		t.Fatalf("secret + import egress must convict as dyn_import_exfil, got %+v", f)
+	}
+}
 
-	rules := AllRules()
-	var matched bool
-	for _, r := range rules {
-		if r.ID == "dyn_import_exfil" {
-			if f := r.Evaluate(evt); f != nil {
-				matched = true
-			}
-		}
+func TestRunSensitiveAccessDetectsSecretReads(t *testing.T) {
+	cred := trace.TraceEvent{Category: "file", Operation: "open",
+		Detail: map[string]interface{}{"path": "/root/.aws/credentials"}}
+	environ := trace.TraceEvent{Category: "file", Operation: "open",
+		Detail: map[string]interface{}{"path": "/proc/1234/environ"}}
+	benign := trace.TraceEvent{Category: "file", Operation: "open",
+		Detail: map[string]interface{}{"path": "/proc/self/environ"}}
+	if !RunSensitiveAccess([]trace.TraceEvent{benign, cred}) {
+		t.Error("credential read must arm the chain")
 	}
-	if !matched {
-		t.Fatal("expected dyn_import_exfil to match")
+	if !RunSensitiveAccess([]trace.TraceEvent{environ}) {
+		t.Error("/proc/<pid>/environ read must arm the chain")
+	}
+	if RunSensitiveAccess([]trace.TraceEvent{benign}) {
+		t.Error("/proc/self/environ alone must NOT arm the chain")
 	}
 }
 
@@ -274,18 +299,32 @@ func TestEnvHarvestSkipsOrdinaryOpen(t *testing.T) {
 }
 
 func TestSuspiciousWrite(t *testing.T) {
-	evt := trace.TraceEvent{
-		Phase:     "install",
-		Category:  "file",
-		Operation: "write",
-		Detail:    map[string]interface{}{"path": "/root/.bashrc"},
+	// Hard-persistence sinks convict on their own (critical).
+	hard := []string{"/etc/crontab", "/etc/cron.d/x", "/etc/systemd/system/x.service",
+		"/etc/ld.so.preload", "/root/.ssh/authorized_keys"}
+	for _, p := range hard {
+		evt := trace.TraceEvent{Phase: "install", Category: "file", Operation: "write",
+			Detail: map[string]interface{}{"path": p}}
+		f := suspiciousWrite().Evaluate(evt)
+		if f == nil || f.RuleID != "dyn_suspicious_write" {
+			t.Fatalf("%s: expected dyn_suspicious_write", p)
+		}
+		if f.Severity != "critical" {
+			t.Errorf("%s: severity = %q, want critical", p, f.Severity)
+		}
 	}
-	f := suspiciousWrite().Evaluate(evt)
-	if f == nil || f.RuleID != "dyn_suspicious_write" {
-		t.Fatal("expected dyn_suspicious_write to match persistence write")
-	}
-	if f.Severity != "critical" {
-		t.Errorf("severity = %q, want critical", f.Severity)
+	// Shell rc files are dual-use (benign PATH export) → high, so a lone write
+	// can't single-handedly flip a package to malicious.
+	for _, p := range []string{"/root/.bashrc", "/root/.zshrc", "/root/.profile"} {
+		evt := trace.TraceEvent{Phase: "install", Category: "file", Operation: "write",
+			Detail: map[string]interface{}{"path": p}}
+		f := suspiciousWrite().Evaluate(evt)
+		if f == nil {
+			t.Fatalf("%s: expected dyn_suspicious_write", p)
+		}
+		if f.Severity != "high" {
+			t.Errorf("%s: severity = %q, want high", p, f.Severity)
+		}
 	}
 }
 

@@ -19,7 +19,7 @@ log = get_logger("crates.fetch")
 USER_AGENT = user_agent()
 CDN_BASE = "https://static.crates.io/crates"
 API_BASE = "https://crates.io/api/v1/crates"
-WORK_ROOT = Path(tempfile.gettempdir()) / "pkgsentry_crates"
+WORK_ROOT = Path(tempfile.gettempdir()) / "pkgsentry"
 
 # Rate limiters
 _api_limiter = asyncio.Semaphore(1)   # 1 req/s to API
@@ -107,16 +107,26 @@ async def download_crate(name: str, version: str) -> FetchResult:
             await asyncio.sleep(1.0)
         metadata = {}
         if crate_resp.status_code == 200:
-            crate_data = crate_resp.json().get("crate", {})
+            crate_json = crate_resp.json()
+            crate_data = crate_json.get("crate", {})
+            # `owners` is not inline on the crate object (separate endpoint); the
+            # publisher of this specific version is `versions[].published_by`.
+            published_by = None
+            for v in crate_json.get("versions", []):
+                if v.get("num") == version:
+                    published_by = v.get("published_by") or None
+                    break
+            uploader = None
+            if isinstance(published_by, dict):
+                uploader = published_by.get("login") or published_by.get("name")
             # Normalize to match PyPI metadata keys
             metadata = {
                 "summary": crate_data.get("description", ""),
                 "home_page": crate_data.get("repository") or crate_data.get("homepage", ""),
                 "keywords": ", ".join(crate_data.get("keywords", [])),
                 "license": crate_data.get("license", ""),
-                "author": ", ".join(
-                    o.get("name", "") for o in crate_data.get("owners", [])
-                ) if "owners" in crate_data else None,
+                "author": uploader,
+                "upload_user": uploader,
                 # Preserve full raw data
                 "_raw_crate": crate_data,
             }

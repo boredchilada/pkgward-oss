@@ -4,6 +4,253 @@ All notable changes to pkgsentry are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] — Unreleased
+
+### Changed
+- **Detonation exfil is now a chain (secret access + external egress), not a lone connect.** A
+  network connect during install/import is dual-use — fetching deps, prebuilt binaries, Zcash Sapling
+  params, disposable-email-domain blocklists, JDK/LLM-SDK downloads, or just resolving DNS all look
+  identical to data theft. `dyn_install_exfil` / `dyn_import_exfil` fired on the bare connect and
+  false-positived constantly, flipping *clean* packages to malicious — most egregiously on the
+  sandbox's **own DNS forwarder** (`172.17.0.2:53`), which flooded the alert channel (@bwo-ui/vue+svelte,
+  legalesign-ui, @oratis/lisa, actiondock, @blazediff/cli, @exodus/taquito-sapling, free-email-domains
+  all clean/benign). Exfil now requires the data-theft *shape*: a secret was touched in the same
+  detonation (`dyn_credential_read` / `dyn_env_harvest` — surfaced run-wide by the rules engine as
+  `run_sensitive_access`) **and** the connect leaves the sandbox for an external host (private/loopback/
+  bridge addresses — incl. the DNS forwarder — are infra, never egress). A lone external egress emits a
+  new **low, non-convicting** `dyn_install_egress` / `dyn_import_egress` note for visibility. A
+  honeytoken leaving the sandbox still convicts standalone (`dyn_honeytoken_exfil` — proof of theft, no
+  chain needed). This is the first *dynamic* behavioral chain. `detonation/internal/rules/{definitions,engine}.go`.
+
+### Fixed
+- **Vault re-detonation was silently failing (cross-uid staging permission drift).** The detonation
+  worker stages a vaulted package's exact scanned bytes for re-detonation; `_stage_from_vault` created
+  its staging dir via `mkdtemp` (mode `0700`) — but the scanner writes as root inside its container
+  while the rootless detonation service reads as the unprivileged `detonation` uid, which can't
+  traverse a `0700` dir, so every vault mount failed (`mkdir …: permission denied`) and fell back to a
+  re-fetch (~20×/h in soak). For *yanked* malicious packages — the vault's whole reason to exist —
+  the re-fetch gets a takedown placeholder, so the payload we actually scanned was never re-detonated.
+  Root cause was deeper than one missing `chmod`: the cross-uid bind-mount permission contract was
+  duplicated and implicit across all five staging paths (each ecosystem `fetch/download.py` widened
+  its own dir and relied on the umask for the file mode), and the vault path drifted off it. New
+  `pkgsentry/detonation_staging.py` is the single source of truth — explicit dir (`0755`) + file
+  (`0644`) modes (umask-independent), documented contract, regression-tested (incl. under a restrictive
+  umask); the vault path routes through it. `detonation_worker.py`, `detonation_staging.py`,
+  `tests/test_detonation_staging.py`.
+- **Native-CLI npm packages (esbuild/swc/cxpher pattern) no longer false-convict.** Two FP
+  root causes, found via `cxpher 2.2.3` (a legit proprietary native-binary package manager
+  that detonation flipped to malicious):
+  - The obfuscation and entropy analyzers read a compiled binary that wears a *source*
+    extension — `bin/cXpher.js` is actually an ELF — as text, turning its high-bit bytes into
+    bogus `obfuscation.nonascii_identifiers` / `homoglyph_identifiers` and `entropy.obfuscated_payload`.
+    Both now skip a file whose *content* is a compiled executable image (new
+    `binary.looks_like_compiled_binary`, magic-byte match — strict, so an encrypted text-disguised
+    payload is still scanned). `binary.py` still flags the artifact. `analyze/{binary,obfuscation,entropy}.py`.
+  - The detonation `dyn_suspicious_write` rule treated a write to a shell rc (`.bashrc`/`.zshrc`/
+    `.profile`) — the near-universal native-CLI **PATH-export** install convention (nvm, cargo,
+    deno, bun, pyenv all do it) — as `critical`, which single-handedly forces a malicious verdict.
+    Shell-rc writes are now `high` (strong signal that must *chain* with a real payload signal to
+    convict, not force it); hard-persistence sinks (cron, systemd, init.d, ld.so.preload, ssh
+    `authorized_keys`) stay `critical`. `detonation/internal/rules/definitions.go`. Regression:
+    `tests/corpus/npm/native_wrapper_binary` extended with an ELF-named-`.js`.
+- **Bundled test-virtualenv no longer false-convicts as `.pth` injection.** A package that
+  sloppily ships its test venv into the sdist carries coverage.py's subprocess-measurement
+  `.pth` (`coverage.process_startup` gated on `COVERAGE_PROCESS_START`/`_CONFIG`) — coverage's
+  own documented file, present in every venv with subprocess coverage. Its `import sys; exec(...)`
+  line tripped the critical `malware.pth_exec_injection` rule (and the opengrep
+  `pth_import_injection` shadow), auto-flipping the whole package to malicious. Both now skip
+  this content-anchored coverage signature; a real exec-payload `.pth` still convicts. Real-world:
+  `portman-proxy 0.1.2` (a clean aiohttp reverse proxy, double-confirmed FP). `analyze/malware_patterns.py`,
+  `intel/baseline/opengrep/python/pth_import_injection.yaml`; regression sample
+  `tests/corpus/pypi/bundled_coverage_venv`.
+- **gomod weak co-occurrence findings no longer flood large legit codebases.** The per-file
+  `gomod.init_net_coexist` / `init_exec_coexist` / `unsafe_import` signals (init() co-located
+  with a net/exec/unsafe import, but *not* used in init()) fired on dozens of files in a big
+  networking project like `tailscale` — inflating the score to suspicious and bloating the LLM
+  prompt. They're now capped per rule (keep 3 + one aggregate note); a high count is itself a
+  benign indicator. The real in-`init()` threats (`init_exec_chain`/`init_net_chain`) are never
+  capped. `ecosystems/gomod/go_directives.py`.
+- **Detonation was blind for npm / crates / gomod — it traced an empty sandbox.**
+  Those three ecosystems staged downloaded archives under `/tmp/pkgsentry_<eco>`, but
+  only `/tmp/pkgsentry` is bind-mounted into both the scanner container and the
+  detonation-service host. The service received an archive path it couldn't see, Docker
+  auto-created it as an empty directory, and the sandbox detonated *nothing* — so every
+  npm package produced the same ~15 install-harness trace events and zero payload
+  behaviour (only pypi, which already staged to `/tmp/pkgsentry`, worked). Dynamic
+  analysis is the generalizer that catches a payload the per-shape static rules miss, so
+  this is why nearly every new npm/gomod sample needed fresh static tuning. All four
+  ecosystems (and the vault-first restage) now stage to the shared `/tmp/pkgsentry`.
+  Live npm detonations now show variable, payload-driven event counts.
+  `ecosystems/{npm,crates,gomod}/fetch/download.py`, `detonation_worker.py`.
+- **DNS-aware abuse-host detection could never fire.** Two bugs: (1) the detonation
+  service runs as a confined systemd unit (`init_t`) that the host denies (`EACCES`)
+  from connecting to the rootless-Docker–published loopback port the DNS forwarder's
+  lookup API used — so the IP→hostname annotation silently no-op'd. Lookups now go over
+  the rootless Docker socket via `docker exec det-dnslog /dns-forwarder lookup <ip>`
+  (the same control channel the service already uses to run sandboxes), needing no host
+  port. (2) `mergeNoise` unioned every noise field *except* `abuse_hosts`, so after the
+  baseline+overlay merge the abuse-host list was always empty. Added a reflection-based
+  regression test that fails if any `NoiseFilters` field is dropped from the merge.
+- **Silent-detection-loss sweep (5 fixes).** A multi-agent audit (find → adversarially
+  verify) surfaced detection paths that degraded to nothing without erroring:
+  - **Behaviour-only convictions could never reach "malicious."** Every detonation
+    finding carries `category="dynamic"`, so the per-category score cap (30) collapsed
+    independent behavioural signals (credential read + DNS exfil + injection) under one
+    ceiling. Scoring now buckets dynamic findings per `rule_id` — distinct behaviours
+    accumulate, same-rule repeats still cap. `detect/score.py`.
+  - **Env-exfil regex missed subscript reads.** `os.environ['AWS_SECRET']` (the canonical
+    form) never matched — only `os.environ.get(...)` did. `analyze/malware_patterns.py`.
+  - **Entropy-jump detector dead on giant packages.** The giant fast-path zeroed per-file
+    entropy (while still computing the costlier ssdeep/TLSH), so `entropy.suspicious_jump`
+    silently never fired on big packages. Entropy is now computed in lite mode too.
+    `pipeline.py`, `analyze/entropy.py`.
+  - **A service-side detonation `error` was finalized as a clean empty detonation** —
+    losing any behaviour-only malicious flip. It now requeues within the bounded budget.
+    `detonation_worker.py`.
+  - **A package could suppress its own dynamic verdict with one NUL byte** in a traced
+    exec path / syscall arg (failed the finalize txn). NUL is now stripped from
+    package-controlled TraceEvent fields, like the static-scan path. `detonation_worker.py`.
+- **Detonation false positives on prebuilt-binary CDNs.** With npm detonation now
+  executing payloads, `dyn_install_exfil` fired on legitimate install-time downloads
+  (Playwright browser CDNs). Added those CDNs to `npm_net_allow`, plus an **exact-match**
+  allowlist entry form (`=host`) so path-style `storage.googleapis.com` (shared CDN) is
+  allowed while per-tenant `<bucket>.storage.googleapis.com` — the dependency-confusion
+  exfil shape (caught a live `corporate-front-vue@99.9.1`) — stays flagged.
+- **LLM-triage hardening (two silent un-conviction paths).**
+  - **Source starvation.** The convicting code is now gathered *first* — source windows
+    around every line-anchored finding, highest-severity file first, per-file capped, with
+    the budget raised 32→48KB — so a large priority/vendored file can no longer exhaust the
+    budget before the line that drove the verdict is shown to the model. `llm/triage.py`.
+  - **Exact-hash matches are non-downgradable.** The LLM could clear a byte-for-byte known
+    malware match (`threat_intel` sha256 tier) to benign and suppress the alert. Those are
+    now held malicious regardless of the LLM. Fuzzy ssdeep/TLSH matches stay downgradable
+    (they were the self-seeded-FP source). `llm/triage.py`.
+- **Intel-pack load robustness (3 silent-loss fixes).**
+  - **One malformed overlay YARA file no longer disables the entire YARA layer.** Rules are
+    compiled per-file first; a bad file (usually an overlay typo, the place operators add
+    campaign rules) is dropped + logged and the rest still load. `analyze/yara_scan.py`.
+  - **Malformed threat-intel hash lines are surfaced** (`intel_jsonl_malformed`, with
+    skipped/loaded counts) instead of vanishing — a campaign fingerprint on a bad line no
+    longer disappears silently. `intel/pack.py`.
+  - **Non-numeric threshold/scoring-weight overrides are logged** (`intel_value_not_numeric`)
+    rather than silently dropped + reverted to the hardcoded default, so a `malicious_min =
+    "61"` typo in an overlay is visible. `intel/pack.py`.
+- **Static-coverage false-negatives (silent-loss sweep, final batch).**
+  - **IOC URL whitelist no longer over-matches** — a bare `^test` prefix silently
+    whitelisted real C2 on any host starting with `test` (`test-c2.evil.com`,
+    `testbench.workers.dev`). Anchored to actual test placeholders. `analyze/iocs.py`.
+  - **Extensionless interpreter hooks are now followed** — `postinstall: node install`
+    (or `tsx setup`) referenced no `.js`, so the install payload was never scanned;
+    resolved via JS/TS module resolution now. `ecosystems/npm/installer.py`.
+  - **Decode-and-rescan uses per-encoding budgets** — a base64-heavy file no longer
+    exhausts a shared cap before the hex/`\xNN` passes, where concealed C2 hides.
+    `analyze/iocs.py`.
+  - **No-longer-silent skips/drops**: YARA logs files skipped for size
+    (`yara_skipped_large_files`); a crates watchlist enqueue failure logs
+    `crates_wl_enqueue_failed`; and a detonation host with DNS capture off now logs a
+    loud `WARNING` that abuse-host detection is inert. `analyze/yara_scan.py`,
+    `ecosystems/crates/ingest/feeds.py`, `detonation/internal/api/server.go`.
+
+### Added
+- **Richer Discord alerts.** Both the static-malicious and detonation-flip webhooks now show
+  a **Publisher** field — author + email, the actual uploader, and maintainers, read from the
+  `Version` row captured at scan time (no extra request; defanged). The publisher's email
+  domain and uploader are first-order supply-chain triage signal. Finding evidence is also
+  widened (80→240 chars) so a long exfil host/domain (e.g. a Cloud Run callback) is shown in
+  full instead of cut off. `notify/discord.py`, `enrich/publisher.py`.
+- **Publisher identity is now captured for every ecosystem (was pypi/npm-only and partial).**
+  The Discord alert's Publisher field was empty for crates and gomod and missing the actual
+  uploader on npm. Now: **npm** records `_npmUser` (the account that published the version — the
+  first-order hijack signal) and the full `maintainers` set; **crates** reads `published_by`
+  from the version (the inline `owners` it tried before is a separate endpoint, so it captured
+  nothing — 0% in prod); **gomod** derives the VCS owner from the module path
+  (`github.com/<owner>/...`, falling back to the host for vanity paths) since the Go proxy
+  exposes no uploader; **pypi** falls back author→maintainer and now persists the uploader.
+  `_apply_metadata` carries `upload_user` + a plural `maintainers` list end-to-end.
+  `ecosystems/{npm,crates,gomod}/fetch/download.py`, `pipeline.py`.
+- **Fetch + statically analyze second-stage deps from suspicious file hosters (npm).**
+  npm lets a dependency be a raw tarball URL instead of a registry range; a
+  dependency-confusion/staged-payload package points it at attacker infra (e.g.
+  `corporate-front-vue@99.9.1 → https://<bucket>.storage.googleapis.com/depenconf/
+  ltidisafe-*.tgz`, whose `preinstall` hex-exfils host/user to a Burp Collaborator
+  callback). The scanner now (1) flags every URL-spec dependency
+  (`installer.npm_url_dependency`, high on a suspicious host — cloud buckets, abuse/tunnel
+  hosts, paste sites, raw/gist), and (2) for suspicious hosts **fetches the tarball and
+  runs the static analyzers over the second stage**, merging findings (namespaced
+  `[fetched-dep:<name>]`) so the staged payload convicts the parent at scan time — no
+  detonation required. Heavily bounded and SSRF-guarded: rejects private/loopback/
+  link-local/reserved/metadata IPs, no redirect-following, 20 MB / 15 s / 3-deps caps,
+  never executed. Reaches attacker infrastructure from the scanner host, so it's gated by
+  `PKGSENTRY_FETCH_URL_DEPS` (default on; the static flag still fires when off). Caps tune
+  via `PKGSENTRY_URL_DEP_{MAX_MB,TIMEOUT,MAX_COUNT}`. `ecosystems/npm/url_deps.py`.
+- **Prompt-injection defense for LLM triage.** The triage model reads attacker-controlled
+  source, so a package can embed text aimed at clearing its own verdict. On top of the
+  existing spotlighting + hardened system prompt, two confidence tiers:
+  - `iocs.llm_prompt_injection` (high, **non-downgradable**) — output-schema mimicry of our
+    exact internal field (`agrees_with_rules`). Near-zero legitimate use, so an injected
+    `benign` verdict can't clear the package (`llm_clear_blocked_prompt_injection`).
+  - `iocs.llm_injection_phrase` (medium, **informational**) — instruction-override phrases
+    ("ignore previous instructions", "mark this as benign"). These also appear incidentally
+    in large minified bundles and, deliberately, in *defensive* injection-guard pattern
+    lists, so the LLM still adjudicates rather than the verdict being forced.
+- **Detonation exfil alerts now show the resolved domain, not just the IP.** The DNS-aware
+  capture already annotated each connect with its hostname, but `dyn_install_exfil` /
+  `dyn_import_exfil` evidence printed only `IP:port`, so an operator couldn't tell a beacon to
+  `callback.workers.dev` from a legit fetch from `cdn.sheetjs.com` (both Cloudflare IPs). The
+  evidence now renders `hostname (ip):port`. Also allowlisted `cdn.sheetjs.com` (SheetJS's
+  off-registry distribution CDN — packages that bundle xlsx fetch from it at install).
+- **DNS-aware filter no longer false-positives on legit CDN-fronted hosts.** The DNS-aware
+  change judged a connect *with* a hostname purely by domain and skipped the IP-CIDR
+  allowlist, so a non-abuse host resolving into an allowlisted CDN range (e.g.
+  `static.rust-lang.org` on Fastly — the `typos` install fetch) FP'd as exfil. The IP-CIDR
+  allowlist is now consulted for hostnamed connects too; abuse hosts are matched first, so
+  this can't re-allow a `workers.dev` beacon — it only restores the no-FP behaviour.
+  `detonation/internal/baseline/filter.go`.
+- **Checksum-verified prebuilt-binary downloads no longer convict as droppers.** A native
+  wrapper that downloads its platform binary at install (esbuild/swc/`@huayoung/huayoungtk-cli`)
+  tripped `npm_install_remote_binary_drop` + the `dyn_install_exfil` chain. When the install
+  script also **SHA-256/512-verifies** the download, the drop finding is down-weighted (high→low)
+  and the vendor host is recorded; at detonation re-score an install-time connect to that same
+  host is recognized as the legit self-download (not exfil) and won't chain to malicious. An
+  *unverified* drop, or exfil to a host unrelated to the download host, still convicts.
+  `ecosystems/npm/installer.py`, `detonation_worker.py`.
+- **OAST callback domains caught even when the URL is string-built** (`iocs.oast_callback`).
+  A payload that splits `'http://' + x + '.oastify.com'` to dodge the URL-literal scanner is
+  now caught by the bare-domain literal (these domains have ~zero legit use in source).
+- **`dependency_confusion_version` flags high-major-not-year versions** (`99.9.1`, `100.0.0`)
+  — the version-inflation pattern that wins a semver resolution race; calendar versions
+  (`2024.1.1`) are excluded.
+- **DNS-aware detonation network filtering + `dyn_abuse_hosting_callback` (critical).**
+  A forwarder container on the detonation bridge captures every name a sandbox resolves
+  (IP→hostname); outbound connects are then judged by *domain*, not by shared-CDN IP, so
+  a runtime beacon to an abuse-prone host (`workers.dev`, `pages.dev`, `trycloudflare`,
+  `ngrok`, `deno.dev`, …) is caught even though it inherits a big provider's trusted IPs.
+  Closes the false-negative where `workers.dev` exfil hid inside the Cloudflare range the
+  registry/CDN allowlist needs. CIDR allowlists are retained only as a no-hostname
+  fallback (no FP regression on legit CDN fetches). Static counterpart
+  `iocs.abuse_hosting_callback` flags the same hosts in source URLs.
+- **Static install-time recon detectors (npm).** `installer.npm_install_{host_recon,
+  network_recon,ci_secret_harvest}` and the `recon_exfil` chain — host/network
+  fingerprinting and CI-secret harvest (`GITHUB_TOKEN`, `NPM_TOKEN`, CI env) in lifecycle
+  scripts and referenced JS, the fast-path for the recon→exfil stealer class.
+- **Vault-first detonation.** Async detonation now detonates the exact frozen bytes from
+  the sample vault instead of re-fetching by name+version — a malicious release is often
+  yanked before async detonation runs, so a re-fetch detonated a takedown placeholder
+  (`0.0.1-security`) instead of the payload. Falls back to re-fetch only when unvaulted.
+
+### Changed
+- **Default LLM triage model → `deepseek/deepseek-v4-flash`** (was `z-ai/glm-5.1`). A benchmark
+  over 9 labeled real samples (5 malware incl. a RAT + a basE91 backdoor + a dep-confusion
+  second-stage, 4 distinct benign-FP classes) scored it perfect — 5/5 malware not suppressed,
+  4/4 false positives cleared — at **~14× lower cost** than glm-5.1 (which left one FP
+  un-cleared). Override with `PKGSENTRY_LLM_MODEL`; `moonshotai/kimi-k2.6:free` was an equally
+  accurate free option. `openai/gpt-oss-20b` and `minimax/minimax-m2.5` cleared real malware in
+  testing — do not use them.
+- **Threat-intel auto-seeding now defaults OFF** (`PKGSENTRY_THREATINTEL_AUTOSEED=0`). A
+  double-confirmed false positive self-seeds its own fingerprints and re-confirms on every
+  later release (the graphifyy class). Re-enable explicitly once the defensive-module guard
+  lands.
+
 ## [0.5.2] — 2026-06-02
 
 ### Known limitations

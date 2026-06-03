@@ -68,6 +68,54 @@ _JS_DECODE = re.compile(
     r"Buffer\.from\([^)]*['\"]base64['\"]|\batob\s*\(",
 )
 
+# --- reconnaissance / collection (MITRE Collection) --------------------------
+# Scoped to INSTALL scripts, where system/network/CI recon has near-zero legit use.
+# os.platform / os.arch / os.cpus are deliberately EXCLUDED — native wrappers check
+# them to pick the right prebuilt binary, so they FP heavily.
+_JS_HOST_RECON = re.compile(
+    r"\bos\.(?:hostname|userInfo)\s*\(|"
+    r"\b(?:whoami|systeminfo)\b|\buname\s+-|\bid\s+-un\b|echo\s+%USERNAME%",
+    re.IGNORECASE,
+)
+_JS_NET_RECON = re.compile(
+    r"\bos\.networkInterfaces\s*\(|\b(?:ifconfig|ipconfig|ip\s+addr)\b",
+    re.IGNORECASE,
+)
+_JS_CI_HARVEST = re.compile(
+    r"GITHUB_TOKEN|GITHUB_ACTOR|GITHUB_REPOSITORY|GH_TOKEN|"
+    r"NPM_TOKEN|NODE_AUTH_TOKEN|CIRCLECI|JENKINS_URL|GITLAB_CI",
+)
+
+
+def _recon_findings(content: str, rel: str) -> list["Finding"]:
+    """Install-time reconnaissance/collection findings. Fires even with no
+    child_process — closes the recon-stealer FN shape (brave-search-mcp-server)."""
+    out: list[Finding] = []
+    host = bool(_JS_HOST_RECON.search(content))
+    netr = bool(_JS_NET_RECON.search(content))
+    ci = bool(_JS_CI_HARVEST.search(content))
+    if host:
+        out.append(Finding(
+            rule_id="installer.npm_install_host_recon", category=CATEGORY,
+            severity="medium", confidence="medium", file=rel,
+            evidence="install script gathers host info (hostname/user/whoami/uname)"))
+    if netr:
+        out.append(Finding(
+            rule_id="installer.npm_install_network_recon", category=CATEGORY,
+            severity="medium", confidence="medium", file=rel,
+            evidence="install script enumerates network interfaces / internal IPs"))
+    if ci:
+        out.append(Finding(
+            rule_id="installer.npm_install_ci_secret_harvest", category=CATEGORY,
+            severity="high", confidence="medium", file=rel,
+            evidence="install script reads CI / GitHub Actions secrets or tokens"))
+    if (host or netr or ci) and _JS_NET.search(content):
+        out.append(Finding(
+            rule_id="installer.npm_install_recon_exfil", category=CATEGORY,
+            severity="high", confidence="high", file=rel,
+            evidence="install script collects system/network/CI recon and sends it over the network"))
+    return out
+
 # Self-decoding packer inside a referenced install script: a char-code decode
 # (String.fromCharCode / charCodeAt / a long decimal array) or a runtime
 # crypto-decrypt (createDecipheriv), whose output is run through eval/Function
@@ -119,6 +167,16 @@ _JS_CHMOD_EXEC = re.compile(
 )
 _URL_HOST = re.compile(r"https?://([A-Za-z0-9.\-]+)", re.IGNORECASE)
 
+# Integrity verification of the downloaded binary: the install script computes a
+# SHA-256/512 of the download (to compare against a published checksum and refuse/
+# delete on mismatch). This is the legit prebuilt-binary distribution pattern
+# (esbuild/swc/@vscode-ripgrep and the huayoungtk-cli vendor CLI all do it); malware
+# droppers chmod+exec whatever they fetched without verifying it. A strong (if not
+# unforgeable) discriminator — it down-weights the remote-binary-drop finding.
+_CHECKSUM_VERIFY = re.compile(
+    r"createHash\s*\(\s*['\"]sha(?:256|512)['\"]", re.IGNORECASE,
+)
+
 # Universal release hosts a native wrapper may legitimately pull a binary from,
 # independent of the package's own repo. Subdomain-matched (endswith ".<host>").
 _TRUSTED_RELEASE_HOSTS = frozenset({
@@ -168,6 +226,15 @@ def _host_trusted(host: str, declared_hosts: set[str]) -> bool:
 # routinely run install hooks via `tsx`/`ts-node` (e.g. `postinstall: tsx setup.ts`),
 # and an attacker can ship the payload as .ts to evade a .js-only follow.
 _LOCAL_SCRIPT_REF = re.compile(r"(?:^|\s)(?:\./)?([\w./-]+\.(?:[cm]?jsx?|[cm]?tsx?))\b")
+
+# Extensionless reference run by a JS interpreter: `postinstall: node install` or
+# `tsx setup` — a payload shipped without a file extension dodges the extension-only
+# matcher above. Resolved by trying common JS/TS extensions (+ <dir>/index.js).
+_INTERP_SCRIPT_REF = re.compile(
+    r"(?:^|[\s;&|()])(?:node|tsx|ts-node|babel-node)\s+(?:--?\S+\s+)*(?:\./)?([\w./-]+)"
+)
+_RESOLVE_EXTS = (".js", ".cjs", ".mjs", ".ts", ".cts", ".mts")
+_JS_TS_SUFFIXES = {".js", ".cjs", ".mjs", ".jsx", ".ts", ".cts", ".mts", ".tsx"}
 
 _SUSPICIOUS_BIN_EXT = {".sh", ".ps1", ".bat", ".cmd", ".exe", ".dll", ".so", ".bin"}
 
@@ -287,9 +354,34 @@ def _analyze_referenced_js(
     """Scan local .js files invoked by a lifecycle script."""
     declared_hosts = declared_hosts or set()
     findings: list[Finding] = []
+
+    # Build the set of referenced local scripts to follow: explicit-extension refs
+    # plus extensionless interpreter refs resolved via JS/TS module resolution.
+    candidates: list[tuple[str, Path]] = []
+    seen_targets: set[Path] = set()
+
+    def _add(ref: str) -> None:
+        tgt = (pkg_dir / ref).resolve()
+        if tgt in seen_targets:
+            return
+        seen_targets.add(tgt)
+        candidates.append((ref, tgt))
+
     for m in _LOCAL_SCRIPT_REF.finditer(script):
+        _add(m.group(1))
+    for m in _INTERP_SCRIPT_REF.finditer(script):
         ref = m.group(1)
-        target = (pkg_dir / ref).resolve()
+        if Path(ref).suffix.lower() in _JS_TS_SUFFIXES:
+            continue  # already handled by the extension matcher
+        for ext in _RESOLVE_EXTS:
+            if (pkg_dir / (ref + ext)).resolve().is_file():
+                _add(ref + ext)
+                break
+        else:
+            if (pkg_dir / ref / "index.js").resolve().is_file():
+                _add(f"{ref.rstrip('/')}/index.js")
+
+    for ref, target in candidates:
         try:
             target.relative_to(pkg_dir.resolve())  # stay inside the package
         except ValueError:
@@ -301,6 +393,7 @@ def _analyze_referenced_js(
         except Exception:
             continue
         rel = f"{rel_prefix}{ref}"
+        findings.extend(_recon_findings(content, rel))
         has_net = bool(_JS_NET.search(content))
         has_exec = bool(_JS_EXEC.search(content))
         if has_net and has_exec:
@@ -379,15 +472,30 @@ def _analyze_referenced_js(
             hosts = {h.lower() for h in _URL_HOST.findall(content)}
             untrusted = sorted(h for h in hosts if not _host_trusted(h, declared_hosts))
             if untrusted:
-                findings.append(Finding(
-                    rule_id="installer.npm_install_remote_binary_drop",
-                    category=CATEGORY, severity="high", confidence="high",
-                    file=rel,
-                    evidence=(
-                        "install script downloads + chmod-executes a binary from a host "
-                        f"unrelated to the package repo: {', '.join(untrusted[:3])}"
-                    ),
-                ))
+                if _CHECKSUM_VERIFY.search(content):
+                    # Checksum-verified prebuilt-binary download (legit native-wrapper
+                    # pattern). Down-weighted; the host is recorded after "hosts:" so the
+                    # detonation re-score recognizes an install-time connect to it as the
+                    # legit self-download rather than chaining dyn_install_exfil to malicious.
+                    findings.append(Finding(
+                        rule_id="installer.npm_install_remote_binary_drop",
+                        category=CATEGORY, severity="low", confidence="medium",
+                        file=rel,
+                        evidence=(
+                            "checksum-verified prebuilt-binary download (legit native-wrapper "
+                            f"pattern); hosts: {', '.join(untrusted[:3])}"
+                        ),
+                    ))
+                else:
+                    findings.append(Finding(
+                        rule_id="installer.npm_install_remote_binary_drop",
+                        category=CATEGORY, severity="high", confidence="high",
+                        file=rel,
+                        evidence=(
+                            "install script downloads + chmod-executes a binary from a host "
+                            f"unrelated to the package repo: {', '.join(untrusted[:3])}"
+                        ),
+                    ))
             elif not hosts:
                 findings.append(Finding(
                     rule_id="installer.npm_install_remote_binary_drop",

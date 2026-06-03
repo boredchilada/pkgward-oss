@@ -150,6 +150,30 @@ def _manifest_toml(*, ecosystem: str, name: str, version: str, sha256: str,
     return "\n".join(lines) + "\n"
 
 
+def read_archive(ecosystem: str, name: str, version: str) -> Optional[tuple[bytes, str]]:
+    """Read back a vaulted archive's *original, unmodified* bytes.
+
+    Returns ``(archive_bytes, inner_filename)`` or ``None`` if the package isn't
+    vaulted / can't be read. Pure data — decrypts with stdlib ``zipfile`` (ZipCrypto
+    pw) and never executes anything. Used by detonation to run the exact bytes we
+    scanned instead of re-fetching (the registry yanks malicious versions fast)."""
+    import glob
+    import zipfile
+    vdir = vault_dir()
+    if vdir is None:
+        return None
+    stem = _safe_stem(ecosystem, name, version)
+    for zp in sorted(glob.glob(str(vdir / f"{stem}__*.zip"))):
+        try:
+            with zipfile.ZipFile(zp) as z:
+                inner = z.namelist()[0]
+                data = z.read(inner, pwd=VAULT_PASSWORD)
+            return data, inner
+        except Exception as e:  # noqa: BLE001
+            log.warning("vault_read_back_failed", error=str(e), zip=zp)
+    return None
+
+
 def archive_to_vault(*, ecosystem: str, name: str, version: str,
                      archive_path: Path, archive_kind: str, verdict: str,
                      score: int, expect_rules: Sequence[str] = (),

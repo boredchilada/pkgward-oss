@@ -210,7 +210,11 @@ def _dependency_confusion_version(version: str) -> bool:
     if all(set(p) == {"9"} for p in parts):
         return True
     nums = [int(p) for p in parts]
-    return len(set(nums)) == 1 and nums[0] >= 9
+    if len(set(nums)) == 1 and nums[0] >= 9:
+        return True
+    # A very high major that isn't a plausible calendar year (2024.1.1) — version
+    # inflation to win a semver resolution race (e.g. corporate-front-vue@99.9.1).
+    return 99 <= nums[0] < 1900
 
 
 def _dep_confusion_finding(version: str) -> Optional[Finding]:

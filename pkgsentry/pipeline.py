@@ -164,8 +164,11 @@ def _apply_metadata(
 ) -> None:
     if not metadata:
         return
-    ver.author = metadata.get("author") or None
-    ver.author_email = metadata.get("author_email") or None
+    ver.author = metadata.get("author") or metadata.get("maintainer") or None
+    ver.author_email = metadata.get("author_email") or metadata.get("maintainer_email") or None
+    upload_user = metadata.get("upload_user")
+    if upload_user:
+        ver.upload_user = str(upload_user)[:128]
     ver.home_page = metadata.get("home_page") or None
     summary = metadata.get("summary")
     if summary:
@@ -192,9 +195,13 @@ def _apply_metadata(
             )
         except (TypeError, ValueError):
             pass
-    maintainer = metadata.get("maintainer")
-    if maintainer:
-        ver.maintainers = [maintainer]
+    maintainers = metadata.get("maintainers")
+    if isinstance(maintainers, list) and maintainers:
+        ver.maintainers = maintainers
+    else:
+        maintainer = metadata.get("maintainer")
+        if maintainer:
+            ver.maintainers = [maintainer]
     if watchlist_rank is not None:
         pkg = session.get(Package, ver.package_id)
         if pkg is not None:
@@ -362,7 +369,11 @@ def _compute_file_hashes(
         except OSError:
             continue
         sha = hashlib.sha256(data).hexdigest()
-        ent = 0.0 if lite else (_shannon_entropy(data) if len(data) >= 64 else 0.0)
+        # Entropy is computed even in lite mode: it's a single O(n) histogram (cheaper
+        # than the ssdeep/TLSH on the next lines) and analyze_entropy_delta needs it to
+        # detect a clean->obfuscated version transition on giant packages. Only the
+        # full analyze_entropy/obfuscation rglob passes are skipped in lite (below).
+        ent = _shannon_entropy(data) if len(data) >= 64 else 0.0
         fuzzy = _ssdeep(data) if _ssdeep and len(data) >= 64 else ""
         tl = _tlsh(data) if _tlsh and len(data) >= 64 else ""
         normalized_info[normalized] = FileInfo(sha256=sha, entropy=ent, ssdeep=fuzzy, tlsh=tl)
@@ -503,8 +514,10 @@ def _run_analyzers(
         findings.extend(analyze_malware_patterns(sub, changed_files=changed))
     findings.extend(analyze_iocs(sub, changed_files=changed))
     findings.extend(analyze_secret_access(sub, changed_files=changed))
-    # Giant fast-path: skip the heaviest per-file CPU analyzers (entropy +
-    # obfuscation). entropy_delta is cheap (prev-vs-current FileInfo) — keep it.
+    # Giant fast-path: skip the full per-file entropy + obfuscation rglob passes.
+    # entropy_delta still runs — the per-file FileInfo.entropy it compares is computed
+    # even in lite mode (see _compute_file_hashes), so the clean->obfuscated version
+    # transition detector stays live on giant packages.
     if not lite:
         findings.extend(analyze_entropy(sub, changed_files=changed))
         findings.extend(analyze_obfuscation(sub, changed_files=changed))
@@ -537,6 +550,15 @@ async def run_static_analyzers(
     findings: list[Finding] = []
     if arc_kind == adapter.install_archive_kind and not replaces_install_analyzer_for(ecosystem):
         findings.extend(await adapter.analyze_install(sub, changed_files=changed))
+    if ecosystem == "npm" and arc_kind == adapter.install_archive_kind:
+        # URL-spec dependencies (raw tarball on a suspicious host) — flag them, and
+        # fetch + statically analyze the second stage so a staged dependency-confusion
+        # payload convicts the parent at scan time. Network + fail-soft; never blocks.
+        from pkgsentry.ecosystems.npm.url_deps import analyze_url_dependencies
+        try:
+            findings.extend(await analyze_url_dependencies(sub))
+        except Exception as e:
+            log.warning("url_deps_failed", error=str(e))
     analyzer_findings = await asyncio.to_thread(
         _run_analyzers, sub, changed, current_info or {}, prev_info or {},
         norm_to_real or {}, ecosystem=ecosystem, lite=lite,
@@ -869,11 +891,13 @@ def _persist_and_finalize(
                 _dl = _downloads.enrich(ecosystem, name)
             except Exception:
                 _dl = None
+            from pkgsentry.enrich import publisher as _publisher
+            _pub = _publisher.from_scan(scan_id)
             discord_notify.send_alert(
                 pkg_name=name, pkg_version=version, ecosystem=ecosystem,
                 rule_verdict=result.verdict, rule_score=result.score,
                 n_findings=len(all_findings), triage=tri, findings=all_findings,
-                downloads_weekly=_dl,
+                downloads_weekly=_dl, publisher=_pub,
             )
 
         # Finalize the queue row now that the alert has been handled.

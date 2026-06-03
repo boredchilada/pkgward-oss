@@ -52,7 +52,12 @@ def _domain_of(url: bytes) -> bytes:
         return b".".join(parts[-2:])
     return host
 
-_TEMPLATE_URL_RE = re.compile(rb"[{%$]|^\.{2,}$|^:$|^test")
+# Template/placeholder host whitelist. The test-placeholder arm is anchored to the
+# WHOLE host (test, testserver, test.com, ...) — a bare "^test" prefix silently
+# whitelisted real C2 on any host starting with "test" (test-c2.evil.com).
+_TEMPLATE_URL_RE = re.compile(
+    rb"[{%$]|^\.{2,}$|^:$|^test(?:server|host|ing|bed|\.(?:com|org|net|local|example|invalid))?$"
+)
 # Markdown/RST artifacts that leak into URL captures: trailing backticks, punctuation, brackets
 _JUNK_SUFFIX_RE = re.compile(rb"[`),;'\"\]>]+$")
 
@@ -136,6 +141,15 @@ _OAST_DOMAINS = (
     "dnslog.cn", "requestcatcher.com", "canarytokens.com", "canarytokens.org",
 )
 
+# Bare/concatenated OAST-domain literal — catches string-built callbacks like
+# `"http://" + data + ".oastify.com"` that the full-URL matcher misses (the payload
+# splits the URL specifically to dodge URL-literal scanners). These domains have
+# ~zero legitimate use inside package source.
+_OAST_LITERAL_RE = re.compile(
+    rb"\b(?:" + b"|".join(re.escape(d.encode("ascii")) for d in _OAST_DOMAINS) + rb")\b",
+    re.IGNORECASE,
+)
+
 
 def _is_oast_url(url_bytes: bytes) -> bool:
     """True if the URL's host is (a subdomain of) a known OOB-interaction service."""
@@ -146,6 +160,32 @@ def _is_oast_url(url_bytes: bytes) -> bool:
     host = u.split("://", 1)[-1].split("/", 1)[0].split("?", 1)[0]
     host = host.split("#", 1)[0].split("@")[-1].split(":", 1)[0].strip().rstrip(".")
     return any(host == d or host.endswith("." + d) for d in _OAST_DOMAINS)
+
+
+# Abuse-prone serverless / tunnel hosting. These hosts sit behind a big provider's
+# trusted CDN IPs (Cloudflare/Vercel/etc.), so IP-based allowlists wave them through
+# even though they're disproportionately used for C2 / install-time exfil — a package
+# beaconing to one is near-certainly malicious. Matched by DOMAIN (the static layer
+# sees the hostname; detonation can't, which is exactly the gap). Heavy-legit app
+# hosts (vercel.app/netlify.app/herokuapp.com) are deliberately NOT in this general
+# list — they're handled in the install-script context to avoid FP on legit links.
+_ABUSE_HOSTING = (
+    "workers.dev", "pages.dev", "trycloudflare.com", "r2.dev",
+    "ngrok.io", "ngrok-free.app", "ngrok.app", "ngrok.dev",
+    "deno.dev", "val.run", "glitch.me", "repl.co", "replit.dev",
+    "surge.sh", "serveo.net", "loca.lt", "telebit.io", "webhook.cool",
+)
+
+
+def _is_abuse_hosting_url(url_bytes: bytes) -> bool:
+    """True if the URL's host is (a subdomain of) an abuse-prone hosting/tunnel host."""
+    try:
+        u = url_bytes.decode("utf-8", "replace").lower()
+    except Exception:
+        return False
+    host = u.split("://", 1)[-1].split("/", 1)[0].split("?", 1)[0]
+    host = host.split("#", 1)[0].split("@")[-1].split(":", 1)[0].strip().rstrip(".")
+    return any(host == d or host.endswith("." + d) for d in _ABUSE_HOSTING)
 
 
 # --- simple-encoding decode pass: surface IOCs hidden behind base64 / hex / \xNN.
@@ -167,11 +207,14 @@ def _mostly_printable(b: bytes) -> bool:
 
 def _decode_blobs(data: bytes) -> list[bytes]:
     out: list[bytes] = []
-    n = 0
+    # Per-type budgets, NOT one shared cap: a base64-heavy file must not exhaust the
+    # budget before the hex/\xNN passes run — deliberately-concealed C2 (the highest-
+    # signal case this exists to catch) routinely hides in exactly those encodings.
+    nb = 0
     for m in _B64_CAND_RE.finditer(data):
-        if n >= _DECODE_BLOB_CAP:
+        if nb >= _DECODE_BLOB_CAP:
             break
-        n += 1
+        nb += 1
         blob = m.group(0)
         try:
             dec = base64.b64decode(blob + b"=" * ((-len(blob)) % 4), validate=False)
@@ -179,20 +222,22 @@ def _decode_blobs(data: bytes) -> list[bytes]:
             continue
         if _mostly_printable(dec):
             out.append(dec)
+    nx = 0
     for m in _XESC_RE.finditer(data):
-        if n >= _DECODE_BLOB_CAP:
+        if nx >= _DECODE_BLOB_CAP:
             break
-        n += 1
+        nx += 1
         try:
             dec = bytes(int(h, 16) for h in re.findall(rb"\\x([0-9a-fA-F]{2})", m.group(0)))
         except ValueError:
             continue
         if _mostly_printable(dec):
             out.append(dec)
+    nh = 0
     for m in _HEXSTR_RE.finditer(data):
-        if n >= _DECODE_BLOB_CAP:
+        if nh >= _DECODE_BLOB_CAP:
             break
-        n += 1
+        nh += 1
         h = m.group(0)
         if len(h) % 2:
             h = h[:-1]
@@ -205,6 +250,27 @@ def _decode_blobs(data: bytes) -> list[bytes]:
     return out
 
 
+# LLM-triage manipulation text, split by confidence:
+#
+# SCHEMA-MIMICRY (iocs.llm_prompt_injection, high, NON-downgradable in triage): the
+# source contains our exact internal triage-output field — essentially zero
+# legitimate reason, so an injected verdict can't be trusted to clear the package.
+_LLM_SCHEMA_MIMIC_RES = (
+    re.compile(rb"agrees_with_rules", re.IGNORECASE),  # our exact output-schema field
+)
+# INSTRUCTION-OVERRIDE PHRASES (iocs.llm_injection_phrase, medium, downgradable):
+# real but FP-prone — they appear in large minified bundles incidentally AND in
+# DEFENSIVE security tools that list injection patterns to block them
+# (mindforge INJECTION_GUARD, capgo bundle). So this is informational: the LLM still
+# sees it and adjudicates; it does NOT force the verdict.
+_LLM_OVERRIDE_RES = (
+    re.compile(rb"[\"']verdict[\"']\s*:\s*[\"'](?:benign|safe)", re.IGNORECASE),
+    re.compile(rb"ignore\s+(?:all\s+|the\s+|any\s+)*(?:previous|prior|above|preceding|earlier|system)\s+(?:instruction|prompt|message|rule)", re.IGNORECASE),
+    re.compile(rb"disregard\s+(?:all\s+|the\s+|any\s+)*(?:previous|prior|above|preceding|earlier|system)\b", re.IGNORECASE),
+    re.compile(rb"(?:mark|classify|label|treat|rate|consider|report)\s+(?:this|it|the\s+\w+)\s+(?:package\s+|code\s+|file\s+)?(?:as\s+)?(?:safe|benign|clean|trusted|not\s+malicious|non-malicious|a\s+false\s+positive)", re.IGNORECASE),
+)
+
+
 def _scan_file(path: Path) -> list[Finding]:
     try:
         data = path.read_bytes()
@@ -213,6 +279,27 @@ def _scan_file(path: Path) -> list[Finding]:
     out: list[Finding] = []
     seen: set[tuple[str, bytes]] = set()
     is_doc = _is_doc_file(path.name)
+    for _rx in _LLM_SCHEMA_MIMIC_RES:
+        _mi = _rx.search(data)
+        if _mi:
+            out.append(Finding(
+                rule_id="iocs.llm_prompt_injection", category=CATEGORY,
+                severity="high", confidence="high", file=path.name, line=None,
+                evidence="LLM triage output-schema mimicry in source: "
+                + _mi.group(0).decode("utf-8", errors="replace")[:160],
+            ))
+            break
+    for _rx in _LLM_OVERRIDE_RES:
+        _mi = _rx.search(data)
+        if _mi:
+            out.append(Finding(
+                rule_id="iocs.llm_injection_phrase", category=CATEGORY,
+                severity="medium", confidence="low", file=path.name, line=None,
+                evidence="LLM instruction-override phrase in source (informational; "
+                "also appears in defensive injection-guard lists): "
+                + _mi.group(0).decode("utf-8", errors="replace")[:160],
+            ))
+            break
     for m in _URL_RE.finditer(data):
         url_body = m.group(1)
         full_url = m.group(0)
@@ -227,6 +314,14 @@ def _scan_file(path: Path) -> list[Finding]:
                 rule_id="iocs.oast_callback", category=CATEGORY, severity="high", confidence="high",
                 file=path.name, line=None,
                 evidence=full_url.decode("utf-8", errors="replace")[:200],
+            ))
+            continue
+        if _is_abuse_hosting_url(full_url):
+            out.append(Finding(
+                rule_id="iocs.abuse_hosting_callback", category=CATEGORY,
+                severity="medium", confidence="high", file=path.name, line=None,
+                evidence="callback to abuse-prone hosting/tunnel host: "
+                + full_url.decode("utf-8", errors="replace")[:160],
             ))
             continue
         out.append(Finding(
@@ -335,6 +430,18 @@ def _scan_file(path: Path) -> list[Finding]:
                     severity="high", confidence="medium", file=path.name, line=None,
                     evidence=f"decoded: {ip.decode('ascii')} ({why})",
                 ))
+
+    # Fallback: a bare/concatenated OAST-domain literal the full-URL scan above missed
+    # (string-built callbacks). Only if no oast finding already fired; skip docs.
+    if not is_doc and not any(f.rule_id == "iocs.oast_callback" for f in out):
+        _om = _OAST_LITERAL_RE.search(data)
+        if _om:
+            out.append(Finding(
+                rule_id="iocs.oast_callback", category=CATEGORY, severity="high",
+                confidence="high", file=path.name, line=None,
+                evidence="OOB-interaction callback domain in source (string-built): "
+                + _om.group(0).decode("utf-8", "replace")[:80],
+            ))
     return out
 
 

@@ -75,6 +75,31 @@ _OK_EXTENSIONS = {
     ".whl", ".egg",
 }
 
+# Executable-image magics only (subset of _MAGIC_BYTES). Used by the source-text
+# analyzers to skip a compiled binary that wears a source extension — e.g. a native
+# CLI shipped as `bin/tool.js` that is actually an ELF (esbuild/swc/cxpher pattern).
+# Reading such a file as text turns its high-bit bytes into bogus "CJK/homoglyph
+# identifiers" and trips entropy. Magic-byte match only — NOT a NUL-byte heuristic,
+# which would also skip a genuinely-obfuscated encrypted payload hidden in a .py/.js.
+_EXEC_IMAGE_MAGICS = (
+    b"\x7fELF", b"MZ",
+    b"\xfe\xed\xfa\xce", b"\xfe\xed\xfa\xcf",
+    b"\xce\xfa\xed\xfe", b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe",
+    b"\x00\x61\x73\x6d",  # WebAssembly
+)
+
+
+def looks_like_compiled_binary(path: Path) -> bool:
+    """True if the file's *content* is a compiled executable image, regardless of
+    extension. Source-text analyzers (obfuscation, entropy) call this to avoid
+    scanning a native binary that carries a .js/.py/.txt name. Deliberately strict
+    (magic bytes only) so an encrypted text-disguised payload still gets scanned."""
+    try:
+        header = path.read_bytes()[:8]
+    except OSError:
+        return False
+    return any(header.startswith(m) for m in _EXEC_IMAGE_MAGICS)
+
 _OK_DIRS = {"__pycache__", ".git", "node_modules"}
 
 _DISGUISE_EXTENSIONS = {".py", ".txt", ".json", ".cfg", ".ini", ".yml", ".yaml"}

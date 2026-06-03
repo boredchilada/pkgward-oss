@@ -4,6 +4,11 @@ version = "1.0.0"
 label = "good"
 expected_verdict = "clean"
 expect_rules = ["binary.compiled_artifact"]
-forbid_rules = ["binary.hidden_executable"]
-notes = "Native-binary CLI wrapper: launcher spawns extension-less dist/tool-<os>-<arch> binaries (the esbuild/turbo/biome pattern). FP guard for binary.hidden_executable — extension-less compiled binaries are not 'disguised'."
+forbid_rules = [
+    "binary.hidden_executable",
+    "obfuscation.nonascii_identifiers",
+    "obfuscation.homoglyph_identifiers",
+    "entropy.obfuscated_payload",
+]
+notes = "Native-binary CLI wrapper: launcher spawns extension-less dist/tool-<os>-<arch> binaries (esbuild/turbo/biome pattern) AND ships the native binary as bin/cXpher.js — an ELF wearing a .js name (cxpher pattern). FP guards: extension-less compiled binaries are not 'disguised' (binary.hidden_executable); the source-text analyzers must skip a compiled binary by content so its high-bit bytes don't read as bogus CJK/homoglyph 'identifiers' or trip entropy. binary.compiled_artifact still fires (correctly)."
 provenance = "synthetic"

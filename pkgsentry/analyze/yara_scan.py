@@ -50,15 +50,32 @@ def _get_rules():
         ns = f"{f.parent.name}__{f.stem}" if f.parent.name != "yara" else f.stem
         filepaths[ns] = str(f)
 
+    # Pre-validate each rule file on its own so a single malformed file — most often
+    # a typo in an operator's private overlay, the exact place high-fidelity campaign
+    # rules are added — doesn't take down the ENTIRE yara layer (layer 8) for the
+    # whole process. Bad files are dropped + logged; the rest still compile.
+    good: dict[str, str] = {}
+    for ns, fp in filepaths.items():
+        try:
+            yara.compile(filepath=fp, externals={"filename": ""})
+            good[ns] = fp
+        except yara.Error as e:
+            log.warning("yara_rule_file_skipped", file=fp, ns=ns, error=str(e))
+    if not good:
+        log.warning("yara_no_valid_rule_files", tried=len(filepaths))
+        return None
+
     try:
         _compiled_rules = yara.compile(
-            filepaths=filepaths,
+            filepaths=good,
             externals={"filename": ""},
         )
         _compiled_from = dirs
     except yara.Error as e:
-        log.warning("yara_compile_failed", error=str(e), files=list(filepaths.keys()))
+        log.warning("yara_compile_failed", error=str(e), files=list(good.keys()))
         return None
+    if len(good) < len(filepaths):
+        log.warning("yara_loaded_partial", loaded=len(good), total=len(filepaths))
     return _compiled_rules
 
 
@@ -81,6 +98,7 @@ def analyze_yara(
         return []
 
     out: list[Finding] = []
+    skipped_large = 0
 
     for p in extracted_root.rglob("*"):
         if not p.is_file():
@@ -92,6 +110,7 @@ def analyze_yara(
             continue
         try:
             if p.stat().st_size > _MAX_FILE_SIZE:
+                skipped_large += 1
                 continue
             data = p.read_bytes()
         except OSError:
@@ -132,4 +151,9 @@ def analyze_yara(
                 evidence=f"{desc} [{', '.join(matched_strings)}]" if matched_strings else desc,
             ))
 
+    if skipped_large:
+        # Large files (multi-MB bundled/packed installers) are exactly where install
+        # malware increasingly hides — surface the skip instead of dropping silently.
+        log.info("yara_skipped_large_files", count=skipped_large,
+                 max_mb=_MAX_FILE_SIZE // (1024 * 1024))
     return out

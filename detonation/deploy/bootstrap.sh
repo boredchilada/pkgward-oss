@@ -57,6 +57,15 @@ id detonation &>/dev/null || { groupadd -f detonation; useradd -r -m -d /home/de
 mkdir -p /home/detonation/deploy /home/detonation/bin
 cp -r "$DEPLOY_DIR/." /home/detonation/deploy/
 cp "$DET_DIR/bin/detonation-svc" /home/detonation/bin/
+
+# Stage the Go source for the dns-forwarder image build. setup.sh builds the
+# image into rootless Docker (which it brings up); the build context must be
+# readable by the detonation user, so it lives under the detonation home.
+rm -rf /home/detonation/src && mkdir -p /home/detonation/src
+cp -r "$DET_DIR/cmd" "$DET_DIR/internal" "$DET_DIR/go.mod" /home/detonation/src/
+[ -f "$DET_DIR/go.sum" ] && cp "$DET_DIR/go.sum" /home/detonation/src/
+cp "$DEPLOY_DIR/dns-forwarder.Dockerfile" /home/detonation/src/
+
 chown -R detonation:detonation /home/detonation
 
 # 5. Provision.

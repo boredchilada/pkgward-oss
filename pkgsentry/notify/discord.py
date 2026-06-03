@@ -51,6 +51,46 @@ def _severity_color(verdict: str, confidence: float) -> int:
     return 0xFEE75C
 
 
+def _fmt_maintainers(m) -> str:
+    """Render the maintainers column (npm list of {name,email} / list / string)."""
+    if isinstance(m, str):
+        return m
+    if isinstance(m, list):
+        out = []
+        for x in m[:6]:
+            if isinstance(x, dict):
+                nm = x.get("name") or x.get("email") or ""
+                if nm:
+                    out.append(str(nm))
+            elif x:
+                out.append(str(x))
+        return ", ".join(out)
+    return ""
+
+
+def _publisher_field(publisher: Optional[dict]) -> Optional[dict]:
+    """Author / publisher identity for supply-chain triage — the email domain and the
+    actual uploader often reveal the actor (a fresh gmail, a research firm, a typo'd
+    org). Defanged so Discord doesn't auto-link it."""
+    if not publisher:
+        return None
+    lines = []
+    author = (publisher.get("author") or "").strip()
+    email = (publisher.get("author_email") or "").strip()
+    if author or email:
+        lines.append("Author: " + (_defang(author) if author else "")
+                     + (f" <{_defang(email)}>" if email else ""))
+    uploader = (publisher.get("upload_user") or "").strip()
+    if uploader:
+        lines.append(f"Published by: `{_defang(uploader)}`")
+    names = _fmt_maintainers(publisher.get("maintainers"))
+    if names:
+        lines.append(f"Maintainers: {_defang(names)}")
+    if not lines:
+        return None
+    return {"name": "Publisher", "value": "\n".join(lines)[:1024], "inline": False}
+
+
 def _build_embed(
     *,
     pkg_name: str,
@@ -62,6 +102,7 @@ def _build_embed(
     triage: LLMTriageResult,
     top_findings: list[Finding],
     downloads_weekly: Optional[int] = None,
+    publisher: Optional[dict] = None,
 ) -> dict:
     # Grey when the LLM couldn't adjudicate (fail-open alert); red/orange when it did.
     unverified = triage.verdict not in ("malicious", "suspicious", "benign")
@@ -98,13 +139,17 @@ def _build_embed(
         finding_lines = []
         for f in top_findings[:8]:
             loc = f"`{f.file}:{f.line}`" if f.file and f.line else "`N/A`"
-            evidence = _defang(f.evidence[:80]) if f.evidence else ""
+            evidence = _defang(f.evidence[:240]) if f.evidence else ""
             finding_lines.append(f"**{f.rule_id}** [{f.severity}/{f.confidence}] {loc}\n{evidence}")
         fields.append({
             "name": "Top Rule Hits",
             "value": "\n".join(finding_lines)[:1024],
             "inline": False,
         })
+
+    pub = _publisher_field(publisher)
+    if pub:
+        fields.append(pub)
 
     fields.append({
         "name": "Registry",
@@ -218,6 +263,7 @@ def send_alert(
     triage: LLMTriageResult,
     findings: list[Finding],
     downloads_weekly: Optional[int] = None,
+    publisher: Optional[dict] = None,
 ) -> bool:
     """Post a Discord webhook alert. Returns True on success, False on failure.
     Best-effort — never raises."""
@@ -233,6 +279,7 @@ def send_alert(
         triage=triage,
         top_findings=_pick_top_findings(findings),
         downloads_weekly=downloads_weekly,
+        publisher=publisher,
     )
     return _post_embed(embed, pkg_name=pkg_name, pkg_version=pkg_version)
 
@@ -248,6 +295,7 @@ def send_dynamic_alert(
     n_findings: int,
     findings: list[Finding],
     downloads_weekly: Optional[int] = None,
+    publisher: Optional[dict] = None,
 ) -> bool:
     """Alert for a verdict flipped to malicious by async detonation (no LLM triage).
     Best-effort — never raises."""
@@ -269,9 +317,12 @@ def send_dynamic_alert(
         finding_lines = []
         for f in top[:8]:
             loc = f"`{f.file}:{f.line}`" if f.file and f.line else "`N/A`"
-            evidence = _defang(f.evidence[:80]) if f.evidence else ""
+            evidence = _defang(f.evidence[:240]) if f.evidence else ""
             finding_lines.append(f"**{f.rule_id}** [{f.severity}/{f.confidence}] {loc}\n{evidence}")
         fields.append({"name": "Top Rule Hits", "value": "\n".join(finding_lines)[:1024], "inline": False})
+    pub = _publisher_field(publisher)
+    if pub:
+        fields.append(pub)
     fields.append({"name": "Registry", "value": f"`{registry_url}`", "inline": False})
 
     embed = {

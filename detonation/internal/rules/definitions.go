@@ -3,6 +3,7 @@ package rules
 
 import (
 	"fmt"
+	"net"
 	"strings"
 
 	"detonation/internal/honeytokens"
@@ -35,6 +36,7 @@ func AllRules() []Rule {
 		// rather than solo-flipping to malicious — keeping FP low.
 		installExfil(),
 		importExfil(),
+		abuseHostingCallback(),
 		credentialRead(),
 		honeytokenExfil(),
 		screenCaptureProbe(),
@@ -92,41 +94,154 @@ func honeytokenExfil() Rule {
 	}
 }
 
-func installExfil() Rule {
+// abuseHostingCallback fires when a connect resolves to an abuse-prone serverless
+// / tunnel host (workers.dev, ngrok, …). The baseline filter tags such connects
+// (it matches by HOSTNAME, so a shared-CDN IP can't hide them) — this is a runtime
+// confirmation that the package actually beaconed to a known C2/exfil channel, so
+// it's critical (a connect a legit install never makes).
+func abuseHostingCallback() Rule {
 	return Rule{
-		ID: "dyn_install_exfil",
+		ID: "dyn_abuse_hosting_callback",
 		Evaluate: func(evt trace.TraceEvent) *trace.DynFinding {
-			if evt.Phase != "install" || evt.Category != "network" || evt.Operation != "connect" {
+			if evt.Category != "network" || evt.Operation != "connect" {
 				return nil
 			}
+			if abuse, _ := evt.Detail["abuse_host"].(bool); !abuse {
+				return nil
+			}
+			host, _ := evt.Detail["hostname"].(string)
 			addr, _ := evt.Detail["addr"].(string)
-			port, _ := evt.Detail["port"].(float64)
 			return &trace.DynFinding{
-				RuleID:     "dyn_install_exfil",
+				RuleID:     "dyn_abuse_hosting_callback",
 				Category:   "dynamic",
-				Severity:   "high",
+				Severity:   "critical",
 				Confidence: "high",
-				Evidence:   fmt.Sprintf("connect(AF_INET, %s:%d) to a non-allowlisted host during install phase", addr, int(port)),
+				Evidence: fmt.Sprintf(
+					"connect to abuse-prone hosting/tunnel host %q (%s) during %s phase — common C2/exfil channel",
+					host, addr, evt.Phase),
 			}
 		},
 	}
 }
 
+// destLabel renders a connect destination as "hostname (ip):port" when the DNS
+// forwarder resolved the name, else "ip:port" — so the alert shows the *domain* a
+// payload beaconed to (e.g. cdn.sheetjs.com, callback.workers.dev), not a bare IP.
+func destLabel(evt trace.TraceEvent) string {
+	addr, _ := evt.Detail["addr"].(string)
+	port, _ := evt.Detail["port"].(float64)
+	if host, _ := evt.Detail["hostname"].(string); host != "" {
+		return fmt.Sprintf("%s (%s):%d", host, addr, int(port))
+	}
+	return fmt.Sprintf("%s:%d", addr, int(port))
+}
+
+// isExternalDest reports whether a connect leaves the sandbox for the public
+// internet. A connect to a private/loopback/link-local address — most notably the
+// DNS forwarder on the Docker bridge (172.17.x.x) the sandbox resolves through —
+// is infrastructure, not egress, and must never read as exfil. Unknown/unparseable
+// addresses are treated as external (conservative for detection).
+func isExternalDest(evt trace.TraceEvent) bool {
+	addr, _ := evt.Detail["addr"].(string)
+	if addr == "" {
+		return true
+	}
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return true
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		return false
+	}
+	return true
+}
+
+// isSensitiveAccess reports whether an event is the package reading a secret —
+// a credential/keystore file or another process's environment. This is the
+// "touched secrets" half of the exfil chain: a network egress only convicts as
+// exfil when one of these occurred in the same detonation. Mirrors the predicates
+// of dyn_credential_read + dyn_env_harvest so the chain and the standalone signals
+// stay consistent.
+func isSensitiveAccess(evt trace.TraceEvent) bool {
+	if evt.Category != "file" || evt.Operation != "open" {
+		return false
+	}
+	path, _ := evt.Detail["path"].(string)
+	if path == "" {
+		return false
+	}
+	if strings.HasPrefix(path, "/proc/") && strings.HasSuffix(path, "/environ") &&
+		path != "/proc/self/environ" {
+		return true
+	}
+	for _, prefix := range sensitivePathPrefixes() {
+		if strings.HasPrefix(path, prefix) || strings.Contains(path, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// RunSensitiveAccess scans a detonation's events for any secret access, so the
+// chain rules (install/import exfil) can require it alongside an external egress.
+func RunSensitiveAccess(events []trace.TraceEvent) bool {
+	for _, evt := range events {
+		if isSensitiveAccess(evt) {
+			return true
+		}
+	}
+	return false
+}
+
+// installExfil is a CHAIN, not a lone-connect rule. A network egress during
+// install is dual-use (fetching deps, prebuilt binaries, params, data lists, DNS),
+// so a connect alone no longer convicts — it false-positived on every legit fetch
+// (Zcash params, domain blocklists, JDK/LLM-SDK downloads, even the sandbox's own
+// DNS forwarder). Exfil requires the data-theft shape: a secret was touched
+// (`run_sensitive_access`, set by the engine when dyn_credential_read / dyn_env_harvest
+// fired in this detonation) AND the connect leaves the sandbox for an external host.
+// A lone external egress emits a low, non-convicting `dyn_install_egress` note for
+// visibility. A honeytoken actually leaving the sandbox is handled standalone by
+// dyn_honeytoken_exfil (proof of theft, no chain needed).
+func installExfil() Rule {
+	return exfilChain("install", "dyn_install_exfil", "dyn_install_egress")
+}
+
 func importExfil() Rule {
+	return exfilChain("import", "dyn_import_exfil", "dyn_import_egress")
+}
+
+func exfilChain(phase, exfilID, egressID string) Rule {
 	return Rule{
-		ID: "dyn_import_exfil",
+		ID: exfilID,
 		Evaluate: func(evt trace.TraceEvent) *trace.DynFinding {
-			if evt.Phase != "import" || evt.Category != "network" || evt.Operation != "connect" {
+			if evt.Phase != phase || evt.Category != "network" || evt.Operation != "connect" {
 				return nil
 			}
-			addr, _ := evt.Detail["addr"].(string)
-			port, _ := evt.Detail["port"].(float64)
+			if !isExternalDest(evt) {
+				return nil // sandbox infra (DNS forwarder, loopback, bridge) — not egress
+			}
+			sensitive, _ := evt.Detail["run_sensitive_access"].(bool)
+			if sensitive {
+				return &trace.DynFinding{
+					RuleID:     exfilID,
+					Category:   "dynamic",
+					Severity:   "high",
+					Confidence: "high",
+					Evidence: fmt.Sprintf(
+						"secret access + external egress during %s phase (exfil): %s",
+						phase, destLabel(evt)),
+				}
+			}
 			return &trace.DynFinding{
-				RuleID:     "dyn_import_exfil",
+				RuleID:     egressID,
 				Category:   "dynamic",
-				Severity:   "high",
-				Confidence: "high",
-				Evidence:   fmt.Sprintf("connect(AF_INET, %s:%d) during import phase", addr, int(port)),
+				Severity:   "low",
+				Confidence: "low",
+				Evidence: fmt.Sprintf(
+					"external network egress during %s phase, no secret access observed: %s",
+					phase, destLabel(evt)),
 			}
 		},
 	}
@@ -362,31 +477,48 @@ func suspiciousWrite() Rule {
 				return nil
 			}
 			path, _ := evt.Detail["path"].(string)
-			suspicious := []string{
+			// Hard persistence / backdoor sinks with no benign install reason — a
+			// write here is conviction-grade on its own.
+			hardPersistence := []string{
 				"/etc/crontab", "/etc/cron.d/",
-				"/root/.bashrc", "/root/.profile",
-				"/root/.bash_profile",
-				"/etc/systemd/",       // systemd unit / timer persistence
-				"/etc/init.d/",        // sysv init persistence
-				"/etc/ld.so.preload",  // global library injection
+				"/etc/systemd/",      // systemd unit / timer persistence
+				"/etc/init.d/",       // sysv init persistence
+				"/etc/ld.so.preload", // global library injection
 			}
-			match := false
-			for _, s := range suspicious {
+			// Shell rc files are dual-use: a write is *usually* a benign PATH export
+			// (nvm/cargo/deno/bun/pyenv and other native-CLI installers all append one),
+			// but can also be command-injection persistence. Strong signal, not auto-
+			// convicting on its own — high, so it must chain with a real payload signal
+			// to reach malicious (score) rather than force it (critical).
+			shellRC := []string{
+				"/root/.bashrc", "/root/.profile", "/root/.bash_profile",
+				"/root/.zshrc", "/root/.zshenv",
+			}
+			severity := ""
+			for _, s := range hardPersistence {
 				if strings.HasPrefix(path, s) {
-					match = true
+					severity = "critical"
 					break
 				}
 			}
 			// authorized_keys is user-relative (/root/.ssh, /home/*/.ssh) so it
 			// can't be prefix-matched — a write to one is an SSH backdoor-key install.
-			if !match && strings.Contains(path, ".ssh/authorized_keys") {
-				match = true
+			if severity == "" && strings.Contains(path, ".ssh/authorized_keys") {
+				severity = "critical"
 			}
-			if match {
+			if severity == "" {
+				for _, s := range shellRC {
+					if strings.HasPrefix(path, s) || strings.Contains(path, "/.config/fish/") {
+						severity = "high"
+						break
+					}
+				}
+			}
+			if severity != "" {
 				return &trace.DynFinding{
 					RuleID:     "dyn_suspicious_write",
 					Category:   "dynamic",
-					Severity:   "critical",
+					Severity:   severity,
 					Confidence: "high",
 					Evidence:   fmt.Sprintf("write to persistence path: %s during %s phase", path, evt.Phase),
 				}

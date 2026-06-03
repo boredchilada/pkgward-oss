@@ -329,6 +329,39 @@ def _analyze_go_mod(path: Path, rel_path: str) -> list[Finding]:
     return findings
 
 
+# Weak per-file co-occurrence signals ("init() + a net/exec/unsafe import in the same
+# file, but NOT used in init()"). On a large legit codebase — especially a networking
+# product like tailscale — these fire on dozens of files and flood both the score and
+# the LLM prompt. A targeted backdoor hides in 1-2 files; a high count is itself a
+# benign indicator. So cap them per rule and replace the excess with one aggregate note.
+_NOISY_COEXIST = frozenset({
+    "gomod.init_net_coexist", "gomod.init_exec_coexist", "gomod.unsafe_import",
+})
+_NOISY_KEEP = 3
+
+
+def _cap_noisy(findings: list[Finding]) -> list[Finding]:
+    counts: dict[str, int] = {}
+    out: list[Finding] = []
+    for f in findings:
+        if f.rule_id in _NOISY_COEXIST:
+            counts[f.rule_id] = counts.get(f.rule_id, 0) + 1
+            if counts[f.rule_id] <= _NOISY_KEEP:
+                out.append(f)
+        else:
+            out.append(f)
+    for rid, n in counts.items():
+        if n > _NOISY_KEEP:
+            out.append(Finding(
+                rule_id=rid, category=CATEGORY, severity="low", confidence="low",
+                file="", line=None,
+                evidence=(f"{n} files match this weak co-occurrence pattern "
+                          f"(showing {_NOISY_KEEP}); a high count indicates a large "
+                          f"legitimate codebase, not a targeted backdoor"),
+            ))
+    return out
+
+
 def analyze_go_directives(
     extracted_root: Path,
     changed_files: set[str] | None = None,
@@ -352,4 +385,4 @@ def analyze_go_directives(
             continue
         findings.extend(_analyze_go_mod(p, rel))
 
-    return findings
+    return _cap_noisy(findings)

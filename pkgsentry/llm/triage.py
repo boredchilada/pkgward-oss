@@ -25,15 +25,17 @@ log = get_logger("llm.triage")
 # Config — env-overridable so the model is swappable without code changes.
 DEFAULT_MODEL = env_chain(
     "PKGSENTRY_LLM_MODEL", "PKGWATCH_LLM_MODEL", "PYPI_SCANNER_LLM_MODEL",
-    default="z-ai/glm-5.1",
+    default="deepseek/deepseek-v4-flash",
 )
 DEFAULT_BASE_URL = env_chain(
     "PKGSENTRY_LLM_BASE_URL", "PKGWATCH_LLM_BASE_URL", "PYPI_SCANNER_LLM_BASE_URL",
     default="https://openrouter.ai/api/v1",
 )
 API_KEY_ENV = "OPENROUTER_API_KEY"
-MAX_CODE_BYTES = 32 * 1024  # ~12K tokens, GLM 5.1 handles this fine
+MAX_CODE_BYTES = 48 * 1024  # ~18K tokens, GLM 5.1 handles this fine
 LINES_AROUND_FINDING = 20
+PER_FILE_CAP = 12 * 1024     # one file can't dominate the convicting-evidence pass
+_SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 REQUEST_TIMEOUT = 60.0
 # Retry the call+parse when the model returns truncated/invalid JSON. Cap the
 # response so the JSON verdict object isn't cut off mid-stream (the usual cause).
@@ -320,7 +322,53 @@ def _gather_source(
             if not _include(companion):
                 break
 
-    # First, the actual install/import entry files (most often malicious).
+    # Convicting evidence FIRST: source windows (±LINES_AROUND_FINDING) around every
+    # line-anchored finding, highest-severity finding's file first, each file capped.
+    # The code that actually drove the verdict must always be in-budget — otherwise a
+    # large priority/vendored file can exhaust the budget and the LLM adjudicates
+    # without ever seeing the convicting line (the starvation FP class).
+    _ranked = sorted(
+        {f.file for f in findings if f.file and f.line is not None},
+        key=lambda n: min((_SEV_ORDER.get(f.severity, 9)
+                           for f in findings if f.file == n and f.line is not None), default=9),
+    )
+    for fname in _ranked:
+        if total >= MAX_CODE_BYTES:
+            break
+        matches = list(_safe_rglob(extracted_root, fname))
+        if not matches:
+            continue
+        p = matches[0]
+        rel = str(p.relative_to(extracted_root))
+        if rel in seen:
+            continue
+        seen.add(rel)
+        try:
+            src_lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        lines = {f.line for f in findings if f.file == fname and f.line is not None}
+        ranges = sorted(
+            (max(1, ln - LINES_AROUND_FINDING), min(len(src_lines), ln + LINES_AROUND_FINDING))
+            for ln in lines
+        )
+        block_lines = [f"--- FILE: {rel} (regions around findings) ---"]
+        last_end = 0
+        for start, end in ranges:
+            if start > last_end + 1:
+                block_lines.append("... [skip] ...")
+            for i in range(start, end + 1):
+                block_lines.append(f"{i:>5}: {src_lines[i-1]}")
+            last_end = max(last_end, end)
+        block = "\n".join(block_lines) + "\n"
+        if len(block) > PER_FILE_CAP:
+            block = block[:PER_FILE_CAP] + "\n... [finding-file truncated] ...\n"
+        if total + len(block) > MAX_CODE_BYTES:
+            break
+        snippets.append(block)
+        total += len(block)
+
+    # Then the install/import entry files (most often malicious).
     priority_names = eco_cfg["priority_files"]
     for priority_name in priority_names:
         if total >= MAX_CODE_BYTES:
@@ -363,45 +411,6 @@ def _gather_source(
             if cand is not None and cand.is_file() and not _include(cand):
                 break
 
-    # Then any other files with line-anchored findings, ±LINES_AROUND_FINDING.
-    if total < MAX_CODE_BYTES:
-        by_file: dict[str, set[int]] = {}
-        for f in findings:
-            if not f.file or f.line is None:
-                continue
-            by_file.setdefault(f.file, set()).add(f.line)
-        for fname, lines in by_file.items():
-            if total >= MAX_CODE_BYTES:
-                break
-            matches = list(_safe_rglob(extracted_root, fname))
-            if not matches:
-                continue
-            p = matches[0]
-            rel = str(p.relative_to(extracted_root))
-            if rel in seen:
-                continue
-            seen.add(rel)
-            try:
-                src_lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
-            except OSError:
-                continue
-            ranges = sorted(
-                (max(1, ln - LINES_AROUND_FINDING), min(len(src_lines), ln + LINES_AROUND_FINDING))
-                for ln in lines
-            )
-            block_lines: list[str] = [f"--- FILE: {rel} (regions around findings) ---"]
-            last_end = 0
-            for start, end in ranges:
-                if start > last_end + 1:
-                    block_lines.append("... [skip] ...")
-                for i in range(start, end + 1):
-                    block_lines.append(f"{i:>5}: {src_lines[i-1]}")
-                last_end = max(last_end, end)
-            block = "\n".join(block_lines) + "\n"
-            if total + len(block) > MAX_CODE_BYTES:
-                break
-            snippets.append(block)
-            total += len(block)
     return "\n".join(snippets) if snippets else "(no source extracted)"
 
 
@@ -502,6 +511,14 @@ def _validate_iocs(claimed: list, source: str) -> list[dict]:
     return out
 
 
+def _is_exact_intel_match(f: Finding) -> bool:
+    """An exact SHA-256 match against the known-malicious fingerprint DB. Fuzzy
+    (ssdeep/TLSH) matches are deliberately excluded — they're lower-confidence and
+    were the source of the self-seeded false positives, so they stay downgradable.
+    Keyed off threat_intel.scan's evidence format ("...(sha256 match, ...")."""
+    return f.category == "threat_intel" and "(sha256 match" in (f.evidence or "")
+
+
 def _enforce_no_downgrade(
     llm_verdict: str, rule_verdict: str, findings: list[Finding],
     llm_confidence: float = 0.0,
@@ -511,7 +528,30 @@ def _enforce_no_downgrade(
     catch false positives from pattern-matching rules; overriding it defeats
     its purpose.
     """
+    # A package that ships LLM-triage manipulation text is adversarial: the model's
+    # verdict on injected input can't be trusted to CLEAR it. Hold at the rule verdict
+    # regardless of what the (possibly-injected) LLM returned.
+    if (any(f.rule_id == "iocs.llm_prompt_injection" for f in findings)
+            and llm_verdict == "benign" and rule_verdict in ("malicious", "suspicious")):
+        log.warning(
+            "llm_clear_blocked_prompt_injection",
+            rule_verdict=rule_verdict, llm_confidence=llm_confidence,
+        )
+        return rule_verdict
+
     if rule_verdict == "malicious":
+        # An exact byte-for-byte match to known malware is the highest-fidelity
+        # signal there is — the file IS that payload. The LLM must never clear it
+        # (a bad seed is fixed by removing the seed, not by papering over a real
+        # campaign repeat). Non-downgradable, regardless of LLM confidence.
+        if any(_is_exact_intel_match(f) for f in findings):
+            if llm_verdict in ("benign", "suspicious"):
+                log.warning(
+                    "llm_clear_blocked_exact_intel",
+                    llm_verdict=llm_verdict, llm_confidence=llm_confidence,
+                    intel=[f.rule_id for f in findings if _is_exact_intel_match(f)],
+                )
+            return "malicious"
         has_chain = any(f.rule_id in BEHAVIORAL_CHAIN_RULES for f in findings)
         if has_chain and llm_verdict in ("benign", "suspicious") and llm_confidence >= 0.80:
             log.warning(

@@ -90,9 +90,14 @@ Build and stage first, then run `setup.sh` (idempotent):
 ```bash
 cd detonation
 make build
-mkdir -p /home/detonation/deploy /home/detonation/bin
+mkdir -p /home/detonation/deploy /home/detonation/bin /home/detonation/src
 cp -r deploy/. /home/detonation/deploy/
 cp bin/detonation-svc /home/detonation/bin/
+# Stage the dns-forwarder build context so setup.sh can build its image (rootless
+# build context must be readable by the detonation user):
+cp -r cmd internal go.mod go.sum /home/detonation/src/ 2>/dev/null || true
+cp deploy/dns-forwarder.Dockerfile /home/detonation/src/
+chown -R detonation:detonation /home/detonation/src
 sudo bash /home/detonation/deploy/setup.sh
 ```
 
@@ -106,8 +111,13 @@ then:
 5. Provisions rootless Docker for the `detonation` user (installs `uidmap`,
    `docker-ce-rootless-extras`, `fuse-overlayfs`, `slirp4netns`).
 6. Pre-pulls the `python:3.11-slim`, `node:20-slim`, `rust:1-slim`, `golang:1.22-alpine` images.
-7. Installs the Tetragon tracing policy.
-8. Under SELinux Enforcing, relabels the intel overlay so detonation-svc can read it.
+7. Builds the `pkgsentry-dnsforwarder` image into rootless Docker (DNS-aware abuse-host
+   detection). The service queries it via `docker exec`, so no host port is published. The
+   build context is staged at `/home/detonation/src` by `bootstrap.sh`; if it is absent
+   (standalone `setup.sh`), DNS capture stays off and detonation judges connects by IP until
+   the image is built (`make forwarder-image`, into the rootless store).
+8. Installs the Tetragon tracing policy.
+9. Under SELinux Enforcing, relabels the intel overlay so detonation-svc can read it.
 
 ### BTF check
 
@@ -220,6 +230,33 @@ The service reads `$PKGSENTRY_INTEL_PATH/detonation/{rules_data,noise_baseline}.
 pin extra/private domains and observed registry IPs there (the npm/pypi/crates/gomod CDN IPs can
 be mined from the `trace_event` table — see `docs/operations.md`). Successful load logs
 `intel_loaded source=baseline+overlay`.
+
+### DNS-aware network filtering
+
+Tetragon reports a connect's **destination IP**, never the hostname. Serverless/tunnel hosts
+(`*.workers.dev`, `pages.dev`, `trycloudflare`, `ngrok`, …) resolve *into* the same shared CDN
+ranges legitimate registry/CDN fetches use, so by IP a `workers.dev` C2 beacon is
+indistinguishable from a `jsdelivr` fetch. To tell them apart the service captures DNS:
+
+- A small `pkgsentry-dnsforwarder` container runs on the detonation bridge; each sandbox is
+  pointed at it (`--dns <forwarder>`), so every name a package resolves passes through and the
+  forwarder records resolved-IP → hostname.
+- Before rules run, each `network`/`connect` event is annotated with the domain the sandbox
+  resolved, and `Filter()` then judges it by **domain**: an abuse-prone host (`abuse_hosts` in
+  `noise_baseline.toml`) is kept and flagged `dyn_abuse_hosting_callback` (critical); a
+  `net_allow` domain (or an allowlisted-CIDR IP) is dropped; anything else is kept for the
+  exfil rules. Exfil-rule evidence shows `hostname (ip):port` when a domain was captured.
+- The service queries the forwarder over the **rootless Docker socket** (`docker exec
+  det-dnslog /dns-forwarder lookup <ip>`), not a host TCP port — the confined `init_t` service
+  is denied connecting to rootless-published loopback ports.
+- An exact-match `net_allow` entry is written `=host` (e.g. `=storage.googleapis.com`): it
+  allows the bare host but **not** per-tenant `<bucket>.storage.googleapis.com` subdomains (the
+  bucket-exfil shape), so path-style cloud CDNs can be allowlisted without opening every bucket.
+
+Gated by `DNS_FORWARDER_IMAGE` (default `pkgsentry-dnsforwarder`, built into rootless Docker by
+`setup.sh`). **Best-effort**: if the forwarder can't start, the service logs a loud `WARNING`,
+sandboxes fall back to a public resolver, and the filter degrades to IP-only matching — abuse-host
+detection is inert but detonation keeps working. Startup logs `dns capture: enabled|disabled`.
 
 ### SELinux gotcha (SELinux Enforcing)
 

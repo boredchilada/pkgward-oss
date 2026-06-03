@@ -112,6 +112,9 @@ DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock
 PKGSENTRY_INTEL_PATH=$INTEL_OVERLAY
 # Max concurrent detonations. Tune to host capacity (≈1 core + network per slot).
 MAX_CONCURRENT=6
+# DNS-aware abuse-host detection. Image is built into rootless Docker below; set
+# empty to disable DNS capture (detonation still runs, judging connects by IP).
+DNS_FORWARDER_IMAGE=pkgsentry-dnsforwarder
 ENVEOF
 
 # ReadWritePaths in a drop-in replaces the base unit's list, so repeat all paths.
@@ -126,6 +129,22 @@ echo "Pre-pulling base images..."
 for img in python:3.11-slim node:20-slim rust:1-slim golang:1.22-alpine; do
     su - detonation -c "DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock docker pull $img" 2>/dev/null || true
 done
+
+# 7b. Build the DNS forwarder image into rootless Docker — enables DNS-aware
+# abuse-host detection (the service queries it via `docker exec`, so no host port
+# is published). Build context is staged at /home/detonation/src by bootstrap.sh;
+# if it's absent (standalone setup.sh), DNS capture stays off until the image is
+# built — detonation still runs, judging connects by resolved IP.
+FWD_SRC=/home/detonation/src
+if [ -f "$FWD_SRC/dns-forwarder.Dockerfile" ] && [ -d "$FWD_SRC/cmd/dns-forwarder" ]; then
+    echo "Building dns-forwarder image..."
+    su - detonation -c "XDG_RUNTIME_DIR=$DET_RUNTIME_DIR DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock docker build -t pkgsentry-dnsforwarder -f '$FWD_SRC/dns-forwarder.Dockerfile' '$FWD_SRC'" \
+        || echo "WARNING: dns-forwarder image build failed — DNS-aware abuse detection will be off (detonation still runs)."
+else
+    echo "NOTE: dns-forwarder build context not staged at $FWD_SRC — DNS-aware abuse"
+    echo "      detection is OFF until the 'pkgsentry-dnsforwarder' image is built into"
+    echo "      rootless Docker (see detonation/Makefile: make forwarder-image)."
+fi
 
 # 8. Tetragon tracing policy (loaded from /etc/tetragon/tetragon.tp.d/ at startup).
 mkdir -p /etc/tetragon/tetragon.tp.d/

@@ -22,6 +22,13 @@ func envIntDefault(key string, def int) int {
 	return def
 }
 
+func envDefault(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
 func main() {
 	socketPath := flag.String("socket", "/var/run/detonation/detonation.sock", "UNIX socket path")
 	listenAddr := flag.String("listen", "", "TCP listen address (overrides socket)")
@@ -36,9 +43,10 @@ func main() {
 	intel.Load()
 
 	cfg := api.Config{
-		MaxConcurrent:   *maxConcurrent,
-		BaseDir:         *baseDir,
-		TetragonLogPath: *tetragonLog,
+		MaxConcurrent:     *maxConcurrent,
+		BaseDir:           *baseDir,
+		TetragonLogPath:   *tetragonLog,
+		DNSForwarderImage: envDefault("DNS_FORWARDER_IMAGE", "pkgsentry-dnsforwarder"),
 	}
 
 	if *listenAddr != "" {

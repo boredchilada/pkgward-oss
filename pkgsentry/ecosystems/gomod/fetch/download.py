@@ -16,7 +16,7 @@ log = get_logger("gomod.fetch")
 
 USER_AGENT = user_agent()
 PROXY_BASE = "https://proxy.golang.org"
-WORK_ROOT = Path(tempfile.gettempdir()) / "pkgsentry_gomod"
+WORK_ROOT = Path(tempfile.gettempdir()) / "pkgsentry"
 
 
 def case_encode(path: str) -> str:
@@ -43,6 +43,26 @@ def _build_zip_url(module_path: str, version: str) -> str:
 def _build_info_url(module_path: str, version: str) -> str:
     encoded = case_encode(module_path)
     return f"{PROXY_BASE}/{encoded}/@v/{version}.info"
+
+
+# Forge hosts where the second path segment is the owning user/org.
+_FORGE_HOSTS = frozenset({
+    "github.com", "gitlab.com", "bitbucket.org", "codeberg.org",
+    "gitea.com", "sr.ht", "git.sr.ht",
+})
+
+
+def _publisher_from_path(module_path: str) -> str | None:
+    """Go has no registry uploader; the publisher identity is the VCS owner the
+    module path points at. `github.com/owner/repo` → `owner`; for custom-domain
+    or vanity paths fall back to the host so an alert still shows *who*."""
+    parts = module_path.split("/")
+    if not parts or "." not in parts[0]:
+        return None
+    host = parts[0]
+    if host in _FORGE_HOSTS and len(parts) >= 2 and parts[1]:
+        return f"{host}/{parts[1]}"
+    return host
 
 
 async def download_module(name: str, version: str) -> FetchResult:
@@ -79,10 +99,17 @@ async def download_module(name: str, version: str) -> FetchResult:
                 metadata = {
                     "home_page": f"https://pkg.go.dev/{name}",
                     "summary": "",
+                    "author": _publisher_from_path(name),
                     "_raw_info": info,
                 }
         except Exception:
             pass
+        if not metadata:
+            metadata = {
+                "home_page": f"https://pkg.go.dev/{name}",
+                "summary": "",
+                "author": _publisher_from_path(name),
+            }
 
     archive = ArchivePath(path=dest, kind="gomod_zip", sha256=sha256)
     size_mb = round(dest.stat().st_size / (1024 * 1024), 1)

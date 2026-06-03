@@ -14,23 +14,26 @@ import (
 	"time"
 
 	"detonation/internal/baseline"
+	"detonation/internal/dnslog"
 	"detonation/internal/rules"
 	"detonation/internal/sandbox"
 	"detonation/internal/trace"
 )
 
 type Config struct {
-	MaxConcurrent   int
-	BaseDir         string
-	SocketPath      string
-	ListenAddr      string
-	TetragonLogPath string
+	MaxConcurrent     int
+	BaseDir           string
+	SocketPath        string
+	ListenAddr        string
+	TetragonLogPath   string
+	DNSForwarderImage string // image for the dns-forwarder container; "" disables DNS capture
 }
 
 type Server struct {
 	config Config
 	mux    *http.ServeMux
 	engine *rules.Engine
+	dns    *dnslog.Manager
 	active atomic.Int32
 	mu     sync.Mutex
 }
@@ -59,6 +62,15 @@ func NewServer(cfg Config) *Server {
 		config: cfg,
 		mux:    http.NewServeMux(),
 		engine: rules.NewEngine(rules.AllRules()),
+		dns:    dnslog.StartManager(cfg.DNSForwarderImage),
+	}
+	if s.dns.Enabled() {
+		log.Printf("dns capture: enabled (forwarder at %s)", s.dns.DNSServer())
+	} else {
+		// Loud: with DNS capture off the abuse-host rule (dyn_abuse_hosting_callback)
+		// is inert and connects are judged by shared-CDN IP only — a silently degraded
+		// security posture an operator must be able to see at a glance.
+		log.Printf("WARNING dns capture: DISABLED — abuse-host detection (dyn_abuse_hosting_callback) is INERT and connects fall back to IP matching. Build the dns-forwarder image into rootless Docker to enable.")
 	}
 	s.mux.HandleFunc("/api/v1/health", s.handleHealth)
 	s.mux.HandleFunc("/api/v1/detonate", s.handleDetonate)
@@ -124,6 +136,7 @@ func (s *Server) runDetonation(ctx context.Context, req DetonateRequest) Detonat
 		return DetonateResponse{Status: "error", Findings: []trace.DynFinding{},
 			TraceSummary: map[string]interface{}{"error": err.Error()}}
 	}
+	sb.Config.DNSServer = s.dns.DNSServer() // "" when DNS capture is disabled
 
 	if err := sb.Setup(); err != nil {
 		return DetonateResponse{ID: sb.Config.ID, Status: "error", Findings: []trace.DynFinding{},
@@ -170,6 +183,32 @@ func (s *Server) runDetonation(ctx context.Context, req DetonateRequest) Detonat
 	// and dyn_import_exfil key off TraceEvent.Phase, which the collector leaves
 	// empty.
 	trace.AssignPhase(rawEvents, installEnd)
+	// DNS-aware: tag each outbound connect with the domain the package resolved,
+	// so the filter allows/denies by hostname instead of by shared-CDN IP and the
+	// abuse-hosting rule can fire. No-op when DNS capture is disabled.
+	if s.dns.Enabled() {
+		hostCache := map[string]string{} // dedup docker-exec lookups per distinct addr
+		for i := range rawEvents {
+			e := &rawEvents[i]
+			if e.Category != "network" || e.Operation != "connect" {
+				continue
+			}
+			addr, _ := e.Detail["addr"].(string)
+			if addr == "" {
+				continue
+			}
+			host, seen := hostCache[addr]
+			if !seen {
+				if h, ok := s.dns.Lookup(addr); ok {
+					host = h
+				}
+				hostCache[addr] = host // cache misses (empty) too
+			}
+			if host != "" {
+				e.Detail["hostname"] = host
+			}
+		}
+	}
 	filtered := baseline.Filter(req.Ecosystem, rawEvents)
 	findings := s.engine.Evaluate(filtered)
 	if findings == nil {

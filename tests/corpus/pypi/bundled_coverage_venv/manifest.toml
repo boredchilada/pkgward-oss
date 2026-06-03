@@ -1,0 +1,11 @@
+ecosystem = "pypi"
+name = "portman-proxy"
+version = "0.1.2"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = [
+    "malware.pth_exec_injection",
+    "opengrep.shadow_pth_import_injection",
+]
+notes = "FP guard for the bundled-test-virtualenv class. A package that sloppily ships its test venv into the sdist carries coverage.py's subprocess-measurement .pth (`coverage.process_startup` gated on COVERAGE_PROCESS_START). That exec-.pth is coverage.py's own documented file, ubiquitous in any venv with subprocess coverage — it must NOT convict as .pth-injection. Real-world: portman-proxy 0.1.2 (clean aiohttp reverse proxy, double-confirmed FP)."
+provenance = "synthetic"

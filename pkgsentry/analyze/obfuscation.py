@@ -20,6 +20,7 @@ import re
 from pathlib import Path
 
 from pkgsentry.adapter import Finding
+from pkgsentry.analyze.binary import looks_like_compiled_binary
 
 CATEGORY = "obfuscation"
 
@@ -176,6 +177,11 @@ def analyze_obfuscation(
         except OSError:
             continue
         if size < MIN_FILE_SIZE:
+            continue
+        # A native binary wearing a source extension (e.g. an ELF named `tool.js`,
+        # the esbuild/swc/cxpher pattern) reads as garbage high-bit text — bogus
+        # CJK/homoglyph "identifiers". Skip it; binary.py flags it as an artifact.
+        if looks_like_compiled_binary(p):
             continue
         is_js = p.suffix.lower() in _JS_EXTENSIONS
         do_alphabets = size <= MAX_FILE_SIZE

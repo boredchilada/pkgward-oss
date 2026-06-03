@@ -39,7 +39,14 @@ def _raw_score(findings: Iterable[Finding]) -> int:
     per_cat: dict[str, int] = {}
     for f in findings:
         pts = _severity_points(f.severity)
-        per_cat[f.category] = min(per_cat.get(f.category, 0) + pts, cap)
+        # Every detonation finding carries the same coarse category "dynamic", so
+        # the per-category cap would collapse independent behavioral signals
+        # (credential read + dns exfil + process injection) into one 30-pt ceiling
+        # and a behavior-only conviction could never reach the malicious threshold.
+        # Bucket dynamic findings per rule_id so distinct behaviors accumulate while
+        # same-rule repeats still cap.
+        key = f.rule_id if f.category == "dynamic" else f.category
+        per_cat[key] = min(per_cat.get(key, 0) + pts, cap)
     return sum(per_cat.values())
 
 

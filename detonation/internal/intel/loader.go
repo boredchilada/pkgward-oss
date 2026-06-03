@@ -51,6 +51,13 @@ type NoiseFilters struct {
 	NpmNetAllow    []string `toml:"npm_net_allow"`
 	CratesNetAllow []string `toml:"crates_net_allow"`
 	GomodNetAllow  []string `toml:"gomod_net_allow"`
+
+	// Abuse-prone serverless / tunnel hosting domains (workers.dev, vercel.app,
+	// ngrok, …). These sit behind a big provider's shared CDN IPs, so an IP-based
+	// allowlist waves them through even though they're disproportionately C2/exfil.
+	// Matched by HOSTNAME (DNS-aware): a connect resolving one is never allowlisted
+	// and fires dyn_abuse_hosting_callback. Shared across ecosystems.
+	AbuseHosts []string `toml:"abuse_hosts"`
 }
 
 // Pack holds everything intel.Load() returns.
@@ -179,6 +186,7 @@ func mergeNoise(base, overlay NoiseFilters) NoiseFilters {
 		NpmNetAllow:     unionStrings(base.NpmNetAllow, overlay.NpmNetAllow),
 		CratesNetAllow:  unionStrings(base.CratesNetAllow, overlay.CratesNetAllow),
 		GomodNetAllow:   unionStrings(base.GomodNetAllow, overlay.GomodNetAllow),
+		AbuseHosts:      unionStrings(base.AbuseHosts, overlay.AbuseHosts),
 	}
 }
 

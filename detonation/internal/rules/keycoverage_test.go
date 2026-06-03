@@ -20,6 +20,10 @@ var emittedDetailKeys = map[string]bool{
 	"family":    true, // network/connect
 	"path":      true, // file/open, file/write
 	"name":      true, // process/memfd_create
+	"hostname":   true, // network/connect — DNS annotation (server.go, when DNS capture is enabled)
+	"abuse_host": true, // network/connect — set by the baseline filter on abuse-host connects
+	"run_sensitive_access": true, // network/connect — set by the rules engine (detonation-level
+	// secret-access fact) so the install/import exfil chain can require it. Not collector-emitted.
 }
 
 // knownDeadDetailKeys documents rules that read a key the collector does NOT emit

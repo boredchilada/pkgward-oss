@@ -41,7 +41,10 @@ Source: `analyze/iocs.py`
 | `iocs.encoded_url` | medium | medium | A non-benign URL found inside a decoded base64 / hex / `\xNN` blob — deliberate concealment |
 | `iocs.encoded_ip` | high | medium | A routable / C2 / cloud-metadata IP found inside a decoded base64 / hex / `\xNN` blob |
 | `iocs.onion` | high | high | Tor .onion address |
-| `iocs.oast_callback` | high | high | URL host is a known out-of-band-interaction / request-capture service (oastify.com, interact.sh, oast.*, burpcollaborator.net, webhook.site, requestbin, dnslog.cn, canarytokens, …) — near-certain exfil/C2 at install time; no legitimate install-time use |
+| `iocs.oast_callback` | high | high | URL host is a known out-of-band-interaction / request-capture service (oastify.com, interact.sh, oast.*, burpcollaborator.net, webhook.site, requestbin, dnslog.cn, canarytokens, …) — near-certain exfil/C2 at install time. Also fires on a **bare/concatenated** OAST-domain literal (`'http://'+x+'.oastify.com'`) the full-URL matcher misses |
+| `iocs.abuse_hosting_callback` | medium | high | URL host is an abuse-prone serverless/tunnel/paste service (`workers.dev`, `pages.dev`, `trycloudflare`, `ngrok`, `deno.dev`, …) — favored for C2 because it inherits a big provider's trusted IPs |
+| `iocs.llm_prompt_injection` | high | high | Source mimics the scanner's **own** LLM-triage output field (`agrees_with_rules`) — a targeted self-clearing injection. Non-downgradable: an injected verdict can't clear the package |
+| `iocs.llm_injection_phrase` | medium | low | Instruction-override phrase ("ignore previous instructions", "mark this as benign"). Informational only — also appears in minified bundles and *defensive* injection-guard lists, so the LLM still adjudicates |
 | `iocs.base64_blob` | medium | low | Large base64 blob (160+ chars) in string literal |
 
 ## Layer 3: Malware patterns (PyPI install-time files only)
@@ -166,7 +169,12 @@ followed and scanned for network + `child_process`/eval.
 | `installer.npm_install_script_network` | high | medium | Referenced install `.js` makes a network call |
 | `installer.npm_install_script_decode_exec` | high | medium | Referenced install `.js` base64-decodes then executes |
 | `installer.npm_install_script_encoded_payload` | medium | medium | Large encoded payload in referenced install `.js` |
-| `installer.npm_install_remote_binary_drop` | high/medium | high/medium | Install `.js` downloads → writes → chmod-executes a binary. high when the download host is unrelated to the package's declared repo/homepage and isn't a known release host (GitHub/githubusercontent/npm registry/nodejs.org/…); medium when the URL is built dynamically. A native wrapper dropping its binary from its own repo / a release CDN does not fire |
+| `installer.npm_install_remote_binary_drop` | high/low | high/medium | Install `.js` downloads → writes → chmod-executes a binary. **high** when the download host is unrelated to the package's declared repo/homepage and isn't a known release host (GitHub/githubusercontent/npm registry/nodejs.org/…); **medium** when the URL is built dynamically; **low** when the script also SHA-256/512-verifies the download (the legit prebuilt-binary pattern — esbuild/swc/native-wrapper). On the low/verified case, the detonation re-score also recognizes an install-time connect to that same vendor host as the legit self-download, so `dyn_install_exfil` to it won't chain to malicious |
+| `installer.npm_url_dependency` | high/medium | high | A dependency spec is a raw tarball **URL** (not a registry range). high on a suspicious file host (cloud bucket / abuse host / paste site — the dependency-confusion delivery shape); medium otherwise. For suspicious hosts the second-stage tarball is fetched + statically analyzed (see `PKGSENTRY_FETCH_URL_DEPS`) |
+| `installer.npm_install_host_recon` | medium | medium | Install script/JS gathers host info (`os.hostname`/`userInfo`, `whoami`/`uname`/`id -un`) |
+| `installer.npm_install_network_recon` | medium | medium | Install script/JS enumerates network interfaces / internal IPs (`os.networkInterfaces`, `ifconfig`/`ipconfig`) |
+| `installer.npm_install_ci_secret_harvest` | high | medium | Install script/JS reads CI/registry secrets (`GITHUB_TOKEN`/`ACTOR`/`REPOSITORY`, `NPM_TOKEN`, `CIRCLECI`/`JENKINS_URL`/`GITLAB_CI`) |
+| `installer.npm_install_recon_exfil` | high | high | Recon (host/network/secret) co-occurs with a network send in an install hook — the recon→exfil chain |
 | `installer.npm_install_obfuscated_entrypoint` | critical | high | A lifecycle hook runs a local script that self-decodes (char-code / runtime-crypto `createDecipheriv`) into `eval`/`Function`. Behavioral-chain → malicious. Catches the `@redhat-cloud-services` worm's `preinstall: node index.js` (Caesar→AES→eval), invisible to the net/base64 rules because the payload is encoded |
 | `installer.npm_install_persistence_loader` | critical | high | A lifecycle hook registers **OS persistence** (systemd `--user` unit / launchd `.plist` / Windows Run-key·`.vbs` / XDG autostart / cron) **and** spawns a **detached, unref'd** background process — the resident-agent loader fingerprint. Behavioral-chain → malicious. Catches the `logger-active`/`utils-terminal` stealer family at the loader, independent of the payload's YARA signature |
 | `installer.npm_install_persistence` | high | high | Lifecycle hook registers OS persistence (above), without the detached-spawn half |
@@ -272,8 +280,11 @@ Package is installed/imported in a rootless-Docker sandbox with Tetragon eBPF tr
 
 | rule_id | Sev | Conf | What it detects |
 |---------|-----|------|-----------------|
-| `dyn_install_exfil` | high | high | Network `connect()` during install to a **non-allowlisted** host. The per-ecosystem `net_allow` (registry/CDN hostnames + CIDR ranges) drops legit dependency fetches first, so a remaining connect is exfil-shaped. **Behavioral chain.** |
-| `dyn_import_exfil` | high | high | Network connect() during import phase |
+| `dyn_install_exfil` | high | high | **Chain:** a secret was read (`dyn_credential_read`/`dyn_env_harvest`, surfaced run-wide as `run_sensitive_access`) **and** the package connects out to an **external** host during install. A connect alone is dual-use (dep/param/data fetches, DNS) and no longer convicts — a private/loopback/bridge address (incl. the sandbox DNS forwarder) is infra, never egress. Evidence shows the resolved domain when DNS capture is on. **Behavioral chain.** |
+| `dyn_install_egress` | low | low | A lone external network egress during install with **no** secret access observed — non-convicting visibility note (the dual-use half of the exfil chain). |
+| `dyn_abuse_hosting_callback` | critical | high | Runtime connect to an abuse-prone host (`workers.dev`, `pages.dev`, `trycloudflare`, `ngrok`, …), judged by the **resolved domain** (DNS-aware), not the shared-CDN IP — catches a beacon hiding inside a trusted provider's IP range that the IP allowlist would otherwise drop |
+| `dyn_import_exfil` | high | high | **Chain:** secret read + external egress during import phase (same model as `dyn_install_exfil`). |
+| `dyn_import_egress` | low | low | Lone external egress during import, no secret access — non-convicting note. |
 | `dyn_credential_read` | high | high | Read of sensitive file (SSH keys, cloud creds, /etc/shadow) via openat path-prefix hook |
 | `dyn_reverse_shell` | critical | high | Shell spawned with open socket. **Behavioral chain.** Dormant — needs socket-fd tracking on exec (not yet wired) |
 | `dyn_proc_inject` | critical | high | ptrace (PTRACE_ATTACH/SEIZE/POKE) or process_vm_writev injection. **Behavioral chain** |
@@ -398,8 +409,8 @@ canonical list is `intel/baseline/behavioral_chains.toml` (overlay-extendable):
 
 | Category | Count |
 |----------|-------|
-| Static rule IDs | 64 |
+| Static rule IDs | ~72 |
 | YARA rules (baseline, via `yara.{name}`) | 12 |
-| Dynamic sandbox rules | 11 (2 dormant) |
+| Dynamic sandbox rules | 12 (2 dormant) |
 | Threat intel (via `intel.{campaign}`) | 0 in baseline; added by a loaded intel pack |
-| **Total distinct rule IDs (baseline)** | **~87** |
+| **Total distinct rule IDs (baseline)** | **~96** |

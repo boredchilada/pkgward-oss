@@ -42,6 +42,29 @@ ALLOW_UNCOVERED = frozenset({
     # OAST/OOB-interaction callback domain (high). Unit-tested in test_iocs;
     # public corpus sample is a follow-up.
     "iocs.oast_callback",
+    # LLM-triage prompt-injection / manipulation text in package source (adversarial
+    # self-clearing attempt). Unit-tested in test_prompt_injection. Corpus follow-up.
+    "iocs.llm_prompt_injection",
+    # Instruction-override phrase (FP-prone: minified bundles + DEFENSIVE injection-
+    # guard pattern lists). Informational/medium, downgradable. Unit-tested in
+    # test_prompt_injection.
+    "iocs.llm_injection_phrase",
+    # Abuse-prone serverless/tunnel callback host in source (workers.dev, pages.dev,
+    # trycloudflare, ngrok, ...). Unit-tested in test_abuse_hosting; verified live on
+    # brave-search-mcp-server. Corpus sample is a follow-up.
+    "iocs.abuse_hosting_callback",
+    # Install-time recon -> exfil: host/network fingerprint + CI-secret harvest in
+    # lifecycle scripts / referenced JS, chained to a network send. Unit-tested in
+    # test_npm_recon; verified live on brave-search-mcp-server and the
+    # corporate-front-vue/ltidisafe dep-confusion stage. Corpus sample is a follow-up.
+    "installer.npm_install_host_recon",
+    "installer.npm_install_network_recon",
+    "installer.npm_install_ci_secret_harvest",
+    "installer.npm_install_recon_exfil",
+    # URL-spec dependency (raw tarball on a suspicious host — dependency-confusion /
+    # staged-payload delivery). Unit-tested in test_url_deps; verified live on
+    # corporate-front-vue -> ltidisafe. Corpus follow-up.
+    "installer.npm_url_dependency",
     # Run-time-packer detection (UPX high / commercial-protector critical).
     # Unit-tested in test_binary; real packed-binary corpus sample is a follow-up.
     "binary.packed_executable",

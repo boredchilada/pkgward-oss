@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pkgsentry.adapter import Finding
+from pkgsentry.analyze.binary import looks_like_compiled_binary
 
 if TYPE_CHECKING:
     from pkgsentry.pipeline import FileInfo
@@ -74,6 +75,12 @@ def analyze_entropy(
         except OSError:
             continue
 
+        # A compiled binary is always near-max entropy; that's not obfuscation. The
+        # ext-skip above misses one wearing a source name (ELF `tool.js`) — content-
+        # check it. binary.py still flags it as a (disguised) artifact, so no loss.
+        if looks_like_compiled_binary(p):
+            continue
+
         ent = _shannon_entropy(data)
 
         if ent >= OBFUSCATED_THRESHOLD:
@@ -113,7 +120,10 @@ def analyze_entropy_delta(
     out: list[Finding] = []
     for norm_path, cur in current_info.items():
         prev = prev_info.get(norm_path)
-        if prev is None or prev.entropy <= 0:
+        # Skip when either side's entropy is unknown (<=0): a zeroed current entropy
+        # (e.g. a future lite-mode regression) would otherwise yield an always-negative
+        # delta and silently mask the detector rather than failing honestly.
+        if prev is None or prev.entropy <= 0 or cur.entropy <= 0:
             continue
         if cur.sha256 == prev.sha256:
             continue

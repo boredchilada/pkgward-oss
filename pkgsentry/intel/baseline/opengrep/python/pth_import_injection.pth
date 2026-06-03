@@ -2,3 +2,5 @@
 # ruleid: pth_import_injection
 import malicious_bootstrap
 /usr/local/lib/python3.11/site-packages
+# ok: pth_import_injection
+import sys; exec('import os\nif os.getenv("COVERAGE_PROCESS_START") or os.getenv("COVERAGE_PROCESS_CONFIG"):\n import coverage; coverage.process_startup(slug="pth")')

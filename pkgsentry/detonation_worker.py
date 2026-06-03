@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,12 +12,13 @@ from typing import Optional
 import structlog
 from sqlalchemy import select
 
-from pkgsentry import detonation_queue
-from pkgsentry.adapter import Finding, NoFilesError, adapter_registry
+from pkgsentry import detonation_queue, detonation_staging, vault
+from pkgsentry.adapter import ArchivePath, Finding, NoFilesError, adapter_registry
 from pkgsentry.detect.score import _is_shadow_finding, score_and_verdict
 from pkgsentry.detonate.client import get_client as get_detonation_client
 from pkgsentry.logging_setup import get_logger
 from pkgsentry.notify import discord as discord_notify
+from pkgsentry.pipeline import _strip_nul
 from pkgsentry.pipeline import (
     _bump_rulehits_deferred,
     _is_watchlist,
@@ -99,14 +102,18 @@ def _finalize_detonation(job: dict, det_result) -> Optional[dict]:
         s.flush()
 
         for evt in det_result.trace_events_json:
+            # binary + detail are package-controlled (traced exec paths/argv, syscall
+            # args). A single NUL byte in either fails the JSONB/TEXT write and would
+            # roll back the whole finalize txn — silently dropping the dynamic verdict
+            # + flip-alert. Strip NUL like the static-scan persistence path does.
             s.add(TraceEvent(
                 detonation_id=det_row.id,
                 phase=evt.get("phase", "install"),
                 category=evt.get("category", "unknown"),
                 operation=evt.get("operation", "unknown"),
                 pid=evt.get("pid"),
-                binary=evt.get("binary"),
-                detail=evt.get("detail") or {},
+                binary=_strip_nul(evt.get("binary")),
+                detail=_strip_nul(evt.get("detail") or {}),
                 matched_rule=evt.get("matched_rule"),
             ))
 
@@ -121,6 +128,13 @@ def _finalize_detonation(job: dict, det_result) -> Optional[dict]:
                         confidence=r.confidence, file=r.file, line=r.line, evidence=r.evidence)
                 for r in static_rows
             ]
+            # Vendor self-download recognition: if the static scan found a checksum-
+            # verified prebuilt-binary download from host H (the legit native-wrapper
+            # pattern), an install-time connect to H is that same self-download, not
+            # exfil — drop the dyn_install_exfil so it doesn't chain to malicious.
+            vhosts = _verified_download_hosts(static_findings)
+            if vhosts:
+                dyn_findings = [f for f in dyn_findings if not _is_self_download_exfil(f, vhosts)]
             all_findings = static_findings + dyn_findings
             _persist_findings(s, scan, dyn_findings)
             rank = _is_watchlist(s, job["name"], job["ecosystem"])
@@ -133,6 +147,7 @@ def _finalize_detonation(job: dict, det_result) -> Optional[dict]:
 
             if new_verdict == "malicious" and job["static_verdict"] != "malicious":
                 non_shadow = [f for f in all_findings if not _is_shadow_finding(f)]
+                from pkgsentry.enrich import publisher as _publisher
                 alert = {
                     "pkg_name": job["name"],
                     "pkg_version": job["version"],
@@ -142,6 +157,7 @@ def _finalize_detonation(job: dict, det_result) -> Optional[dict]:
                     "new_score": new_score,
                     "n_findings": len(non_shadow),
                     "findings": non_shadow,
+                    "publisher": _publisher.from_scan(scan.id),
                 }
 
         log.info(
@@ -160,17 +176,76 @@ def _finalize_detonation(job: dict, det_result) -> Optional[dict]:
     return alert
 
 
+_EXFIL_HOST_RE = re.compile(r"phase:\s*([A-Za-z0-9.\-]+)")
+
+
+def _registrable(host: str) -> str:
+    p = host.lower().strip(". ").split(".")
+    return ".".join(p[-2:]) if len(p) >= 2 else host.lower()
+
+
+def _verified_download_hosts(findings: list) -> set:
+    """Registrable domains a package downloads a CHECKSUM-VERIFIED prebuilt binary
+    from (the legit native-wrapper pattern). installer.npm_install_remote_binary_drop
+    records these as 'hosts: <h>, ...' only when checksum verification was present."""
+    out: set = set()
+    for f in findings:
+        ev = f.evidence or ""
+        if (f.rule_id == "installer.npm_install_remote_binary_drop"
+                and "checksum-verified" in ev and "hosts:" in ev):
+            for h in ev.split("hosts:", 1)[1].split(","):
+                h = h.strip()
+                if h:
+                    out.add(_registrable(h))
+    return out
+
+
+def _is_self_download_exfil(f, vhosts: set) -> bool:
+    """A dyn_install_exfil whose connect host is a verified self-download host — the
+    legit binary fetch, not exfil; drop it so it doesn't chain to malicious."""
+    if f.rule_id != "dyn_install_exfil":
+        return False
+    m = _EXFIL_HOST_RE.search(f.evidence or "")
+    return bool(m) and _registrable(m.group(1)) in vhosts
+
+
+def _stage_from_vault(job: dict) -> Optional[ArchivePath]:
+    """Stage the exact scanned bytes from the vault as an archive for detonation.
+
+    Returns an ArchivePath under the host-shared staging dir (/tmp/pkgsentry, the only
+    dir bind-mounted into both the scanner container and the detonation service host so
+    the svc can read the archive bytes), or None if the
+    package isn't vaulted. This is preferred over re-fetching: a malicious version is
+    often yanked from the registry before async detonation runs, so a re-fetch gets a
+    takedown placeholder instead of the payload we actually scanned."""
+    res = vault.read_archive(job["ecosystem"], job["name"], job["version"])
+    if res is None:
+        return None
+    data, inner = res
+    # Stage through the shared helper so the dir/file carry the cross-uid bind-mount
+    # permissions the rootless detonation service needs (see detonation_staging).
+    dest = detonation_staging.stage_bytes(data, inner, prefix="vault-")
+    return ArchivePath(path=dest, kind=job["archive_kind"], sha256=hashlib.sha256(data).hexdigest())
+
+
 async def _fetch_and_detonate(adapter, job: dict, archives_out: list):
-    """Re-fetch the archive and run the sandbox (the network-bound, timed part).
+    """Detonate the package. Prefer the frozen vault copy of the exact scanned bytes;
+    fall back to a re-fetch only when the package isn't vaulted.
 
     Appends to *archives_out* so the caller can clean up even on cancellation."""
-    fetched = await adapter.fetch(job["name"], job["version"])
-    archives_out.extend(
-        list(getattr(fetched, "archives", None) or (fetched if isinstance(fetched, list) else []))
-    )
-    if not archives_out:
-        raise NoFilesError("no_archives")
-    arc = next((a for a in archives_out if a.kind == job["archive_kind"]), archives_out[0])
+    arc = await asyncio.to_thread(_stage_from_vault, job)
+    if arc is not None:
+        archives_out.append(arc)
+        log.info("detonation_archive_source", source="vault", name=job["name"], version=job["version"])
+    else:
+        fetched = await adapter.fetch(job["name"], job["version"])
+        archives_out.extend(
+            list(getattr(fetched, "archives", None) or (fetched if isinstance(fetched, list) else []))
+        )
+        if not archives_out:
+            raise NoFilesError("no_archives")
+        arc = next((a for a in archives_out if a.kind == job["archive_kind"]), archives_out[0])
+        log.info("detonation_archive_source", source="refetch", name=job["name"], version=job["version"])
     log.info("detonation_start", archive=arc.kind, name=job["name"], version=job["version"])
     return await get_detonation_client().detonate(
         ecosystem=job["ecosystem"],
@@ -209,6 +284,14 @@ async def _process_detonation(job: dict) -> None:
             return
         if det_result is None:
             _requeue_or_fail(job, "detonation_unavailable")
+            return
+        if det_result.status == "error":
+            # The service returns HTTP 200 with status="error" on a sandbox/setup/
+            # install failure (including the empty-archive case). Finalizing it would
+            # persist an empty detonation and mark the job done — silently discarding
+            # any behaviour-only malicious verdict. Requeue within the bounded budget
+            # instead of treating an errored detonation as a clean one.
+            _requeue_or_fail(job, "detonation_service_error")
             return
 
         alert = await asyncio.to_thread(_finalize_detonation, job, det_result)

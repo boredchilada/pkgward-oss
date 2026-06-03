@@ -26,7 +26,7 @@ log = get_logger("npm.fetch")
 
 USER_AGENT = user_agent()
 REGISTRY_BASE = "https://registry.npmjs.org"
-WORK_ROOT = Path(tempfile.gettempdir()) / "pkgsentry_npm"
+WORK_ROOT = Path(tempfile.gettempdir()) / "pkgsentry"
 
 # npm registry has no published per-IP rate limit, but be a good citizen.
 _registry_limiter = asyncio.Semaphore(10)
@@ -157,6 +157,18 @@ def _normalize_metadata(manifest: dict) -> dict:
     deps = manifest.get("dependencies")
     requires_dist = sorted(deps.keys()) if isinstance(deps, dict) else None
 
+    # `_npmUser` is the account that actually published this version — the
+    # first-order supply-chain signal (a hijacked maintainer publishes under their
+    # own login). `maintainers` is the package's full owner set.
+    npm_user = manifest.get("_npmUser")
+    upload_user = npm_user.get("name") if isinstance(npm_user, dict) else None
+    maintainers = manifest.get("maintainers")
+    if isinstance(maintainers, list):
+        maintainers = [m.get("name") if isinstance(m, dict) else m for m in maintainers]
+        maintainers = [m for m in maintainers if m] or None
+    else:
+        maintainers = None
+
     return {
         "summary": manifest.get("description") or "",
         "home_page": home_page,
@@ -164,6 +176,8 @@ def _normalize_metadata(manifest: dict) -> dict:
         "license": license_val or "",
         "author": author_name or None,
         "author_email": author_email,
+        "upload_user": upload_user,
+        "maintainers": maintainers,
         "requires_dist": requires_dist,
         "_raw_npm": manifest,
     }

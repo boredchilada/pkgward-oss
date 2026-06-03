@@ -14,4 +14,7 @@ rules:
     paths:
       include:
         - "*.pth"
-    pattern-regex: '^\s*import\s+\S+'
+    patterns:
+      - pattern-regex: '^\s*import\s+\S+'
+      # coverage.py's subprocess-measurement .pth (bundled test venvs ship it).
+      - pattern-not-regex: 'COVERAGE_PROCESS_(START|CONFIG).*coverage\.process_startup'

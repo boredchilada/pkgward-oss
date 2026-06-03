@@ -37,6 +37,7 @@ type SandboxConfig struct {
 	NetworkMode   string
 	WorkDir       string
 	DecoyHome     string // host dir of the shared decoy-credential tree, bind-mounted ro
+	DNSServer     string // bridge IP of the dns-forwarder; the sandbox resolves through it
 }
 
 func newID() string {
@@ -88,6 +89,12 @@ func (c *SandboxConfig) DockerRunArgs(image string, cmd []string, cidFile string
 		fmt.Sprintf("--memory=%dm", c.MemoryLimitMB),
 		"--workdir=" + c.WorkDir,
 		"-v", mountSpec,
+	}
+	// Resolve through the DNS-capture forwarder (with a public fallback so a
+	// forwarder hiccup never breaks resolution), so each connect can be tagged
+	// with the domain the package actually looked up.
+	if c.DNSServer != "" {
+		args = append(args, "--dns="+c.DNSServer, "--dns=1.1.1.1")
 	}
 	// Plant decoy credentials so environment-aware worms harvest (honeytokens.go):
 	// env vars + the shared decoy home bind-mounted read-only. Both are invisible

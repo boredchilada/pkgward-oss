@@ -109,6 +109,35 @@ func resolveAllowedIPs(allow []string) *allowSet {
 	return out
 }
 
+// hostnameMatches reports whether host matches any entry in the list. A plain
+// entry matches the host or any subdomain of it ("foo.com" matches "a.foo.com").
+// An entry prefixed with "=" is EXACT-only ("=storage.googleapis.com" matches the
+// path-style bare host but NOT "<bucket>.storage.googleapis.com") — used to allow a
+// shared CDN's bare host while keeping per-tenant bucket subdomains (the exfil
+// shape) flagged.
+func hostnameMatches(host string, suffixes []string) bool {
+	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	if host == "" {
+		return false
+	}
+	for _, d := range suffixes {
+		d = strings.ToLower(strings.TrimSpace(d))
+		if d == "" {
+			continue
+		}
+		if strings.HasPrefix(d, "=") {
+			if host == d[1:] {
+				return true
+			}
+			continue
+		}
+		if host == d || strings.HasSuffix(host, "."+d) {
+			return true
+		}
+	}
+	return false
+}
+
 func Filter(ecosystem string, events []trace.TraceEvent) []trace.TraceEvent {
 	noise := intel.Current().Noise
 	var fileNoise, execNoise, netAllow []string
@@ -165,9 +194,28 @@ func Filter(ecosystem string, events []trace.TraceEvent) []trace.TraceEvent {
 				}
 			}
 		}
-		if evt.Category == "network" && evt.Operation == "connect" && allowedIPs != nil {
-			if addr, _ := evt.Detail["addr"].(string); addr != "" {
-				if allowedIPs.contains(addr) {
+		if evt.Category == "network" && evt.Operation == "connect" {
+			host, _ := evt.Detail["hostname"].(string)
+			if host != "" {
+				// DNS-aware: judge by the resolved hostname, not the (shared-CDN) IP.
+				if hostnameMatches(host, noise.AbuseHosts) {
+					evt.Detail["abuse_host"] = true // -> dyn_abuse_hosting_callback
+				} else if hostnameMatches(host, netAllow) {
+					continue // allowlisted registry/CDN by domain
+				} else if addr, _ := evt.Detail["addr"].(string); addr != "" && allowedIPs != nil && allowedIPs.contains(addr) {
+					// A NON-abuse host that resolves into an allowlisted CDN range
+					// (e.g. static.rust-lang.org on Fastly) — drop, same as pre-DNS-
+					// aware. Abuse hosts were handled above, so this can't re-allow a
+					// workers.dev beacon; it only restores the no-FP behaviour for
+					// legit CDN-fronted hosts not named in net_allow.
+					continue
+				}
+				// else: a non-allowlisted host — keep so the exfil rules fire.
+			} else if allowedIPs != nil {
+				// No hostname captured (direct-IP connect, or DNS not observed):
+				// fall back to the resolved-IP allowlist — pre-DNS-aware behavior,
+				// so this is a no-op regression until the DNS forwarder is wired.
+				if addr, _ := evt.Detail["addr"].(string); addr != "" && allowedIPs.contains(addr) {
 					continue
 				}
 			}

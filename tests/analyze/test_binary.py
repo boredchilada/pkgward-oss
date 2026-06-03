@@ -71,3 +71,22 @@ def test_unpack_real_upx_roundtrip(tmp_path):
     res = unpack_packed_executables(tmp_path)
     assert any(status == "unpacked" for _, status in res)
     assert (tmp_path / ("payload" + UNPACKED_SUFFIX)).exists()
+
+
+def test_looks_like_compiled_binary_detects_disguised_elf(tmp_path):
+    # An ELF wearing a source extension (esbuild/swc/cxpher native-CLI pattern) is
+    # detected by content so the source-text analyzers skip it.
+    from pkgsentry.analyze.binary import looks_like_compiled_binary
+    p = tmp_path / "cXpher.js"
+    p.write_bytes(ELF + b"\x90" * 512)
+    assert looks_like_compiled_binary(p) is True
+
+
+def test_looks_like_compiled_binary_does_not_skip_encrypted_text_payload(tmp_path):
+    # A genuinely-obfuscated/encrypted blob hidden in a .py is NOT a compiled image —
+    # it must still reach entropy/obfuscation (strict magic-byte match, no NUL heuristic).
+    import os
+    from pkgsentry.analyze.binary import looks_like_compiled_binary
+    p = tmp_path / "payload.py"
+    p.write_bytes(os.urandom(2048))
+    assert looks_like_compiled_binary(p) is False
