@@ -1,0 +1,8 @@
+ecosystem = "npm"
+name = "totally-legit-utils"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["yara.reverse_shell_pattern"]
+notes = "Genuine Python reverse shell: connects to a hardcoded WAN IP:port, dup2's the socket fd onto stdin/stdout/stderr, and spawns an interactive /bin/sh. Coverage pin that reverse_shell_pattern still fires after the quote-adjacency tightening (both the dup2+fileno branch and the quoted-/bin/sh subprocess branch)."
+provenance = "synthetic"

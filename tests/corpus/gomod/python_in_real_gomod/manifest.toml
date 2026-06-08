@@ -1,0 +1,10 @@
+ecosystem = "gomod"
+name = "github.com/example/realmod-with-python"
+version = "v1.0.0"
+label = "bad"
+expected_verdict = "suspicious"
+expect_rules = [
+    "yara.cross_ecosystem_python_in_go",
+]
+notes = "A REAL Go module (go.mod + .go present) that ALSO ships PyArmor-protected Python — a genuine cross-ecosystem mismatch worth flagging. Coverage pin that the gomod-no-Go gate does NOT over-suppress: when Go is actually present, cross_ecosystem_python_in_go must still fire."
+provenance = "synthetic"

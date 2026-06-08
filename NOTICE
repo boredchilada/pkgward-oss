@@ -1,28 +1,34 @@
-pkgsentry
+pkgward
 Copyright 2026 Michel Verbel
 
 The engine (this repository) is licensed under the GNU Affero General Public License v3.0
 (LICENSE).
 
-The baseline intel pack (pkgsentry/intel/baseline/) is licensed separately under the
-permissive Apache-2.0 license (declared in pkgsentry/intel/baseline/intel_pack.toml) so its
+The baseline intel pack (pkgward/intel/baseline/) is licensed separately under the
+permissive Apache-2.0 license (declared in pkgward/intel/baseline/intel_pack.toml) so its
 detection signatures can be freely reused. Portions of that pack include or adapt content
 from the open-source projects listed below; those attributions and their own license terms
 are preserved at the source-file level and must remain intact.
 
-YARA rules in pkgsentry/intel/baseline/yara/community_sigbase.yar are adapted
-from Neo23x0/signature-base, used under the Detection Rule License (DRL) 1.1:
+YARA rules are one-rule-per-file under pkgward/intel/baseline/yara/ (the file
+name matches the rule name). Each file carries its source/license attribution in
+a header comment, and per-rule attributions (author, original_id, reference) are
+preserved in each rule's `meta` block. If you redistribute this baseline pack,
+those attributions must remain intact.
+
+The sigbase_*.yar files are adapted from Neo23x0/signature-base, used under the
+Detection Rule License (DRL) 1.1:
 
   https://github.com/Neo23x0/signature-base
   https://github.com/Neo23x0/signature-base/blob/master/LICENSE
 
-Specific rule attributions (author, original_id, reference) are preserved in
-each rule's `meta` block within community_sigbase.yar. If you redistribute
-this baseline pack, those attributions must remain intact.
+The community_*.yar files (community_dyndns_c2, community_ip_lookup_recon) are
+adapted from Yara-Rules/rules (capabilities.yar), used under the GNU GPLv2:
 
-YARA rules in pkgsentry/intel/baseline/yara/python_baseline.yar are authored
-by the pkgsentry project. Each rule cites a public technical reference where
-the underlying malware pattern is documented.
+  https://github.com/Yara-Rules/rules
+
+The remaining YARA rule files are authored by the pkgward project; each cites
+a public technical reference where the underlying malware pattern is documented.
 
 The detonation Go service depends on the following third-party libraries
 (see detonation/go.mod for the authoritative list):

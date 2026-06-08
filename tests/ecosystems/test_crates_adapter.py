@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-from pkgsentry.adapter import adapter_registry
-import pkgsentry.ecosystems.crates  # noqa: F401
+from pkgward.adapter import adapter_registry
+import pkgward.ecosystems.crates  # noqa: F401
 
 
 def test_crates_adapter_registered():

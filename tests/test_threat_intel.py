@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import pytest
 
-from pkgsentry.analyze import threat_intel as ti
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import ThreatIntelHash
-from pkgsentry.util import capabilities as caps
+from pkgward.analyze import threat_intel as ti
+from pkgward.store import session as sess
+from pkgward.store.models import ThreatIntelHash
+from pkgward.util import capabilities as caps
 
 _CONTENT = (b"const token = process.env.GITHUB_TOKEN;\n"
             b"for (const f of fs.readdirSync(dir)) { upload(f); }\n") * 4
@@ -14,7 +14,7 @@ _CONTENT = (b"const token = process.env.GITHUB_TOKEN;\n"
 
 @pytest.fixture
 def db(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'t.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'t.db'}")
     sess.reset_engine()
     sess.init_db()
     return tmp_path
@@ -76,7 +76,7 @@ def test_default_label_is_critical(db):
 
 
 def test_seed_upsert_backfills_missing_tlsh(db, monkeypatch):
-    from pkgsentry.store import seed_intel
+    from pkgward.store import seed_intel
 
     _add(sha256="1" * 64, ssdeep="x", tlsh=None, campaign="camp", label="malicious")
 

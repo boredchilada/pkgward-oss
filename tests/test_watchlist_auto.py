@@ -11,9 +11,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import select
 
-from pkgsentry import watchlist_auto
-from pkgsentry.store.models import Watchlist
-from pkgsentry.watchlist_auto import (
+from pkgward import watchlist_auto
+from pkgward.store.models import Watchlist
+from pkgward.watchlist_auto import (
     AUTO_MALICIOUS_RANK,
     add_confirmed_malicious,
     is_watchlist_auto_only,

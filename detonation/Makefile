@@ -12,7 +12,7 @@ build:
 # *rootless* store, so run it as the detonation user with DOCKER_HOST pointing at
 # the rootless socket (bootstrap.sh/setup.sh do this automatically on deploy).
 forwarder-image:
-	docker build -t pkgsentry-dnsforwarder -f deploy/dns-forwarder.Dockerfile .
+	docker build -t pkgward-dnsforwarder -f deploy/dns-forwarder.Dockerfile .
 
 test:
 	go test ./... -v

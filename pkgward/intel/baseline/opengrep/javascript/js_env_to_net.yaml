@@ -1,0 +1,45 @@
+rules:
+  - id: js_env_to_net
+    mode: taint
+    message: >-
+      A credential-named environment variable / process secret is tainted into a
+      network call. Token/key exfiltration (npm tokens, CI secrets, cloud keys),
+      frequently from an install script.
+    languages: [js, ts]
+    severity: ERROR
+    metadata:
+      severity: high
+      confidence: medium
+      category: installer
+      pkgward_layer: opengrep
+    pattern-sources:
+      # Only a SECRET-named env read is a source. A bare `process.env` or a
+      # non-secret var (PORT, NODE_ENV, LOG_LEVEL, npm_package_*) reaching a
+      # network call is ordinary config plumbing, not exfil — it was ~98% of this
+      # rule's shadow hits (2360 scans, 2% precision). The name set mirrors the
+      # curated `_SENSITIVE_ENV_VARS` in ecosystems/crates/build_rs.py.
+      # NOTE: the secret-name regex is inlined in both blocks rather than shared via
+      # a YAML anchor/alias (&secret_names / *secret_names) — opengrep's rule parser
+      # rejects the alias ("Expected a string value for regex"), which silently
+      # dropped this whole rule from the loaded set. Keep the two copies in sync.
+      - patterns:
+          - pattern: process.env.$K
+          - metavariable-regex:
+              metavariable: $K
+              regex: >-
+                (?i)(token|secret|passwd|password|passphrase|credential|client_secret|api[_-]?key|access[_-]?key|private[_-]?key|secret[_-]?key|auth[_-]?(token|key)|bearer|session[_-]?(secret|token|id)|npm_token|gh_token|github_token|gitlab_token|cargo_registry_token|aws_(secret|access|session)|docker_password|database_url|conn(ection)?[_-]?str|\bdsn\b|mnemonic|seed[_-]?phrase|wallet|signing[_-]?key|webhook)
+      - patterns:
+          - pattern: process.env[$K]
+          - metavariable-regex:
+              metavariable: $K
+              regex: >-
+                (?i)(token|secret|passwd|password|passphrase|credential|client_secret|api[_-]?key|access[_-]?key|private[_-]?key|secret[_-]?key|auth[_-]?(token|key)|bearer|session[_-]?(secret|token|id)|npm_token|gh_token|github_token|gitlab_token|cargo_registry_token|aws_(secret|access|session)|docker_password|database_url|conn(ection)?[_-]?str|\bdsn\b|mnemonic|seed[_-]?phrase|wallet|signing[_-]?key|webhook)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: fetch($URL, ...)
+              - pattern: $H.request(...)
+              - pattern: $H.get($URL, ...)
+              - pattern: axios.post(...)
+              - pattern: axios($CFG)
+              - pattern: require('https').request(...)

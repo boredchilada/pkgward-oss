@@ -12,18 +12,18 @@ from sqlalchemy.orm import Session, sessionmaker
 
 # Tests run with the maintainer's private overlay loaded — this matches
 # what production sees and lets us validate parity. CI also runs a second
-# job with PKGSENTRY_INTEL_PATH unset to validate the baseline pack alone.
+# job with PKGWARD_INTEL_PATH unset to validate the baseline pack alone.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _PRIVATE_INTEL = _REPO_ROOT / "intel" / "private"
-if _PRIVATE_INTEL.is_dir() and not os.environ.get("PKGSENTRY_INTEL_PATH"):
-    os.environ["PKGSENTRY_INTEL_PATH"] = str(_PRIVATE_INTEL)
+if _PRIVATE_INTEL.is_dir() and not os.environ.get("PKGWARD_INTEL_PATH"):
+    os.environ["PKGWARD_INTEL_PATH"] = str(_PRIVATE_INTEL)
 
 
 @pytest.fixture(autouse=True)
 def _reset_intel():
-    """Reset the intel singleton between tests so PKGSENTRY_INTEL_PATH
+    """Reset the intel singleton between tests so PKGWARD_INTEL_PATH
     overrides set by individual tests are picked up cleanly."""
-    from pkgsentry import intel
+    from pkgward import intel
     intel.reset()
     yield
     intel.reset()
@@ -31,7 +31,7 @@ def _reset_intel():
 
 @pytest.fixture()
 def sqlite_engine(tmp_path: Path):
-    from pkgsentry.store.models import Base
+    from pkgward.store.models import Base
     url = f"sqlite:///{tmp_path/'test.db'}"
     eng = create_engine(url, future=True)
     Base.metadata.create_all(eng)

@@ -4,9 +4,9 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from pkgsentry import focus
-from pkgsentry.focus import FocusEntry
-from pkgsentry.store.models import FocusList
+from pkgward import focus
+from pkgward.focus import FocusEntry
+from pkgward.store.models import FocusList
 
 
 # --- parse_focus_file ---------------------------------------------------
@@ -130,11 +130,11 @@ def test_gate_decision(on_foc, on_wl, brand_new, exclusive, expected):
 
 
 def test_focus_exclusive_env(monkeypatch):
-    monkeypatch.delenv("PKGSENTRY_FOCUS_EXCLUSIVE", raising=False)
+    monkeypatch.delenv("PKGWARD_FOCUS_EXCLUSIVE", raising=False)
     assert focus.focus_exclusive() is False
-    monkeypatch.setenv("PKGSENTRY_FOCUS_EXCLUSIVE", "1")
+    monkeypatch.setenv("PKGWARD_FOCUS_EXCLUSIVE", "1")
     assert focus.focus_exclusive() is True
-    monkeypatch.setenv("PKGSENTRY_FOCUS_EXCLUSIVE", "0")
+    monkeypatch.setenv("PKGWARD_FOCUS_EXCLUSIVE", "0")
     assert focus.focus_exclusive() is False
 
 

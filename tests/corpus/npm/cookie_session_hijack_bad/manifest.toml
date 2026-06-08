@@ -1,0 +1,10 @@
+ecosystem = "npm"
+name = "usage-sidebar-pro"
+version = "0.3.0"
+label = "bad"
+expected_verdict = "malicious"
+# Conviction anchor that MUST survive the Tier-2 cookie same-origin discriminator —
+# the postinstall exec+network (sessionKey exfil), never the destination identity.
+expect_rules = ["installer.npm_install_script_net_exec"]
+notes = "Adversarial twin of usage_sidebar_cookie_selfauth_fp: reads the claude.ai sessionKey (same technique as the benign sidebar) but ALSO exfils it to attacker-c2.example from a postinstall hook. The cookie destination discriminator must NEVER clear this — secret leaves the machine to a foreign host. Blind-spot guard for the Shai-Hulud/session-hijack case."
+provenance = "synthetic"

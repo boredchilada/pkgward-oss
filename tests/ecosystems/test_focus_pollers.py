@@ -2,14 +2,14 @@
 import pytest
 from sqlalchemy import select
 
-from pkgsentry import focus
-from pkgsentry.focus import FocusEntry
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import ScanQueue
+from pkgward import focus
+from pkgward.focus import FocusEntry
+from pkgward.store import session as sess
+from pkgward.store.models import ScanQueue
 
 
 def _fresh_db(tmp_path, monkeypatch, name):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/name}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/name}")
     sess.reset_engine()
     sess.init_db()
 
@@ -22,7 +22,7 @@ async def test_pypi_poll_focus_releases(httpx_mock, tmp_path, monkeypatch):
     httpx_mock.add_response(url="https://pypi.org/pypi/requests/json", json={"info": {"version": "2.31.0"}})
     httpx_mock.add_response(url="https://pypi.org/pypi/flask/json", json={"info": {"version": "3.0.0"}})
 
-    from pkgsentry.ecosystems.pypi.ingest import focus as pf
+    from pkgward.ecosystems.pypi.ingest import focus as pf
     n = await pf.poll_focus_releases()
     assert n == 2
     with sess.session_scope() as s:
@@ -39,7 +39,7 @@ async def test_crates_poll_focus_releases(httpx_mock, tmp_path, monkeypatch):
         url="https://crates.io/api/v1/crates/serde",
         json={"crate": {"newest_version": "1.0.219"}},
     )
-    from pkgsentry.ecosystems.crates.ingest import focus as cf
+    from pkgward.ecosystems.crates.ingest import focus as cf
     n = await cf.poll_focus_releases()
     assert n == 1
     with sess.session_scope() as s:
@@ -56,7 +56,7 @@ async def test_gomod_poll_focus_releases(httpx_mock, tmp_path, monkeypatch):
         url="https://proxy.golang.org/golang.org/x/crypto/@latest",
         json={"Version": "v0.21.0"},
     )
-    from pkgsentry.ecosystems.gomod.ingest import focus as gf
+    from pkgward.ecosystems.gomod.ingest import focus as gf
     n = await gf.poll_focus_releases()
     assert n == 1
     with sess.session_scope() as s:
@@ -67,5 +67,5 @@ async def test_gomod_poll_focus_releases(httpx_mock, tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_poll_focus_empty_is_noop(tmp_path, monkeypatch):
     _fresh_db(tmp_path, monkeypatch, "ef.db")
-    from pkgsentry.ecosystems.pypi.ingest import focus as pf
+    from pkgward.ecosystems.pypi.ingest import focus as pf
     assert await pf.poll_focus_releases() == 0

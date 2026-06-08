@@ -1,8 +1,15 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 import pytest
 
-from pkgsentry.ecosystems.pypi.ingest import feeds
-from pkgsentry.store import session as sess
+from pkgward.ecosystems.pypi.ingest import feeds
+from pkgward.store import session as sess
+
+
+@pytest.fixture(autouse=True)
+def _disable_anomaly_gate(monkeypatch):
+    # These exercise the BASE ingest gate; the version-update anomaly gate (which
+    # makes per-package JSON calls) has its own tests in test_version_anomaly.
+    monkeypatch.setattr(feeds, "PYPI_ANOMALY_GATE", False)
 
 
 SAMPLE_UPDATES_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
@@ -23,7 +30,7 @@ def test_parse_feed_extracts_name_version():
 
 @pytest.mark.asyncio
 async def test_poll_feeds_once_enqueues(httpx_mock, tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'f.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'f.db'}")
     sess.reset_engine()
     sess.init_db()
     httpx_mock.add_response(url=feeds.UPDATES_URL, content=SAMPLE_UPDATES_XML)

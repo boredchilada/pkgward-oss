@@ -2,7 +2,7 @@
 """npm install-time reconnaissance/collection detectors (brave-search class)."""
 from __future__ import annotations
 
-from pkgsentry.ecosystems.npm.installer import _recon_findings
+from pkgward.ecosystems.npm.installer import _recon_findings
 
 # The real brave-search-mcp-server postinstall.js recon surface.
 RECON = r'''

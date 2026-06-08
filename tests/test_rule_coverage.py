@@ -21,13 +21,17 @@ from pathlib import Path
 from tests import corpus_harness as ch
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_PKG = _REPO_ROOT / "pkgsentry"
+_PKG = _REPO_ROOT / "pkgward"
 
 # Rules that are real but intentionally not (yet) exercised by a public,
 # baseline-only synthetic sample. Whittle this down by adding samples. Adding a
 # NEW rule_id to an analyzer without either a sample or an entry here fails the
 # coverage assertion below — by design.
 ALLOW_UNCOVERED = frozenset({
+    # A lifecycle hook that directly executes a bundled NON-binary file (shell/
+    # extensionless script). Unit-tested in test_npm_bundled_exec; the binary
+    # variant (the IronWorm catch) is corpus-pinned by install_runs_bundled_binary.
+    "installer.npm_install_runs_bundled_file",
     # Low-signal IOC sub-rules — only meaningful alongside other findings, not
     # verdict-driving on their own, so they appear incidentally rather than pinned.
     "iocs.ipv4",
@@ -39,6 +43,11 @@ ALLOW_UNCOVERED = frozenset({
     "iocs.cloud_metadata_endpoint",
     "iocs.encoded_url",
     "iocs.encoded_ip",
+    # Recursive multi-layer decode engine (decode_engine.recover, now wired into iocs):
+    # a hidden executable/shebang decoded via a chain, or code behind a >=2-layer chain.
+    # Unit-tested in test_iocs; real multi-layer-packer corpus sample is a follow-up.
+    "iocs.decoded_executable",
+    "iocs.decoded_code",
     # OAST/OOB-interaction callback domain (high). Unit-tested in test_iocs;
     # public corpus sample is a follow-up.
     "iocs.oast_callback",
@@ -79,7 +88,6 @@ ALLOW_UNCOVERED = frozenset({
     # obfuscated entrypoint. Unit-tested in test_obfuscation / test_npm_installer;
     # the live @redhat-cloud-services worm sample is held inert in the private vault.
     "obfuscation.charcode_eval",
-    "obfuscation.decrypt_then_exec",
     "installer.npm_install_obfuscated_entrypoint",
     # Resident-agent loader (install-time persistence + detached spawn) — catches
     # the logger-active / utils-terminal stealer family at the loader, independent
@@ -96,9 +104,8 @@ ALLOW_UNCOVERED = frozenset({
     # malware_patterns not yet sampled publicly.
     "malware.telegram_bot_exfil",
     "malware.slack_webhook",
-    # Credential-store-sweep (info-stealer harvest). Unit-tested in
-    # test_secret_access; corpus sample is a follow-up.
-    "malware.credential_store_sweep",
+    # Credential-store-sweep (info-stealer harvest): now corpus-pinned by
+    # npm/agent_secret_to_provider_bad. Also unit-tested in test_secret_access.
     "malware.etc_shadow_read",
     # .pth chain-gate: pth_import_injection is the high bare-sideload case
     # (pth_exec_injection + env_bulk_exfil + env_exfil_tainted are now corpus-pinned).
@@ -120,6 +127,13 @@ ALLOW_UNCOVERED = frozenset({
     "version_diff.new_rules_fired",
     "version_diff.author_changed",
     "version_diff.dependency_spike",
+    # Declares a dependency on a confirmed-malicious package (supply-chain
+    # propagation). Unit-tested in test_dep_intel; needs live auto-watchlist DB
+    # state to fire, so a corpus sample is a follow-up.
+    "dep_intel.depends_on_known_malicious",
+    # node-gyp binding.gyp command-expansion install-time exec (Phantom Gyp).
+    # Unit-tested in test_npm_installer; corpus sample is a follow-up.
+    "installer.npm_binding_gyp_command_exec",
     # crates build.rs variants not yet sampled.
     "crates.build_rs_env_harvest",
     "crates.build_rs_outdir_escape",
@@ -138,10 +152,10 @@ ALLOW_UNCOVERED = frozenset({
     "gomod.replace_local_path",
     "gomod.encoded_payload",
     # npm installer variants beyond the lifecycle net+exec chain.
+    # (npm_install_script_network + npm_install_script_net_exec are now corpus-pinned
+    # by agent_secret_to_provider_bad / cookie_session_hijack_bad.)
     "installer.npm_lifecycle_network",
     "installer.npm_lifecycle_subprocess",
-    "installer.npm_install_script_network",
-    "installer.npm_install_script_net_exec",
     "installer.npm_install_script_decode_exec",
     "installer.npm_install_script_encoded_payload",
     "installer.npm_install_remote_binary_drop",
@@ -169,7 +183,7 @@ def _static_rule_ids() -> set[str]:
 
 def _opengrep_rule_ids() -> set[str]:
     """`opengrep.<id>` (+ shadow variant) for every baseline opengrep rule id."""
-    from pkgsentry import intel
+    from pkgward import intel
     intel.reset()
     pack = intel.load(use_env=False)
     out: set[str] = set()
@@ -184,7 +198,7 @@ def _opengrep_rule_ids() -> set[str]:
 
 def _yara_rule_ids() -> set[str]:
     """`yara.<name>` for every baseline YARA rule."""
-    from pkgsentry import intel
+    from pkgward import intel
     intel.reset()
     pack = intel.load(use_env=False)
     out: set[str] = set()

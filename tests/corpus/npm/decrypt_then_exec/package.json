@@ -1,0 +1,7 @@
+{
+  "name": "decrypt-then-exec-loader",
+  "version": "1.0.0",
+  "description": "utility",
+  "main": "index.js",
+  "license": "MIT"
+}

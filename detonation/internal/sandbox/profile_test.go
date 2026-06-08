@@ -11,7 +11,7 @@ func TestPyPIProfile(t *testing.T) {
 	if p == nil {
 		t.Fatal("pypi profile not found")
 	}
-	if p.BaseImage != "python:3.11-slim" {
+	if p.BaseImage != "python:3.13-slim-trixie" {
 		t.Errorf("base image = %q", p.BaseImage)
 	}
 	install := p.InstallCmd("evil-package", "1.0.0", "/sandbox/pkg.tar.gz")
@@ -49,7 +49,7 @@ func TestNpmProfile(t *testing.T) {
 	if p == nil {
 		t.Fatal("npm profile not found")
 	}
-	if p.BaseImage != "node:20-slim" {
+	if p.BaseImage != "node:22-trixie-slim" {
 		t.Errorf("base image = %q", p.BaseImage)
 	}
 	install := p.InstallCmd("chalk", "5.6.2", "/sandbox/chalk-5.6.2.tgz")
@@ -82,7 +82,7 @@ func TestGomodProfile(t *testing.T) {
 	if p == nil {
 		t.Fatal("gomod profile not found")
 	}
-	if p.BaseImage != "golang:1.22-alpine" {
+	if p.BaseImage != "golang:1.24-trixie" {
 		t.Errorf("base image = %q", p.BaseImage)
 	}
 	install := p.InstallCmd("github.com/foo/bar", "v1.2.3", "/sandbox/github.com_foo_bar-v1.2.3.zip")

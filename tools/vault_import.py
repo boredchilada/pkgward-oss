@@ -7,7 +7,7 @@ any archive you want preserved as a known-bad regression anchor. The archive is
 stored inert (ZipCrypto, pw `infected`) + a TOML manifest, exactly like the
 pipeline's auto-archive path.
 
-Requires PKGSENTRY_VAULT_PATH to point at the (private) vault directory.
+Requires PKGWARD_VAULT_PATH to point at the (private) vault directory.
 
 Usage:
     # Fetch from the registry and store:
@@ -34,8 +34,8 @@ def _parse_pkg(spec: str) -> tuple[str, str]:
 
 
 async def _fetch_archive(ecosystem: str, name: str, version: str, kind: str | None):
-    import pkgsentry.ecosystems  # noqa: F401  (populate adapter_registry)
-    from pkgsentry.adapter import adapter_registry
+    import pkgward.ecosystems  # noqa: F401  (populate adapter_registry)
+    from pkgward.adapter import adapter_registry
 
     adapter = adapter_registry.get(ecosystem)
     if adapter is None:
@@ -62,10 +62,10 @@ def main() -> None:
     ap.add_argument("--registry-url", default=None)
     args = ap.parse_args()
 
-    from pkgsentry import intel, vault
+    from pkgward import intel, vault
     intel.load()
     if not vault.is_enabled():
-        sys.exit("PKGSENTRY_VAULT_PATH is not set — nothing to import into.")
+        sys.exit("PKGWARD_VAULT_PATH is not set — nothing to import into.")
 
     name, version = _parse_pkg(args.package)
 

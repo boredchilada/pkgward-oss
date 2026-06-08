@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from unittest.mock import patch
 
-from pkgsentry.ecosystems.pypi.ingest import cursor as cur
-from pkgsentry.store.models import ScanCursor, ScanQueue, Watchlist
-from pkgsentry.store import session as sess
+from pkgward.ecosystems.pypi.ingest import cursor as cur
+from pkgward.store.models import ScanCursor, ScanQueue, Watchlist
+from pkgward.store import session as sess
 
 
 def test_get_and_set_serial(tmp_path, monkeypatch):
     """First get bootstraps the cursor to PyPI's current serial; subsequent
     set/get round-trips correctly. We mock _fetch_current_serial so the test
     is hermetic (no network) and asserts a known initial value."""
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'c.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'c.db'}")
     monkeypatch.setattr(cur, "_fetch_current_serial", lambda client: 999)
     sess.reset_engine()
     sess.init_db()
@@ -22,7 +22,7 @@ def test_get_and_set_serial(tmp_path, monkeypatch):
 def test_get_last_serial_falls_back_to_zero_when_xmlrpc_fails(tmp_path, monkeypatch):
     """If PyPI's XMLRPC endpoint is unreachable on first run, bootstrap
     falls back to 0 (and the next successful pull_since will advance it)."""
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'cf.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'cf.db'}")
     monkeypatch.setattr(cur, "_fetch_current_serial", lambda client: None)
     sess.reset_engine()
     sess.init_db()
@@ -30,7 +30,7 @@ def test_get_last_serial_falls_back_to_zero_when_xmlrpc_fails(tmp_path, monkeypa
 
 
 def test_pull_since_enqueues_new_items(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'c2.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'c2.db'}")
     # Bootstrap below pretends PyPI is at serial 0 so the fake events advance it.
     monkeypatch.setattr(cur, "_fetch_current_serial", lambda client: 0)
     sess.reset_engine()

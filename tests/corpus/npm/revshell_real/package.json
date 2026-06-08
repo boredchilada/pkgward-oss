@@ -1,0 +1,7 @@
+{
+  "name": "totally-legit-utils",
+  "version": "1.0.0",
+  "description": "utils",
+  "main": "npm/index.js",
+  "license": "MIT"
+}

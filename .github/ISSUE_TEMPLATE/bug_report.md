@@ -25,11 +25,11 @@ What you expected to happen instead.
 2. ...
 
 **Environment**
-- pkgsentry version / commit:
+- pkgward version / commit:
 - How you're running it (standalone compose / BYO Postgres / from source):
 - OS + Docker version:
 - Ecosystem(s) involved (PyPI / crates.io / Go / npm):
 
 **Logs / output**
-Relevant `docker logs pkgsentry` output or a finding's `rule_id` and evidence.
+Relevant `docker logs pkgward` output or a finding's `rule_id` and evidence.
 Please redact anything sensitive.

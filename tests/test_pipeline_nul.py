@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from pkgsentry.adapter import Finding as AdapterFinding
-from pkgsentry.pipeline import _apply_metadata, _persist_findings, _strip_nul
-from pkgsentry.store.models import Finding, Package, Scan, Version
+from pkgward.adapter import Finding as AdapterFinding
+from pkgward.pipeline import _apply_metadata, _persist_findings, _strip_nul
+from pkgward.store.models import Finding, Package, Scan, Version
 
 
 def test_strip_nul_scalars_and_containers():

@@ -1,0 +1,71 @@
+# Domains that appear constantly in legitimate packages and should NOT
+# generate IOC findings. UNION semantics: overlay entries are added.
+#
+# The baseline ships a small, obviously-benign set — the source registries
+# themselves, major hosting platforms, and standards bodies. Operators
+# typically extend this via private overlay based on their own
+# false-positive history.
+
+benign_domains = [
+    # Package registries themselves
+    "pypi.org",
+    "files.pythonhosted.org",
+    "crates.io",
+    "static.crates.io",
+    "docs.rs",
+    "proxy.golang.org",
+    "index.golang.org",
+    "pkg.go.dev",
+    "npmjs.org",
+    "npmjs.com",
+    "rubygems.org",
+    "packagist.org",
+    # Source hosting
+    "github.com",
+    "github.io",
+    "githubusercontent.com",
+    "raw.githubusercontent.com",
+    "gitlab.com",
+    "bitbucket.org",
+    # Standards bodies and major docs
+    "python.org",
+    "docs.python.org",
+    "readthedocs.io",
+    "readthedocs.org",
+    "w3.org",
+    "ietf.org",
+    "apache.org",
+    "mozilla.org",
+    "opensource.org",
+    "spdx.org",
+    # Common testing / example domains (RFC 2606)
+    "example.com",
+    "example.org",
+    "example.net",
+    "example.invalid",
+    "localhost",
+    "127.0.0.1",
+    # First-party LLM-provider API endpoints. AI coding agents / LLM clients send
+    # the user's own API key to these as Bearer auth and stream completions — a
+    # systematic url_suspicious false-positive source (the arise-jinwoo-cli class).
+    # SPECIFIC API hosts only, never the bare registrable domain, so `evil.openai.com`
+    # still fires. NOTE: url_suspicious is low/non-convicting — this only trims noise;
+    # a package exfiltrating secrets TO one of these still convicts on the harvest /
+    # postinstall-network / behavioral-chain layers (see corpus
+    # npm/agent_secret_to_provider_bad, which keeps convicting with api.anthropic.com
+    # whitelisted).
+    "api.anthropic.com",
+    "api.openai.com",
+    "api.groq.com",
+    "api.x.ai",
+    "api.mistral.ai",
+    "api.deepseek.com",
+    "api.cohere.ai",
+    "api.cohere.com",
+    "api.together.xyz",
+    "api.perplexity.ai",
+    "integrate.api.nvidia.com",
+    "generativelanguage.googleapis.com",
+    "openrouter.ai",
+    "opencode.ai",
+]

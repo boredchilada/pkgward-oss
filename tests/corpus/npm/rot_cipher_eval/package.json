@@ -1,0 +1,7 @@
+{
+  "name": "rot-cipher-eval",
+  "version": "1.0.0",
+  "description": "string helpers",
+  "main": "index.js",
+  "license": "MIT"
+}

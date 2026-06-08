@@ -3,8 +3,8 @@ import hashlib
 
 import pytest
 
-from pkgsentry.adapter import Finding
-from pkgsentry.ecosystems.pypi.fetch import download as dl
+from pkgward.adapter import Finding
+from pkgward.ecosystems.pypi.fetch import download as dl
 
 
 SDIST_BYTES = b"sdist-payload-bytes"

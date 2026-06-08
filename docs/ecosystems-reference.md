@@ -22,8 +22,8 @@ Reference for implementing and maintaining ecosystem adapters.
 - Integrity: SHA256 in `digests` field of each URL entry
 
 ### Watchlist (Top packages)
-- Source: `https://hugovk.github.io/top-pypi-packages/top-pypi-packages-30-days.min.json`
-- Contains top ~8000 packages ranked by 30-day download count
+- Source: `https://hugovk.github.io/top-pypi-packages/top-pypi-packages.min.json`
+- Takes the top 10,000 packages ranked by download count
 - Refresh weekly
 
 ### Attack Surface
@@ -60,7 +60,7 @@ Reference for implementing and maintaining ecosystem adapters.
 
 ### Metadata & Download
 - API base: `https://crates.io/api/v1`
-- **Required header:** `User-Agent: pkgsentry (contact: <PKGSENTRY_CONTACT_EMAIL>)` — the contact identifier is set via the `PKGSENTRY_CONTACT_EMAIL` env var.
+- **Required header:** `User-Agent: pkgward (contact: <PKGWARD_CONTACT_EMAIL>)` — the contact identifier is set via the `PKGWARD_CONTACT_EMAIL` env var.
 - Crate info: `GET /crates/{name}`
 - Version info: `GET /crates/{name}/{version}`
 - Search: `GET /crates?q={query}&sort={sort}&per_page={n}&page={p}`
@@ -167,7 +167,7 @@ Reference for implementing and maintaining ecosystem adapters.
 
 ## npm (JavaScript) — ACTIVE
 
-Implemented in `pkgsentry/ecosystems/npm/` (diagram: `diagrams/npm-pipeline.drawio`).
+Implemented in `pkgward/ecosystems/npm/` (diagram: `diagrams/npm-pipeline.drawio`).
 Plugs into the same ingest → analyze → score → detonate → triage pipeline. Notes below
 document the registry APIs the adapter uses.
 
@@ -194,9 +194,9 @@ is a native `package.json` lifecycle-script analyzer
 combines registry-search popularity + awesome-nodejs + a hardcoded `CRITICAL_INFRA` list.
 
 ### Discovery (Real-time)
-- The npm registry is a CouchDB. New/changed packages stream from the public replica's
-  changes feed: `https://replicate.npmjs.com/_changes?since={seq}&feed=continuous` (or
-  `feed=longpoll`). Each row carries a `seq` and the package `id`.
+- The npm registry is a CouchDB. New/changed packages are read from the public replica's
+  changes feed, polled in pages: `https://replicate.npmjs.com/_changes?since={seq}&limit={n}`.
+  Each row carries a `seq` and the package `id`.
 - **Gotcha:** the `seq` sequence numbers are **not guaranteed monotonic** — they were reset
   during a past CouchDB upgrade. Treat the `since` cursor as an **opaque token**, not an
   ever-increasing integer (don't compare/order by it like the PyPI XML-RPC serial).
@@ -221,14 +221,21 @@ combines registry-search popularity + awesome-nodejs + a hardcoded `CRITICAL_INF
 |--------|-------|------|-----------|
 | Lifecycle scripts | `package.json` `preinstall`/`install`/`postinstall`/`prepare` | Critical — arbitrary code runs automatically on `npm install` (`postinstall` most-abused) | Parse `package.json` scripts; detonation runs `npm install` with scripts ENABLED, Tetragon-traced |
 | `bin` entries | `package.json` `bin` | Medium — installed onto PATH | Flag unexpected bin shims |
+| Obfuscated runtime entry | `main`/`bin` is a self-decoding `eval` loader | Critical — payload fires at `require()`/CLI time, **no install hook needed** | `installer.npm_runtime_obfuscated_entrypoint` (chain → malicious); detonation runs `main`/`bin` (below) |
 | Obfuscation | minified/encoded JS | High — hide payload | opengrep JS/TS + entropy + IOC extraction |
 | Typosquatting | package name | High — `expres` vs `express` | name-similarity matching |
 | Dependency confusion | scope/name vs internal pkgs | High — internal-name hijack | name + registry-source checks |
 
 ### Detonation angle
-`npm install` (scripts enabled) inside the rootless-Docker sandbox executes the lifecycle
-scripts; Tetragon traces the resulting process/file/network behavior (same model as the
-other ecosystems — runc runtime, not gVisor).
+Inside the rootless-Docker sandbox the install phase runs the lifecycle scripts (scripts
+enabled) **and then the package's runtime entry + CLI bins** — `node <main>` as an entry
+module (so `require.main === module`-gated payloads fire) and each `bin` target,
+backgrounded into the settle window. This catches require-time payloads (a self-decoding
+loader or downloader shipped as `main`/`bin` with no lifecycle hook — the turbo-dls class)
+that a bare `npm install` never triggers. The separate import phase runs in a fresh
+container where the package isn't resolvable, so the runtime exercise has to happen in the
+install-phase container. Tetragon traces the resulting process/file/network behavior (same
+model as the other ecosystems — runc runtime, not gVisor).
 
 ### Notes / sources
 - Registry API docs: https://github.com/npm/registry/blob/main/docs/responses/package-metadata.md , https://api-docs.npmjs.com/
@@ -236,7 +243,7 @@ other ecosystems — runc runtime, not gVisor).
 
 ## Focus list — file syntax per ecosystem
 
-Operator-supplied dependency lists (`pkgsentry focus load <file> -e <eco>`; see
+Operator-supplied dependency lists (`pkgward focus load <file> -e <eco>`; see
 `docs/operations.md`). One entry per line; `#` comments and blank lines ignored. Names are
 stored verbatim (no normalization) and matched against the ingest feeds.
 

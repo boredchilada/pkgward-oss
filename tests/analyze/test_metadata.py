@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from datetime import datetime, timezone, timedelta
 
-from pkgsentry.analyze.metadata import (
+from pkgward.analyze.metadata import (
     analyze_metadata,
     file_list_mismatch,
     typosquat_distance,
@@ -39,6 +39,20 @@ def test_file_list_match_no_finding():
     assert f == []
 
 
+def test_file_list_mismatch_single_artifact_no_finding():
+    # gomod/crates/npm ship one archive (here populated as wheel_files) and an
+    # empty sdist side must NOT make every file "absent from sdist" (the
+    # gomod/Spitzer FP). Same guard protects single-artifact PyPI releases.
+    assert file_list_mismatch(
+        sdist_files=[],
+        wheel_files=["Spitzer/__init__.py", "Spitzer/exploiters/bruteforce.py"],
+    ) == []
+    assert file_list_mismatch(
+        sdist_files=["pkg/__init__.py", "pkg/extra.py"],
+        wheel_files=[],
+    ) == []
+
+
 def test_rapid_release_flagged():
     ctx = MetadataContext(
         name="requests", version="2.32.1",
@@ -65,7 +79,7 @@ def test_maintainer_change_flagged():
 
 # ── dependency-confusion version finding (low) ──────────────────────
 import pytest as _pytest
-from pkgsentry.analyze.metadata import _dependency_confusion_version, analyze_metadata, MetadataContext
+from pkgward.analyze.metadata import _dependency_confusion_version, analyze_metadata, MetadataContext
 
 
 @_pytest.mark.parametrize("v,expected", [

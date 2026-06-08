@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-from pkgsentry.ecosystems.crates.ingest.watchlist import parse_crates_page
+from pkgward.ecosystems.crates.ingest.watchlist import parse_crates_page
 
 
 def test_parse_crates_page():

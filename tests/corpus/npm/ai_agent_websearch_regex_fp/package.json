@@ -1,0 +1,11 @@
+{
+  "name": "ai-agent-cli-fp",
+  "version": "1.0.0",
+  "description": "AI coding assistant CLI for terminal",
+  "type": "module",
+  "bin": { "agent": "./bin/agent.js" },
+  "scripts": {
+    "start": "node ./bin/agent.js"
+  },
+  "dependencies": {}
+}

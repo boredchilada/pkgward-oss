@@ -3,13 +3,13 @@ import asyncio
 import pytest
 from sqlalchemy import select
 
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import ScanQueue
+from pkgward.store import session as sess
+from pkgward.store.models import ScanQueue
 
 
 @pytest.mark.asyncio
 async def test_pool_drains_in_priority_order(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'w.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'w.db'}")
     sess.reset_engine()
     sess.init_db()
 
@@ -22,7 +22,7 @@ async def test_pool_drains_in_priority_order(tmp_path, monkeypatch):
                 processed.append(f"{row.priority}:{row.name}")
                 row.status = "done"
 
-    from pkgsentry import workers
+    from pkgward import workers
     monkeypatch.setattr(workers, "process_one", fake_process)
 
     with sess.session_scope() as s:

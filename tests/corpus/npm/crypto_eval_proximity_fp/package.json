@@ -1,0 +1,7 @@
+{
+  "name": "crypto-config-loader",
+  "version": "1.0.0",
+  "description": "Decrypt an operator-provisioned AES-256-GCM config blob.",
+  "main": "lib/index.js",
+  "license": "MIT"
+}

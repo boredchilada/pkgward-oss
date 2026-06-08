@@ -1,0 +1,16 @@
+ecosystem = "gomod"
+name = "example.com/pkitool"
+version = "v1.0.0"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = [
+    "gomod.init_exec_chain",
+    "gomod.init_net_chain",
+]
+notes = """FP guard for iocs.decoded_executable (the smallstep/cli winpe_test.go class,
+2026-06-07). A *_test.go that base64-decodes a native binary to PARSE it — with no
+execution sink anywhere in the file — is fixture data, not a dropper. The rule still
+fires but de-escalates to low in a test file with no exec sink, so the package must
+score clean. Reverting the exec-sink/test-file tiering (back to critical/high) flips
+this to suspicious/malicious and fails the build."""
+provenance = "synthetic"

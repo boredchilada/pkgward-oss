@@ -10,7 +10,7 @@ import stat
 
 import pytest
 
-from pkgsentry import detonation_staging as ds
+from pkgward import detonation_staging as ds
 
 
 def _mode(p):

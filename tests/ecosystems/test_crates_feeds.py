@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from pkgsentry.ecosystems.crates.ingest.feeds import parse_rss_items, _parse_title
+from pkgward.ecosystems.crates.ingest.feeds import parse_rss_items, _parse_title
 
 
 # ── _parse_title unit tests ─────────────────────────────────────────
@@ -126,7 +126,7 @@ def test_parse_rss_items_empty_titles_skipped():
 
 
 def test_dedup_new_items_resolves_drops_and_keeps():
-    from pkgsentry.ecosystems.crates.ingest.feeds import _dedup_new_items
+    from pkgward.ecosystems.crates.ingest.feeds import _dedup_new_items
     new_items = [
         ("already-concrete", "1.0.0"),  # untouched
         ("known-crate", "latest"),       # already queued -> dropped

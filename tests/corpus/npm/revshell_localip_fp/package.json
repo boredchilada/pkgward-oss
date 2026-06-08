@@ -1,0 +1,7 @@
+{
+  "name": "sysinfo-helper",
+  "version": "1.0.0",
+  "description": "Host system info helpers.",
+  "main": "npm/index.js",
+  "license": "MIT"
+}

@@ -7,8 +7,8 @@ import types
 
 import pytest
 
-import pkgsentry.analyze.yara_scan as ys
-from pkgsentry.util import capabilities as caps
+import pkgward.analyze.yara_scan as ys
+from pkgward.util import capabilities as caps
 
 
 def test_one_bad_yara_file_does_not_kill_the_layer(tmp_path, monkeypatch):

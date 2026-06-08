@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import ScanQueue
+from pkgward.store import session as sess
+from pkgward.store.models import ScanQueue
 
 
 def _init_db(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'ing.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'ing.db'}")
     sess.reset_engine()
     sess.init_db()
 
@@ -21,7 +21,7 @@ def _entry(path, version, ts):
 
 async def test_gomod_cursor_held_before_failed_brandnew_enqueue(tmp_path, monkeypatch):
     _init_db(tmp_path, monkeypatch)
-    from pkgsentry.ecosystems.gomod.ingest import cursor as gc
+    from pkgward.ecosystems.gomod.ingest import cursor as gc
 
     base = gc._ts_to_cursor("2026-05-01T00:00:00.000000Z")
     gc.set_last_cursor(base)
@@ -58,7 +58,7 @@ async def test_gomod_cursor_held_before_failed_brandnew_enqueue(tmp_path, monkey
 
 async def test_gomod_poll_terminates_on_same_timestamp_full_page(tmp_path, monkeypatch):
     _init_db(tmp_path, monkeypatch)
-    from pkgsentry.ecosystems.gomod.ingest import cursor as gc
+    from pkgward.ecosystems.gomod.ingest import cursor as gc
 
     gc.set_last_cursor(gc._ts_to_cursor("2026-05-01T00:00:00.000000Z"))
     ts = "2026-05-02T00:00:00.000000Z"
@@ -76,7 +76,7 @@ async def test_gomod_poll_terminates_on_same_timestamp_full_page(tmp_path, monke
 
 async def test_crates_reconcile_enqueues_missed_brandnew(tmp_path, monkeypatch):
     _init_db(tmp_path, monkeypatch)
-    from pkgsentry.ecosystems.crates.ingest import feeds
+    from pkgward.ecosystems.crates.ingest import feeds
 
     async def _fake_new(pages):
         return [("alpha", "1.0.0"), ("beta", "2.1.0")]

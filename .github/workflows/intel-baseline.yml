@@ -8,7 +8,7 @@ on:
 jobs:
   baseline:
     runs-on: ubuntu-latest
-    # Runs the full test suite with no PKGSENTRY_INTEL_PATH set, exercising
+    # Runs the full test suite with no PKGWARD_INTEL_PATH set, exercising
     # the public baseline pack only — no private overlay.
     steps:
       - uses: actions/checkout@v4
@@ -22,5 +22,5 @@ jobs:
 
       - name: pytest (baseline-only)
         env:
-          PKGSENTRY_INTEL_PATH: ""
+          PKGWARD_INTEL_PATH: ""
         run: pytest tests/ -x -q

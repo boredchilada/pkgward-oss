@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pkgsentry.analyze.imports import analyze_imports
-from pkgsentry.analyze.iocs import analyze_iocs
-from pkgsentry.analyze.malware_patterns import analyze_malware_patterns
+from pkgward.analyze.imports import analyze_imports
+from pkgward.analyze.iocs import analyze_iocs
+from pkgward.analyze.malware_patterns import analyze_malware_patterns
 
 
 # ---------------------------------------------------------------------------
@@ -25,7 +25,7 @@ def _write(root: Path, files: dict[str, bytes]) -> None:
 # ---------------------------------------------------------------------------
 
 def test_compute_hashes_sdist_strips_toplevel(tmp_path):
-    from pkgsentry.pipeline import _compute_file_hashes
+    from pkgward.pipeline import _compute_file_hashes
 
     _write(tmp_path, {
         "pkg-1.0.0/setup.py": b"print(1)",
@@ -40,7 +40,7 @@ def test_compute_hashes_sdist_strips_toplevel(tmp_path):
 
 
 def test_compute_hashes_wheel_no_strip(tmp_path):
-    from pkgsentry.pipeline import _compute_file_hashes
+    from pkgward.pipeline import _compute_file_hashes
 
     _write(tmp_path, {
         "pkg/__init__.py": b"",
@@ -53,7 +53,7 @@ def test_compute_hashes_wheel_no_strip(tmp_path):
 
 
 def test_compute_hashes_deterministic(tmp_path):
-    from pkgsentry.pipeline import _compute_file_hashes
+    from pkgward.pipeline import _compute_file_hashes
 
     _write(tmp_path, {"pkg-1.0/a.py": b"hello"})
     h1, _ = _compute_file_hashes(tmp_path, "sdist")
@@ -66,7 +66,7 @@ def test_compute_hashes_large_file_sha_only(tmp_path, monkeypatch):
     skips the expensive entropy/ssdeep/TLSH metrics — and the SHA matches the
     non-streamed value."""
     import hashlib
-    import pkgsentry.pipeline as pl
+    import pkgward.pipeline as pl
 
     monkeypatch.setattr(pl, "HASH_FULL_MAX_BYTES", 1024)
     blob = b"\x00\xff" * 4096  # 8 KB, > cap
@@ -78,7 +78,7 @@ def test_compute_hashes_large_file_sha_only(tmp_path, monkeypatch):
 
 
 def test_compute_hashes_small_file_full_metrics(tmp_path, monkeypatch):
-    import pkgsentry.pipeline as pl
+    import pkgward.pipeline as pl
     monkeypatch.setattr(pl, "HASH_FULL_MAX_BYTES", 1024 * 1024)
     _write(tmp_path, {"a.py": b"x" * 512})
     hashes, _ = pl._compute_file_hashes(tmp_path, "wheel")
@@ -92,12 +92,12 @@ def test_compute_hashes_small_file_full_metrics(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def _fi(sha: str, entropy: float = 0.0, ssdeep: str = "") -> "FileInfo":
-    from pkgsentry.pipeline import FileInfo
+    from pkgward.pipeline import FileInfo
     return FileInfo(sha256=sha, entropy=entropy, ssdeep=ssdeep)
 
 
 def test_find_changed_new_file():
-    from pkgsentry.pipeline import _find_changed_files
+    from pkgward.pipeline import _find_changed_files
 
     current = {"a.py": _fi("aaa"), "b.py": _fi("bbb")}
     prev = {"a.py": _fi("aaa")}
@@ -107,7 +107,7 @@ def test_find_changed_new_file():
 
 
 def test_find_changed_modified_file():
-    from pkgsentry.pipeline import _find_changed_files
+    from pkgward.pipeline import _find_changed_files
 
     current = {"a.py": _fi("new_hash")}
     prev = {"a.py": _fi("old_hash")}
@@ -117,7 +117,7 @@ def test_find_changed_modified_file():
 
 
 def test_find_changed_no_changes():
-    from pkgsentry.pipeline import _find_changed_files
+    from pkgward.pipeline import _find_changed_files
 
     current = {"a.py": _fi("same"), "b.py": _fi("same2")}
     prev = {"a.py": _fi("same"), "b.py": _fi("same2")}
@@ -127,7 +127,7 @@ def test_find_changed_no_changes():
 
 
 def test_find_changed_all_new_first_version():
-    from pkgsentry.pipeline import _find_changed_files, FileInfo
+    from pkgward.pipeline import _find_changed_files, FileInfo
 
     current = {"a.py": _fi("aaa"), "b.py": _fi("bbb")}
     prev: dict[str, FileInfo] = {}
@@ -226,7 +226,7 @@ def test_malware_scans_changed_file(tmp_path):
 
 def test_cross_version_sdist_diff(tmp_path):
     """Same file content across versions → no changes; modified → detected."""
-    from pkgsentry.pipeline import _compute_file_hashes, _find_changed_files
+    from pkgward.pipeline import _compute_file_hashes, _find_changed_files
 
     v1 = tmp_path / "v1"
     _write(v1, {

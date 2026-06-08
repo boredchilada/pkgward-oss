@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
-from pkgsentry.ecosystems.gomod.fetch.download import case_encode
+from pkgward.ecosystems.gomod.fetch.download import case_encode
 
 
 def test_case_encode_lowercase():

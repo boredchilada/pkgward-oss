@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pkgsentry.intel.pack import IntelPack, load_pack
+from pkgward.intel.pack import IntelPack, load_pack
 
 
 def _make_pack_dir(root: Path, *, with_opengrep: bool = False, with_yara: bool = False) -> Path:

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
-from pkgsentry.adapter import Finding
-from pkgsentry.detonate.gate import should_detonate
+from pkgward.adapter import Finding
+from pkgward.detonate.gate import should_detonate
 
 
 def test_skip_clean_low_score():

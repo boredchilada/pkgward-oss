@@ -1,0 +1,11 @@
+ecosystem = "npm"
+name = "decrypt-then-exec-loader"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = [
+    "obfuscation.decrypt_then_exec",
+    "installer.npm_runtime_obfuscated_entrypoint",
+]
+notes = "Self-decrypting loader declared as `main`: a createDecipheriv result is eval'd inline at require() time (well within the proximity window). Coverage pin that the new _crypto_feeds_eval proximity gate still fires on a real inline decrypt->eval loader (regression guard for fix #1) — both the obfuscation rule and the runtime-entrypoint chain rule must fire."
+provenance = "synthetic"

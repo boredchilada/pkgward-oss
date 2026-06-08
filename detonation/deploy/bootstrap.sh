@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-command deploy for the pkgsentry detonation sandbox.
+# One-command deploy for the pkgward detonation sandbox.
 # Installs Docker and a Go toolchain if absent, builds and stages the service,
 # runs setup.sh, and starts the sandbox. Run as root.
 set -euo pipefail

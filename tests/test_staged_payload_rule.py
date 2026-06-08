@@ -2,7 +2,7 @@
 """Behavioral guard for the private `staged_payload_exec` YARA rule.
 
 The rule lives in the operator intel overlay, not the baseline pack, so this test
-skips on a checkout without the overlay loaded (`PKGSENTRY_INTEL_PATH` unset). When
+skips on a checkout without the overlay loaded (`PKGWARD_INTEL_PATH` unset). When
 the overlay IS loaded it asserts both directions of the FP fix:
 
   - it stays SILENT on the JavaScript constructs that pervade bundled `.mjs`
@@ -22,7 +22,7 @@ _RULE_NAME = "staged_payload_exec"
 
 
 def _load_rule_source() -> str | None:
-    from pkgsentry import intel
+    from pkgward import intel
 
     intel.reset()
     pack = intel.load(use_env=True)

@@ -15,7 +15,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RULES_BASE="$ROOT/pkgsentry/intel/baseline/opengrep"
+RULES_BASE="$ROOT/pkgward/intel/baseline/opengrep"
 BIN="${OPENGREP_BIN:-opengrep}"
 
 if ! command -v "$BIN" >/dev/null 2>&1; then

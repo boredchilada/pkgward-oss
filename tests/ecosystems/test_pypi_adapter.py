@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 import pytest
 
-from pkgsentry.adapter import adapter_registry
-import pkgsentry.ecosystems.pypi  # registers
-from pkgsentry.ecosystems.pypi.adapter import PyPIAdapter
+from pkgward.adapter import adapter_registry
+import pkgward.ecosystems.pypi  # registers
+from pkgward.ecosystems.pypi.adapter import PyPIAdapter
 
 
 def test_pypi_adapter_registered():

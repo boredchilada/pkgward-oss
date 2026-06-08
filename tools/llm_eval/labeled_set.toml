@@ -1,0 +1,134 @@
+# LLM-triage labeled evaluation set.
+#
+# Each [[sample]] is a REAL published package fetched live at bench time (same
+# adapter.fetch path prod uses), analyzed through the real static seam, then run
+# through llm.triage.triage(). The harness scores three axes (see tools/llm_eval/run_eval.py):
+#
+#   bad  sample  -> PASS if triage verdict != "benign"        (no-suppress; catastrophic if it clears)
+#   good sample  -> CLEARED  if verdict == "benign"           (the value: removes the FP)
+#                -> ESCALATED if verdict == "malicious"        (the production failure we are fixing)
+#                -> verdict suspicious/inconclusive on a good  = neutral (no malicious alert fires)
+#
+# The 2026-06 benchmark only measured no-suppress + cleared. It had NO over-escalation
+# axis, which is exactly why deepseek-v4-flash scored "perfect" yet generated the
+# 2026-06-07 FP alert surge. This set adds the adjudicated FPs that expose it.
+#
+# `failure` records what the CURRENT (deepseek-v4-flash + baseline prompt) model did
+# on this sample in the wild, for regression tracking. `driver` = what produced the
+# bad alert: "llm" (rules only suspicious, LLM escalated) or "rules+llm" (both
+# malicious -> ALSO auto-watchlisted, the worst case).
+#
+# Provenance: adjudicated locally 2026-06-07 (this session) + 2026-06-07 earlier
+# (stickcode, hellyeah). All "good" verdicts confirmed by reading the actual source.
+
+# ---------------------------------------------------------------------------
+# GOOD — benign packages the scanner false-flagged. The over-escalation axis.
+# ---------------------------------------------------------------------------
+
+[[sample]]
+ecosystem = "npm"
+name = "@prestyj/pixel"
+version = "4.3.101"
+label = "good"
+driver = "llm"            # rule=suspicious(30); LLM escalated to malicious 95%
+failure = "escalated"
+notes = "Legit error-tracking SDK. install() is a `bin` CLI subcommand (cli.js guards on args.command), NOT an npm lifecycle hook. workers.dev is its own ingest backend. Tests: lifecycle-vs-CLI + first-party-destination."
+
+[[sample]]
+ecosystem = "npm"
+name = "ainx"
+version = "1.13.23"
+label = "good"
+driver = "rules+llm"      # rule=malicious(82) + LLM malicious(95) -> auto-watchlisted
+failure = "escalated"
+notes = "Legit Pterodactyl/Blueprint CLI (rjweb/0x4096). `bun build --minify` bundle; createDecipheriv helper is dead code, eval belongs to deps; no lifecycle hook. Tests: obfuscation+data-flow + minified-bundle."
+
+[[sample]]
+ecosystem = "npm"
+name = "@expo/apple-utils"
+version = "2.1.21"
+label = "good"
+driver = "rules+llm"      # rule=malicious(90) + LLM malicious(75) -> auto-watchlisted (top-1M pkg!)
+failure = "escalated"
+notes = "Official Expo App Store Connect tool, ~882K dl/wk. @vercel/ncc bundle (not malicious obf); iocs.ipv4 are X.509 OID strings (2.5.4.3). Tests: minified-bundle + base64/OID-as-IP + first-party-destination."
+
+[[sample]]
+ecosystem = "npm"
+name = "@solomei-ai/intent"
+version = "1.12.1"
+label = "good"
+driver = "llm"            # was needs_review (inconclusive) — acceptable, but ideally cleared
+failure = "inconclusive"
+notes = "Consent/init-gated analytics SDK. base64 blobs = html2canvas-pro lookup tables + 1x1 GIF beacon; callimacus.ai is its own telemetry. Tests: base64-blobs-are-data + first-party-destination."
+
+[[sample]]
+ecosystem = "npm"
+name = "stickcode"
+version = "6.0.14"
+label = "good"
+driver = "llm"            # rule=suspicious(30); LLM escalated malicious 95% (earlier 2026-06-07)
+failure = "escalated"
+notes = "Commercial Brotli+AES library with online license activation. Phone-home is behind exported init(license), NOT install/import; machineId is a device fingerprint. Tests: lifecycle-vs-CLI + first-party-licensing."
+
+[[sample]]
+ecosystem = "npm"
+name = "@hellyeah/cli-darwin-arm64"
+version = "0.0.2-bootstrap"
+label = "good"
+driver = "rules+llm"      # rule=malicious + LLM malicious 65% (earlier 2026-06-07). HEAVY: ~24MB tgz.
+failure = "escalated"
+notes = "Platform-shim native binary (finalroundai). `bun build --compile` Mach-O; opaque-artifact, no JS to read, no install hook. Tests: opaque-artifact + compiled-binary-not-a-loader. Large download."
+
+[[sample]]
+ecosystem = "gomod"
+name = "github.com/QuantumDatalytica-LLC/quantum-core-engine"
+version = "v2.0.0+incompatible"
+label = "good"
+driver = "llm"            # rule=suspicious(30); LLM escalated malicious 85-95% across v1.0.x..v2.0.0
+failure = "escalated"
+notes = "Commercial PyArmor-protected code (QuantumDatalytica/Softqube). Genuine Dashingsoft runtime, no install hook, no exfil. Repo has NO go.mod/.go — mis-ingested by gomod via Go proxy. Tests: opaque-artifact(PyArmor) + obfuscation!=malice + gomod-no-Go ingest bug."
+
+[[sample]]
+ecosystem = "gomod"
+name = "github.com/brbtcoficial/react-native-safe"
+version = "v1.0.22"
+label = "good"
+driver = "llm"            # rule=suspicious(30); LLM escalated malicious 85-95% across v0.2.0..v1.0.22
+failure = "escalated"
+notes = "Legit B8 (Brazilian KYC) video-liveness SDK. handleChannelData = bounded 4-command registry (not RCE); 54.94.8.152 is B8's AWS sa-east-1 TURN. Tests: WebRTC/turn:-context + bounded-dispatch-not-RCE + gomod-no-Go ingest."
+
+[[sample]]
+ecosystem = "pypi"
+name = "ezCOS"
+version = "0.0.5"
+label = "good"
+driver = "rules"          # rule=suspicious; LLM correctly inconclusive (needs_review). Kept for typosquat axis.
+failure = "none"
+notes = "Real academic tool (Prof. Géry Casiez, Univ. Lille). Typosquat-NAME collision with 'ecos' only; benign content, no install code. Tests: typosquat-name-only + author-reputation. LLM already handled correctly — guards against regression."
+
+# ---------------------------------------------------------------------------
+# BAD — real malware. The no-suppress axis. NEVER let the model clear these.
+# ---------------------------------------------------------------------------
+
+[[sample]]
+ecosystem = "npm"
+name = "nodepathbalance54"
+version = "1.1.0"
+label = "bad"
+failure = "none"          # caught: rule=suspicious(30), LLM correctly escalated malicious 95%
+notes = "Telegram-bot stealer, runs on require(). Hardcoded bot token + chatId; ipify + os.networkInterfaces; POST to api.telegram.org/sendMessage. Dependency-confusion family (deps on nodepathbalance45). Concrete visible mechanism — must stay convicted under the reinforced prompt."
+
+[[sample]]
+ecosystem = "npm"
+name = "mlamp-captcha-web-sdk"
+version = "1.0.0"
+label = "bad"
+failure = "none"          # caught: rule=suspicious(46), LLM correctly escalated malicious 95%
+notes = "postinstall char-code payload spawns detached --eval child: gates on npm_package_*, evades sandboxes (NODE_OPTIONS --require, AWS dummy keys), exfils hostname/user/NIC-IPs/env to XOR-obfuscated host. Concrete visible mechanism — must stay convicted."
+
+# ---------------------------------------------------------------------------
+# TODO: merge in the original 2026-06 set once exact versions are recovered:
+#   bad : ai-sdk-helpers@1.3.1, corporate-front-vue, brave-search, forge-jsxy,
+#         baileys-mbuilder   (cred-harvest / dep-confusion / RAT / basE91 backdoor)
+#   good: huayoungtk-cli@1.0.7, nodefisher, @omegagrid, mindforge
+# These were validated live in docs/internal/llm-model-benchmark-2026-06.md.

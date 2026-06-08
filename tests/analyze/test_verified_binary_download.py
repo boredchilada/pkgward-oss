@@ -10,9 +10,9 @@ import json
 import pathlib
 import tempfile
 
-from pkgsentry.adapter import Finding
-from pkgsentry.detonation_worker import _verified_download_hosts, _is_self_download_exfil
-from pkgsentry.ecosystems.npm.installer import analyze_install_scripts
+from pkgward.adapter import Finding
+from pkgward.detonation_worker import _verified_download_hosts, _is_self_download_exfil
+from pkgward.ecosystems.npm.installer import analyze_install_scripts
 
 
 def _pkg(install_js: str) -> pathlib.Path:

@@ -2,7 +2,7 @@
 """Credential-store-sweep detection (meoo-* / rookie-security-test stealer family)."""
 from __future__ import annotations
 
-from pkgsentry.analyze.secret_access import analyze_secret_access
+from pkgward.analyze.secret_access import analyze_secret_access
 
 
 def _ids(findings):

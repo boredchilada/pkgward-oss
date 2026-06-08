@@ -6,8 +6,8 @@ import hashlib
 
 import pytest
 
-from pkgsentry.adapter import IntegrityError, NoFilesError
-from pkgsentry.ecosystems.npm.fetch import download as dl
+from pkgward.adapter import IntegrityError, NoFilesError
+from pkgward.ecosystems.npm.fetch import download as dl
 
 TARBALL = b"fake-npm-tarball-bytes"
 REG = "https://registry.npmjs.org"

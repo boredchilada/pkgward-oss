@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" agent="pkgsentry" version="26.0.0">
+<mxfile host="app.diagrams.net" agent="pkgward" version="26.0.0">
   <diagram id="detection-layers" name="Detection Layers">
     <mxGraphModel dx="1800" dy="1400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="2200" math="0" shadow="0">
       <root>
@@ -9,7 +9,7 @@
         <mxCell id="title" value="Detection Layers" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=28;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
           <mxGeometry x="550" y="20" width="500" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="subtitle" value="pkgsentry Multi-Ecosystem Malware Scanner" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;fontStyle=2;fontColor=#555555;" vertex="1" parent="1">
+        <mxCell id="subtitle" value="pkgward Multi-Ecosystem Malware Scanner" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;fontStyle=2;fontColor=#555555;" vertex="1" parent="1">
           <mxGeometry x="550" y="65" width="500" height="30" as="geometry" />
         </mxCell>
 
@@ -23,7 +23,7 @@
         <mxCell id="legend_green" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="1195" y="50" width="20" height="16" as="geometry" />
         </mxCell>
-        <mxCell id="legend_green_text" value="Universal (PyPI + Crates + Go)" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+        <mxCell id="legend_green_text" value="Universal (PyPI + Crates + Go + npm)" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fillColor=none;strokeColor=none;" vertex="1" parent="1">
           <mxGeometry x="1220" y="48" width="200" height="20" as="geometry" />
         </mxCell>
         <mxCell id="legend_yellow" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
@@ -254,7 +254,7 @@
         </mxCell>
 
         <!-- python_malware.yar sub-box -->
-        <mxCell id="layer8_yar1" value="&lt;b&gt;python_malware.yar&lt;/b&gt; — 11 rules" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6ffe6;strokeColor=#82b366;fontSize=11;verticalAlign=top;spacingTop=4;align=center;" vertex="1" parent="static_group">
+        <mxCell id="layer8_yar1" value="&lt;b&gt;Overlay YARA&lt;/b&gt; — one rule per .yar" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6ffe6;strokeColor=#82b366;fontSize=11;verticalAlign=top;spacingTop=4;align=center;" vertex="1" parent="static_group">
           <mxGeometry x="35" y="655" width="500" height="55" as="geometry" />
         </mxCell>
         <mxCell id="layer8_yar1_tags" value="W4SP &amp;nbsp;|&amp;nbsp; browser theft &amp;nbsp;|&amp;nbsp; crypto wallets &amp;nbsp;|&amp;nbsp; staged_payload_exec &amp;nbsp;|&amp;nbsp; env_credential_harvest" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="static_group">
@@ -262,10 +262,10 @@
         </mxCell>
 
         <!-- community_sigbase.yar sub-box -->
-        <mxCell id="layer8_yar2" value="&lt;b&gt;community_sigbase.yar&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6ffe6;strokeColor=#82b366;fontSize=11;verticalAlign=top;spacingTop=4;align=center;" vertex="1" parent="static_group">
+        <mxCell id="layer8_yar2" value="&lt;b&gt;Baseline YARA&lt;/b&gt; — one rule per .yar" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6ffe6;strokeColor=#82b366;fontSize=11;verticalAlign=top;spacingTop=4;align=center;" vertex="1" parent="static_group">
           <mxGeometry x="555" y="655" width="500" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="layer8_yar2_desc" value="Adapted Neo23x0/signature-base + community rules" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="static_group">
+        <mxCell id="layer8_yar2_desc" value="sigbase (DRL) + technique rules; npm/python/rust" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="static_group">
           <mxGeometry x="560" y="680" width="490" height="24" as="geometry" />
         </mxCell>
         <mxCell id="layer8_eco" value="Universal" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#82b366;fillColor=none;strokeColor=none;" vertex="1" parent="static_group">
@@ -356,7 +356,7 @@
         </mxCell>
 
         <!-- 8 Behavioral Rules as a 2x4 grid -->
-        <mxCell id="rule_label" value="8 Behavioral Rules:" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="dynamic_group">
+        <mxCell id="rule_label" value="14 Behavioral Rules:" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="dynamic_group">
           <mxGeometry x="35" y="100" width="200" height="20" as="geometry" />
         </mxCell>
 
@@ -392,7 +392,7 @@
             <mxPoint x="770" y="1640" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="flow_label2" value="verdict == malicious gates LLM" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#666666;fillColor=none;strokeColor=none;fontStyle=2;" vertex="1" parent="1">
+        <mxCell id="flow_label2" value="malicious OR suspicious gates LLM" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#666666;fillColor=none;strokeColor=none;fontStyle=2;" vertex="1" parent="1">
           <mxGeometry x="780" y="1605" width="190" height="20" as="geometry" />
         </mxCell>
 
@@ -407,14 +407,14 @@
         <mxCell id="layer12" value="&lt;b&gt;Layer 12 — LLM Triage&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=0;verticalAlign=top;spacingTop=5;align=center;" vertex="1" parent="ai_group">
           <mxGeometry x="20" y="50" width="1060" height="110" as="geometry" />
         </mxCell>
-        <mxCell id="layer12_desc" value="OpenRouter → GLM-5.1" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="ai_group">
+        <mxCell id="layer12_desc" value="OpenRouter → deepseek-v4-flash" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#666666;" vertex="1" parent="ai_group">
           <mxGeometry x="35" y="75" width="200" height="20" as="geometry" />
         </mxCell>
         <mxCell id="layer12_eco" value="Universal" style="text;html=1;align=right;verticalAlign=top;fontSize=10;fontStyle=1;fontColor=#82b366;fillColor=none;strokeColor=none;" vertex="1" parent="ai_group">
           <mxGeometry x="980" y="53" width="90" height="20" as="geometry" />
         </mxCell>
 
-        <mxCell id="layer12_gate" value="&lt;b&gt;Gate:&lt;/b&gt; Only runs when verdict == malicious" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="ai_group">
+        <mxCell id="layer12_gate" value="&lt;b&gt;Gate:&lt;/b&gt; runs on malicious OR suspicious (can escalate)" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fillColor=none;strokeColor=none;fontColor=#555555;" vertex="1" parent="ai_group">
           <mxGeometry x="35" y="95" width="350" height="20" as="geometry" />
         </mxCell>
 

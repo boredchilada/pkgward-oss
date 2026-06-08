@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import pytest
 
-from pkgsentry.ecosystems.npm.ingest import cursor as npm_cursor
-from pkgsentry.ecosystems.npm.ingest.cursor import _seq_to_int
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import ScanCursor, ScanQueue
+from pkgward.ecosystems.npm.ingest import cursor as npm_cursor
+from pkgward.ecosystems.npm.ingest.cursor import _seq_to_int
+from pkgward.store import session as sess
+from pkgward.store.models import ScanCursor, ScanQueue
 
 
 def test_seq_to_int_plain():
@@ -44,8 +44,8 @@ def _changes_page(rows: list[tuple[int, str]]) -> dict:
 
 @pytest.fixture()
 def _npm_db(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'npm.db'}")
-    monkeypatch.delenv("PKGSENTRY_FOCUS_EXCLUSIVE", raising=False)
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'npm.db'}")
+    monkeypatch.delenv("PKGWARD_FOCUS_EXCLUSIVE", raising=False)
     sess.reset_engine()
     sess.init_db()
     npm_cursor._reset_resolve_attempts_for_tests()

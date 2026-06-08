@@ -5,9 +5,9 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timezone
 
-from pkgsentry.adapter import Finding
-from pkgsentry.detonate.client import DetonationResult, PhaseResult
-from pkgsentry.detonate.gate import should_detonate
+from pkgward.adapter import Finding
+from pkgward.detonate.client import DetonationResult, PhaseResult
+from pkgward.detonate.gate import should_detonate
 
 
 def test_gate_triggers_for_suspicious():
@@ -33,7 +33,7 @@ def test_gate_skips_clean_no_watchlist():
 
 def test_detonation_findings_merge():
     """Static + dynamic findings merge and re-score correctly."""
-    from pkgsentry.detect.score import score_and_verdict
+    from pkgward.detect.score import score_and_verdict
 
     static_findings = [
         Finding(rule_id="malware.obfuscation", category="malware", severity="high", confidence="medium"),
@@ -49,7 +49,7 @@ def test_detonation_findings_merge():
 
 def test_detonation_result_empty_findings_no_change():
     """Clean detonation doesn't change a suspicious verdict."""
-    from pkgsentry.detect.score import score_and_verdict
+    from pkgward.detect.score import score_and_verdict
 
     static_findings = [
         Finding(rule_id="malware.obfuscation", category="malware", severity="high", confidence="medium"),
@@ -63,7 +63,7 @@ def test_detonation_result_empty_findings_no_change():
 def test_enqueue_gate_local_detonation_enabled(monkeypatch):
     """A host with a local detonation client enqueues (unchanged behavior)."""
     from types import SimpleNamespace
-    from pkgsentry.pipeline import _detonation_cluster_enabled
+    from pkgward.pipeline import _detonation_cluster_enabled
     monkeypatch.delenv("DETONATION_ENABLED", raising=False)
     assert _detonation_cluster_enabled(SimpleNamespace(is_enabled=lambda: True)) is True
 
@@ -71,7 +71,7 @@ def test_enqueue_gate_local_detonation_enabled(monkeypatch):
 def test_enqueue_gate_scan_only_host(monkeypatch):
     """A scan-only host (no local detonation) still enqueues when DETONATION_ENABLED=1."""
     from types import SimpleNamespace
-    from pkgsentry.pipeline import _detonation_cluster_enabled
+    from pkgward.pipeline import _detonation_cluster_enabled
     monkeypatch.setenv("DETONATION_ENABLED", "1")
     assert _detonation_cluster_enabled(SimpleNamespace(is_enabled=lambda: False)) is True
 
@@ -79,6 +79,6 @@ def test_enqueue_gate_scan_only_host(monkeypatch):
 def test_enqueue_gate_detonation_absent(monkeypatch):
     """No local client and no DETONATION_ENABLED → don't enqueue (no undrained pileup)."""
     from types import SimpleNamespace
-    from pkgsentry.pipeline import _detonation_cluster_enabled
+    from pkgward.pipeline import _detonation_cluster_enabled
     monkeypatch.delenv("DETONATION_ENABLED", raising=False)
     assert _detonation_cluster_enabled(SimpleNamespace(is_enabled=lambda: False)) is False

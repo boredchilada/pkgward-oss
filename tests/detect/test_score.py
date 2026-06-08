@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-from pkgsentry.adapter import Finding
-from pkgsentry.detect.score import score_and_verdict
+from pkgward.adapter import Finding
+from pkgward.detect.score import score_and_verdict
 
 
 def _f(severity, category="iocs", rule_id="x"):
@@ -52,8 +52,8 @@ def test_top100_critical_alerts():
 
 
 def test_network_subprocess_chain_is_malicious():
-    from pkgsentry.adapter import Finding
-    from pkgsentry.detect.score import score_and_verdict
+    from pkgward.adapter import Finding
+    from pkgward.detect.score import score_and_verdict
     f = Finding(rule_id="imports.network_subprocess_chain", category="imports",
                 severity="high", confidence="high", file="__init__.py", line=4, evidence="chain")
     res = score_and_verdict([f], watchlist_rank=None)

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
-from pkgsentry.queue import (
+from pkgward.queue import (
     MAX_AUTO_ATTEMPTS,
     STALE_CLAIM_TIMEOUT_SECONDS,
     _eco_weights,
@@ -16,7 +16,7 @@ from pkgsentry.queue import (
     prune_terminal,
     sweep_stale_claims,
 )
-from pkgsentry.store.models import ScanQueue
+from pkgward.store.models import ScanQueue
 
 
 def test_enqueue_dedupes_pending(db_session):
@@ -257,7 +257,7 @@ def test_claim_next_backlog_dominates_but_floor_protects(db_session):
 import pytest
 from sqlalchemy.exc import OperationalError
 
-import pkgsentry.queue as q
+import pkgward.queue as q
 
 
 def _op_err(msg: str) -> OperationalError:

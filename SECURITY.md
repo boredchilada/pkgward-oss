@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-pkgsentry is a security tool — vulnerabilities in the engine itself, in the detonation sandbox, or in the intel-pack loader could let attackers evade detection or pivot through deployments. We take these seriously.
+pkgward is a security tool — vulnerabilities in the engine itself, in the detonation sandbox, or in the intel-pack loader could let attackers evade detection or pivot through deployments. We take these seriously.
 
 **Please do not file public GitHub issues for active vulnerabilities.**
 
@@ -10,7 +10,7 @@ Instead, email **`security@cyfar.ca`** with:
 
 - A clear description of the issue
 - A proof-of-concept or repro case (a synthetic malicious package, a crafted intel pack, a fuzzed input — whatever demonstrates the problem)
-- Affected pkgsentry version(s)
+- Affected pkgward version(s)
 - Your contact info (so we can ask follow-up questions; anonymity is OK if you'd prefer)
 
 We'll acknowledge receipt within 72 hours, give you a tracking handle, and keep you posted on remediation timing. Once a fix is released, we'll coordinate a public disclosure window with you.

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import importlib
 
-import pkgsentry.util.capabilities as capabilities
+import pkgward.util.capabilities as capabilities
 
 
 def test_capabilities_reports_all_three():

@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 import pytest
 from sqlalchemy import select
 
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import ScanQueue, Version, Watchlist
+from pkgward.store import session as sess
+from pkgward.store.models import ScanQueue, Version, Watchlist
 
 
 def _tgz(data):
@@ -32,13 +32,13 @@ def _whl(data):
 
 @pytest.mark.asyncio
 async def test_metadata_persisted(httpx_mock, tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'m.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'m.db'}")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    from pkgsentry.ecosystems.pypi.fetch import download as dl
+    from pkgward.ecosystems.pypi.fetch import download as dl
     monkeypatch.setattr(dl, "WORK_ROOT", tmp_path)
     sess.reset_engine()
     sess.init_db()
-    import pkgsentry.ecosystems.pypi  # noqa: F401
+    import pkgward.ecosystems.pypi  # noqa: F401
 
     sdist_bytes = _tgz({"foo-1/setup.py": b"from setuptools import setup\nsetup(name='foo')\n"})
     whl_bytes = _whl({"foo/__init__.py": b""})
@@ -74,7 +74,7 @@ async def test_metadata_persisted(httpx_mock, tmp_path, monkeypatch):
         s.add(ScanQueue(ecosystem="pypi", name="foo", version="1.0",
                         priority="normal", status="claimed", claim_token="test-tok"))
 
-    from pkgsentry.pipeline import process_one
+    from pkgward.pipeline import process_one
     with sess.session_scope() as s:
         row = s.scalars(select(ScanQueue)).one()
         qid = row.id

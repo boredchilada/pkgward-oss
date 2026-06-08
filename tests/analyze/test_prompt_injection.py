@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pkgsentry.adapter import Finding
-from pkgsentry.analyze.iocs import _scan_file
-from pkgsentry.llm.triage import _enforce_no_downgrade
+from pkgward.adapter import Finding
+from pkgward.analyze.iocs import _scan_file
+from pkgward.llm.triage import _enforce_no_downgrade
 
 
 def _rules(path: Path) -> set[str]:

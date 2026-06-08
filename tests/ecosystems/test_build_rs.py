@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from pathlib import Path
-from pkgsentry.ecosystems.crates.build_rs import analyze_build_rs
+from pkgward.ecosystems.crates.build_rs import analyze_build_rs
 
 
 def _write_crate(tmp_path: Path, build_rs_content: str) -> Path:

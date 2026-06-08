@@ -22,8 +22,8 @@ import pytest
 
 def _stub_intel_with_opengrep_dir(monkeypatch, tmp_path: Path) -> Path:
     """Point intel.current() at a pack containing one opengrep rule dir."""
-    from pkgsentry import intel
-    from pkgsentry.intel.pack import IntelPack
+    from pkgward import intel
+    from pkgward.intel.pack import IntelPack
 
     og_dir = tmp_path / "intel_opengrep" / "python"
     og_dir.mkdir(parents=True)
@@ -34,8 +34,8 @@ def _stub_intel_with_opengrep_dir(monkeypatch, tmp_path: Path) -> Path:
 
 
 def _stub_intel_no_opengrep(monkeypatch) -> None:
-    from pkgsentry import intel
-    from pkgsentry.intel.pack import IntelPack
+    from pkgward import intel
+    from pkgward.intel.pack import IntelPack
 
     monkeypatch.setattr(intel, "current", lambda: IntelPack())
 
@@ -99,7 +99,7 @@ def _opengrep_result(
 def test_analyzer_returns_empty_when_disabled(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENGREP_ENABLED", "0")
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     findings = opengrep_scan.analyze_opengrep(_make_extracted_pkg(tmp_path))
@@ -110,7 +110,7 @@ def test_analyzer_returns_empty_when_binary_missing(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENGREP_ENABLED", "1")
     monkeypatch.setenv("OPENGREP_BIN", str(tmp_path / "nonexistent_opengrep"))
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     findings = opengrep_scan.analyze_opengrep(_make_extracted_pkg(tmp_path))
@@ -120,7 +120,7 @@ def test_analyzer_returns_empty_when_binary_missing(tmp_path, monkeypatch):
 def test_analyzer_returns_empty_when_no_rule_dirs(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENGREP_ENABLED", "1")
     _stub_intel_no_opengrep(monkeypatch)
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     # subprocess.run must never be called when there are no rule dirs
@@ -142,7 +142,7 @@ def test_parses_json_output_to_finding(tmp_path, monkeypatch):
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
     extracted = _make_extracted_pkg(tmp_path)
 
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     # Pretend the binary exists.
@@ -179,7 +179,7 @@ def test_shadow_mode_prefixes_rule_id(tmp_path, monkeypatch):
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
     extracted = _make_extracted_pkg(tmp_path)
 
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     monkeypatch.setattr(opengrep_scan, "_check_binary", lambda: True)
@@ -207,7 +207,7 @@ def test_shadow_mode_is_default(tmp_path, monkeypatch):
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
     extracted = _make_extracted_pkg(tmp_path)
 
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     monkeypatch.setattr(opengrep_scan, "_check_binary", lambda: True)
@@ -232,7 +232,7 @@ def test_metadata_severity_takes_precedence_over_opengrep_top_level(tmp_path, mo
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
     extracted = _make_extracted_pkg(tmp_path)
 
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     monkeypatch.setattr(opengrep_scan, "_check_binary", lambda: True)
@@ -259,7 +259,7 @@ def test_missing_metadata_severity_falls_back_to_top_level_mapping(tmp_path, mon
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
     extracted = _make_extracted_pkg(tmp_path)
 
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     monkeypatch.setattr(opengrep_scan, "_check_binary", lambda: True)
@@ -285,7 +285,7 @@ def test_invalid_severity_normalizes_to_medium(tmp_path, monkeypatch):
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
     extracted = _make_extracted_pkg(tmp_path)
 
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     monkeypatch.setattr(opengrep_scan, "_check_binary", lambda: True)
@@ -322,7 +322,7 @@ def test_changed_files_filter_drops_results_outside_set(tmp_path, monkeypatch):
     (extracted / "changed.py").write_text("pass\n", encoding="utf-8")
     (extracted / "unchanged.py").write_text("pass\n", encoding="utf-8")
 
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     monkeypatch.setattr(opengrep_scan, "_check_binary", lambda: True)
@@ -349,7 +349,7 @@ def test_subprocess_failure_returns_empty(tmp_path, monkeypatch):
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
     extracted = _make_extracted_pkg(tmp_path)
 
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     monkeypatch.setattr(opengrep_scan, "_check_binary", lambda: True)
@@ -368,7 +368,7 @@ def test_timeout_returns_empty(tmp_path, monkeypatch):
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
     extracted = _make_extracted_pkg(tmp_path)
 
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     monkeypatch.setattr(opengrep_scan, "_check_binary", lambda: True)
@@ -388,7 +388,7 @@ def test_timeout_returns_empty(tmp_path, monkeypatch):
 
 def test_replaces_install_analyzer_false_when_disabled(monkeypatch):
     monkeypatch.setenv("OPENGREP_ENABLED", "0")
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     assert opengrep_scan.replaces_install_analyzer_for("pypi") is False
     assert opengrep_scan.replaces_install_analyzer_for("crates") is False
@@ -398,7 +398,7 @@ def test_replaces_install_analyzer_false_when_shadow(monkeypatch):
     """Shadow mode is the default; legacy analyzers MUST still run."""
     monkeypatch.setenv("OPENGREP_ENABLED", "1")
     monkeypatch.setenv("OPENGREP_SHADOW", "1")
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     assert opengrep_scan.replaces_install_analyzer_for("pypi") is False
     assert opengrep_scan.replaces_install_analyzer_for("crates") is False
@@ -407,7 +407,7 @@ def test_replaces_install_analyzer_false_when_shadow(monkeypatch):
 def test_replaces_install_analyzer_true_in_cutover_for_migrated_ecosystems(monkeypatch):
     monkeypatch.setenv("OPENGREP_ENABLED", "1")
     monkeypatch.setenv("OPENGREP_SHADOW", "0")
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     assert opengrep_scan.replaces_install_analyzer_for("pypi") is True
     assert opengrep_scan.replaces_install_analyzer_for("crates") is True
@@ -417,7 +417,7 @@ def test_replaces_install_analyzer_false_for_unmigrated_ecosystems(monkeypatch):
     """Go modules have no install-time hook — gating must be a no-op there."""
     monkeypatch.setenv("OPENGREP_ENABLED", "1")
     monkeypatch.setenv("OPENGREP_SHADOW", "0")
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     assert opengrep_scan.replaces_install_analyzer_for("gomod") is False
 
@@ -427,7 +427,7 @@ def test_malformed_json_returns_empty(tmp_path, monkeypatch):
     _stub_intel_with_opengrep_dir(monkeypatch, tmp_path)
     extracted = _make_extracted_pkg(tmp_path)
 
-    from pkgsentry.analyze import opengrep_scan
+    from pkgward.analyze import opengrep_scan
 
     opengrep_scan._reset_caches_for_tests()
     monkeypatch.setattr(opengrep_scan, "_check_binary", lambda: True)

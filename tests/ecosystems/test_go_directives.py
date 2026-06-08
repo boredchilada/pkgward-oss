@@ -4,7 +4,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from pkgsentry.ecosystems.gomod.go_directives import analyze_go_directives
+from pkgward.ecosystems.gomod.go_directives import analyze_go_directives
 
 
 def _make_tree(files: dict[str, str]) -> Path:

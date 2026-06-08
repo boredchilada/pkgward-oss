@@ -1,12 +1,12 @@
-# pkgsentry
+# pkgward
 
 Multi-ecosystem package malware scanner. Monitors PyPI, Crates.io, Go modules, and npm for malicious packages — both supply-chain attacks on popular packages (top-N watchlist) and lure/social-engineering packages (all new uploads).
 
 ## Quick reference
 
-- **Module:** `pkgsentry` (all imports: `from pkgsentry.…`)
-- **Runtime:** Python 3.11, Docker container `pkgsentry`
-- **DB:** PostgreSQL (configurable via `PKGSENTRY_DB_URL`; defaults to local SQLite)
+- **Module:** `pkgward` (all imports: `from pkgward.…`)
+- **Runtime:** Python 3.11, Docker container `pkgward`
+- **DB:** PostgreSQL (configurable via `PKGWARD_DB_URL`; defaults to local SQLite)
 - **Detonation service:** Go binary at `detonation/`, runs on Linux via systemd (see `docs/detonation.md`)
 - **Secrets:** `.env` file (gitignored) — see `.env.example`
 
@@ -20,12 +20,12 @@ docker compose -f docker-compose.standalone.yml up -d
 docker compose up -d
 
 # Logs
-docker logs pkgsentry --tail 50 -f
+docker logs pkgward --tail 50 -f
 
 # Queue/scan stats
-docker exec pkgsentry python -c "
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import ScanQueue, Scan
+docker exec pkgward python -c "
+from pkgward.store import session as sess
+from pkgward.store.models import ScanQueue, Scan
 from sqlalchemy import select, func
 sess.init_db()
 with sess.session_scope() as s:
@@ -50,14 +50,14 @@ python -m pytest tests/test_regression_corpus.py tests/test_rule_coverage.py -q 
 
 The regression corpus (`tests/corpus/`) runs labeled known-bad/known-good samples through the
 real analyze→score path so detection regressions fail the build. See `docs/regression-testing.md`.
-Private samples/vault load via `PKGSENTRY_CORPUS_PATH` / `PKGSENTRY_VAULT_PATH`.
+Private samples/vault load via `PKGWARD_CORPUS_PATH` / `PKGWARD_VAULT_PATH`.
 
 opengrep/semgrep and (often) the Python deps aren't on dev hosts. Run against the scanner
 image with the working tree mounted — clean, doesn't touch the running scanner:
 
 ```bash
-docker run --rm --entrypoint python -v "$PWD:/src" -w /src pkgsentry-scanner -m pytest tests/ -q
-docker run --rm --entrypoint bash   -v "$PWD:/src" -w /src pkgsentry-scanner tools/test_opengrep_rules.sh
+docker run --rm --entrypoint python -v "$PWD:/src" -w /src pkgward-scanner -m pytest tests/ -q
+docker run --rm --entrypoint bash   -v "$PWD:/src" -w /src pkgward-scanner tools/test_opengrep_rules.sh
 ```
 
 ## Key env vars
@@ -65,17 +65,17 @@ docker run --rm --entrypoint bash   -v "$PWD:/src" -w /src pkgsentry-scanner too
 | Var | Purpose | Default |
 |-----|---------|---------|
 | `SCANNER_INGEST` | `0` = don't enqueue new packages, `1` = poll feeds/cursor | `1` |
-| `PKGSENTRY_FOCUS_EXCLUSIVE` | `1` = scan ONLY focus-list packages (skip watchlist + brand-new gates and watchlist refresh); `0` = additive (focus packages scanned at high priority *plus* the normal gates) | `0` |
+| `PKGWARD_FOCUS_EXCLUSIVE` | `1` = scan ONLY focus-list packages (skip watchlist + brand-new gates and watchlist refresh); `0` = additive (focus packages scanned at high priority *plus* the normal gates) | `0` |
 | `OPENROUTER_API_KEY` | LLM triage API key | — |
 | `DISCORD_WEBHOOK_URL` | Malicious package alerts | — |
-| `PKGSENTRY_DB_URL` | DB connection URL | `sqlite:///pkgsentry.db` |
-| `PKGSENTRY_CONTACT_EMAIL` | Surfaced in outbound User-Agent | project URL |
-| `PKGSENTRY_LLM_MODEL` | LLM model ID | `z-ai/glm-5.1` |
-| `PKGSENTRY_LLM_MAX_USD` | Per-process budget cap | `20.0` |
-| `PKGSENTRY_LLM_MAX_CALLS_PER_HOUR` | Rate limit on triage calls | `1000` |
-| `PKGSENTRY_INTEL_PATH` | Path to private intel pack overlay | unset (baseline only) |
-| `PKGSENTRY_CORPUS_PATH` | Path to a private regression-corpus dir (extra known-bad/good samples) | unset |
-| `PKGSENTRY_VAULT_PATH` | Frozen-sample vault dir; when set, malicious archives are auto-preserved (inert) | unset (off) |
+| `PKGWARD_DB_URL` | DB connection URL | `sqlite:///pkgward.db` |
+| `PKGWARD_CONTACT_EMAIL` | Surfaced in outbound User-Agent | project URL |
+| `PKGWARD_LLM_MODEL` | LLM model ID | `z-ai/glm-5.1` |
+| `PKGWARD_LLM_MAX_USD` | Per-process budget cap | `20.0` |
+| `PKGWARD_LLM_MAX_CALLS_PER_HOUR` | Rate limit on triage calls | `1000` |
+| `PKGWARD_INTEL_PATH` | Path to private intel pack overlay | unset (baseline only) |
+| `PKGWARD_CORPUS_PATH` | Path to a private regression-corpus dir (extra known-bad/good samples) | unset |
+| `PKGWARD_VAULT_PATH` | Frozen-sample vault dir; when set, malicious archives are auto-preserved (inert) | unset (off) |
 | `DETONATION_SOCKET` | Detonation service UNIX socket | — |
 | `DETONATION_URL` | TCP fallback for detonation service | — |
 | `DETONATION_WORKERS` | Async detonation worker pool size (drains `DetonationQueue`; match the service `--max-concurrent`) | `6` |
@@ -86,10 +86,10 @@ docker run --rm --entrypoint bash   -v "$PWD:/src" -w /src pkgsentry-scanner too
 | `OPENGREP_SHADOW` | `1` = shadow mode (findings excluded from scoring); `0` = cutover (replaces legacy install-time analyzers) | `1` |
 | `OPENGREP_TIMEOUT_SEC` | Per-package wall-clock timeout for the opengrep subprocess | `60` |
 | `OPENGREP_BIN` | Override the opengrep binary path / PATH name | `opengrep` |
-| `PKGSENTRY_LLM_MAX_RETRIES` | Retries on bad/invalid JSON from the LLM (cost/tokens accumulate across attempts) | `2` |
-| `PKGSENTRY_LLM_MAX_RESPONSE_TOKENS` | Cap on the LLM response (prevents `finish_reason=length` truncation that produces invalid JSON). On `finish_reason=length` the retry escalates by 1.5×, capped at `*_CEILING`. | `5000` |
-| `PKGSENTRY_LLM_MAX_RESPONSE_TOKENS_CEILING` | Hard ceiling for the escalating retry on length-truncation. Beyond this the model is treated as rambling and the call bails. | `8000` |
-| `PKGSENTRY_HASH_FULL_MAX_MB` | Files above this size get SHA-256 only (streamed); entropy/ssdeep/TLSH skipped. Big prebuilt native binaries are near-useless for those metrics. | `20` |
+| `PKGWARD_LLM_MAX_RETRIES` | Retries on bad/invalid JSON from the LLM (cost/tokens accumulate across attempts) | `2` |
+| `PKGWARD_LLM_MAX_RESPONSE_TOKENS` | Cap on the LLM response (prevents `finish_reason=length` truncation that produces invalid JSON). On `finish_reason=length` the retry escalates by 1.5×, capped at `*_CEILING`. | `5000` |
+| `PKGWARD_LLM_MAX_RESPONSE_TOKENS_CEILING` | Hard ceiling for the escalating retry on length-truncation. Beyond this the model is treated as rambling and the call bails. | `8000` |
+| `PKGWARD_HASH_FULL_MAX_MB` | Files above this size get SHA-256 only (streamed); entropy/ssdeep/TLSH skipped. Big prebuilt native binaries are near-useless for those metrics. | `20` |
 | `SCHED_RESERVED_FRACTION` | Fraction of claim-share split *equally* among non-empty ecosystems (the floor — guarantees no ecosystem starves). Set `1.0` for legacy uniform-fair behavior. | `0.4` |
 | `SCHED_MAX_ECO_SHARE` | Upper cap on any single ecosystem's claim-share, so a surge can't fully dominate. | `0.7` |
 | `WATCHLIST_AUTO_MALICIOUS` | Master switch for the auto-watchlist gate (double-confirmed malicious → add at sentinel rank). | `1` |
@@ -97,20 +97,20 @@ docker run --rm --entrypoint bash   -v "$PWD:/src" -w /src pkgsentry-scanner too
 | `WATCHLIST_AUTO_MAX_PER_ECO` | Hard cap per ecosystem on auto-added entries; oldest evicted when over. | `5000` |
 | `WATCHLIST_AUTO_MAX_ADDS_PER_HOUR` | Per-ecosystem add-rate ceiling (in-process, defense-in-depth). | `100` |
 | `WATCHLIST_AUTO_BLOCKLIST` | `"eco:name,eco:name,…"` — names that are NEVER auto-added (operator FP exit ramp). | unset |
-| `PKGSENTRY_FINDING_REUSE_DAYS` | For auto-watchlisted names, TTL window for carrying forward prior findings on SHA-unchanged files. Bounds rule-update staleness. | `7` |
+| `PKGWARD_FINDING_REUSE_DAYS` | For auto-watchlisted names, TTL window for carrying forward prior findings on SHA-unchanged files. Bounds rule-update staleness. | `7` |
 
 ## Architecture
 
-**Ingest** (focus list + watchlist + all new packages, per-ecosystem feeds/cursor) → **Queue** (backlog-weighted cross-ecosystem scheduling, see "Queue scheduling" below) → **Workers** → **Download** + SHA256 verify → **Extract** + hash (streamed SHA-256 always; entropy + ssdeep + TLSH only on files ≤ `PKGSENTRY_HASH_FULL_MAX_MB`) → **Code-diff** vs previous version → **Analyze** → **Score** → **LLM triage** (cost-gated, on static-malicious, retried on bad JSON) → **Discord alert** (fail-open: rule-malicious alerts unless the LLM explicitly clears it; alerts where the LLM couldn't adjudicate are tagged `llm_unverified`); the scan finalizes on the static verdict and **enqueues** detonation (`DetonationQueue`) instead of running it inline.
+**Ingest** (focus list + watchlist + all new packages, per-ecosystem feeds/cursor) → **Queue** (backlog-weighted cross-ecosystem scheduling, see "Queue scheduling" below) → **Workers** → **Download** + SHA256 verify → **Extract** + hash (streamed SHA-256 always; entropy + ssdeep + TLSH only on files ≤ `PKGWARD_HASH_FULL_MAX_MB`) → **Code-diff** vs previous version → **Analyze** → **Score** → **LLM triage** (cost-gated, on static-malicious, retried on bad JSON) → **Discord alert** (fail-open: rule-malicious alerts unless the LLM explicitly clears it; alerts where the LLM couldn't adjudicate are tagged `llm_unverified`); the scan finalizes on the static verdict and **enqueues** detonation (`DetonationQueue`) instead of running it inline.
 
-**Detonation is async** (`pkgsentry/detonation_worker.py`, since 0.5.1): a separate worker pool drains `DetonationQueue` → **Detonate** (all ecosystems) → **Re-score** → **delayed Discord alert** if the verdict flips to malicious. This keeps the scan pipeline from blocking on the detonation service's concurrency cap. See `docs/diagrams/scan-pipeline.drawio`.
+**Detonation is async** (`pkgward/detonation_worker.py`, since 0.5.1): a separate worker pool drains `DetonationQueue` → **Detonate** (all ecosystems) → **Re-score** → **delayed Discord alert** if the verdict flips to malicious. This keeps the scan pipeline from blocking on the detonation service's concurrency cap. See `docs/diagrams/scan-pipeline.drawio`.
 
 ### Intel pack
 
-All tunable detection data is loaded from an intel pack at process start (`pkgsentry.intel.load()` in `runtime.py`). See `docs/intel-pack.md` for full reference.
+All tunable detection data is loaded from an intel pack at process start (`pkgward.intel.load()` in `runtime.py`). See `docs/intel-pack.md` for full reference.
 
 ```
-pkgsentry/intel/baseline/        # ships in tree, Apache-2.0 (third-party YARA under their own licenses, see NOTICE)
+pkgward/intel/baseline/        # ships in tree, Apache-2.0 (third-party YARA under their own licenses, see NOTICE)
   intel_pack.toml                # manifest
   yara/                          # community + baseline YARA rules
   hashes/known_malicious.jsonl   # empty in baseline
@@ -127,7 +127,7 @@ pkgsentry/intel/baseline/        # ships in tree, Apache-2.0 (third-party YARA u
   detonation/                    # behavioral rule data + noise filters
 ```
 
-Operators supply a private overlay via `PKGSENTRY_INTEL_PATH`. Merge semantics: UNION for additive content (YARA dirs, hashes, keywords, whitelists), REPLACE for scalars (thresholds, weights, prompts). Startup logs `intel_loaded source=… yara_n=… …`.
+Operators supply a private overlay via `PKGWARD_INTEL_PATH`. Merge semantics: UNION for additive content (YARA dirs, hashes, keywords, whitelists), REPLACE for scalars (thresholds, weights, prompts). Startup logs `intel_loaded source=… yara_n=… …`.
 
 ### Ecosystems
 
@@ -156,11 +156,11 @@ A package is enqueued if it meets **any** condition:
 
 Existing non-watchlist/non-focus version updates are skipped.
 
-**Focus list** (`FocusList` table; `pkgsentry/focus.py`): a per-ecosystem personal
+**Focus list** (`FocusList` table; `pkgward/focus.py`): a per-ecosystem personal
 watchlist. Easiest path is one combined file with `[pypi]`/`[crates]`/`[gomod]` sections
-plus `pkgsentry run -f <file>` (focused/exclusive mode, authoritative sync). Also loadable
-without switching modes via `pkgsentry focus load <file>` (combined, no `-e`, authoritative)
-or `pkgsentry focus load <file> -e <eco>` (flat, additive). Entry syntax is lenient — a
+plus `pkgward run -f <file>` (focused/exclusive mode, authoritative sync). Also loadable
+without switching modes via `pkgward focus load <file>` (combined, no `-e`, authoritative)
+or `pkgward focus load <file> -e <eco>` (flat, additive). Entry syntax is lenient — a
 package `name` optionally followed by a version in any common form (`name`, `name==1.2.3`,
 `name>=1.2.3`, `name~=1.2`, `name^1.0`, gomod `name v1.2.3`) so operators can paste
 requirements.txt / go.mod / Cargo lines. The NAME is monitored (every new release scanned);
@@ -168,7 +168,7 @@ any version present is scanned once at load (a range's lower bound). gomod match
 case-insensitively. Parsing lives in `focus.parse_focus_file` / `_floor_version`.
 Every new release of a focus package is enqueued at `high`; a pinned version is scanned
 once at load time. The gate check is centralized in `focus.gate_decision()` and applied
-in the four gated ingest consumers. With `PKGSENTRY_FOCUS_EXCLUSIVE=1` the scanner ingests
+in the four gated ingest consumers. With `PKGWARD_FOCUS_EXCLUSIVE=1` the scanner ingests
 **only** focus packages (watchlist + brand-new gates and the watchlist refresh/seed jobs
 are skipped); an empty focus list in this mode logs `focus_exclusive_empty` and the
 scanner idles by design.
@@ -190,7 +190,7 @@ Detection spans 13 layers. See `docs/detection-rules.md` for the full rule catal
 10. `analyze/threat_intel.py` — known-malicious fingerprints (SHA256, ssdeep, TLSH)
 11. `detonate/` — rootless-Docker sandbox + Tetragon eBPF dynamic analysis (all ecosystems)
 12. `analyze/opengrep_scan.py` — opengrep static analysis with intrafile taint tracking (all ecosystems). Shadow mode default-on via `OPENGREP_SHADOW=1`.
-13. `analyze/obfuscation.py` — custom-encoding (base85/basE91/z85 radix alphabets) + non-ASCII / homoglyph identifier obfuscation + JS self-decoding packers (char-code→eval, runtime crypto-decrypt→eval) (all ecosystems); catches packers the base64/entropy heuristics miss. Caps via `PKGSENTRY_OBFUSCATION_MAX_MB` / `PKGSENTRY_OBFUSCATION_PACKER_MAX_MB`.
+13. `analyze/obfuscation.py` — custom-encoding (base85/basE91/z85 radix alphabets) + non-ASCII / homoglyph identifier obfuscation + JS self-decoding packers (char-code→eval, runtime crypto-decrypt→eval) (all ecosystems); catches packers the base64/entropy heuristics miss. Caps via `PKGWARD_OBFUSCATION_MAX_MB` / `PKGWARD_OBFUSCATION_PACKER_MAX_MB`.
 
 ### Scoring
 
@@ -200,13 +200,13 @@ Detection spans 13 layers. See `docs/detection-rules.md` for the full rule catal
 
 `queue.py` `claim_next()` uses **backlog-weighted** scheduling across ecosystems with a reserved floor. For each priority tier (high → normal → low) it counts pending items per ecosystem and picks one by weighted sampling: `SCHED_RESERVED_FRACTION` (default 0.4) of attention is split *equally* among non-empty ecosystems (the floor — guarantees nothing starves), the remainder is allocated *proportionally to backlog size*, and any single ecosystem is clamped at `SCHED_MAX_ECO_SHARE` (default 0.7) so a surge can't fully dominate. Within the chosen ecosystem the oldest pending item is claimed (CAS-on-status); on a CAS race the loop falls back to the next ecosystem in the weighted-sample order. `SCHED_RESERVED_FRACTION=1.0` reverts to the previous uniform-fair behavior. Priority tiers are strictly ordered (any high-priority item beats any backlog at lower tiers).
 
-### Auto-watchlist + finding carry-forward (`pkgsentry/watchlist_auto.py`, `finding_reuse.py`)
+### Auto-watchlist + finding carry-forward (`pkgward/watchlist_auto.py`, `finding_reuse.py`)
 
-When a scan completes with **both** `result.verdict == "malicious"` *and* `tri.verdict == "malicious"` (rules and LLM agree), the pipeline calls `watchlist_auto.add_confirmed_malicious(s, ecosystem, name)`. This inserts `(ecosystem, name)` into the `Watchlist` table at **sentinel rank `9_999_999`** so every future release of the name is enqueued at high priority — closes the gap where the brand-new ingest gate fires *once per name* (a follow-up malicious release after the initial catch would otherwise be skipped). Idempotent (`refreshed_at` updates on re-confirm). Size-controlled by a TTL janitor (default 180d), per-ecosystem hard cap, and in-process add-rate ceiling; FP exit via the `WATCHLIST_AUTO_BLOCKLIST` env or `pkgsentry watchlist auto remove`. The four `refresh_watchlist` paths filter `WHERE rank != AUTO_MALICIOUS_RANK` so popularity refresh never evicts auto-added rows.
+When a scan completes with **both** `result.verdict == "malicious"` *and* `tri.verdict == "malicious"` (rules and LLM agree), the pipeline calls `watchlist_auto.add_confirmed_malicious(s, ecosystem, name)`. This inserts `(ecosystem, name)` into the `Watchlist` table at **sentinel rank `9_999_999`** so every future release of the name is enqueued at high priority — closes the gap where the brand-new ingest gate fires *once per name* (a follow-up malicious release after the initial catch would otherwise be skipped). Idempotent (`refreshed_at` updates on re-confirm). Size-controlled by a TTL janitor (default 180d), per-ecosystem hard cap, and in-process add-rate ceiling; FP exit via the `WATCHLIST_AUTO_BLOCKLIST` env or `pkgward watchlist auto remove`. The four `refresh_watchlist` paths filter `WHERE rank != AUTO_MALICIOUS_RANK` so popularity refresh never evicts auto-added rows.
 
-For auto-watchlisted names *only*, the pipeline also runs **finding carry-forward**: after analyzers complete (still respecting `changed_files`), `finding_reuse.carry_forward_findings()` queries the most-recent prior scan of the same package within `PKGSENTRY_FINDING_REUSE_DAYS` (default 7) and appends every prior finding whose file's `(file_path, sha256)` is unchanged in the current scan's `FileHash` set. Scoring + the LLM see the full merged evidence; analyzers don't re-run on unchanged files. Scoped to known-bad names so a yara/opengrep rule update doesn't risk stale-cache false-negatives on clean packages.
+For auto-watchlisted names *only*, the pipeline also runs **finding carry-forward**: after analyzers complete (still respecting `changed_files`), `finding_reuse.carry_forward_findings()` queries the most-recent prior scan of the same package within `PKGWARD_FINDING_REUSE_DAYS` (default 7) and appends every prior finding whose file's `(file_path, sha256)` is unchanged in the current scan's `FileHash` set. Scoring + the LLM see the full merged evidence; analyzers don't re-run on unchanged files. Scoped to known-bad names so a yara/opengrep rule update doesn't risk stale-cache false-negatives on clean packages.
 
-CLI for inspection / FP trimming: `pkgsentry watchlist auto {list,remove,purge,backfill}`. The `backfill` subcommand walks scan history and adds every package that ever produced a double-confirmed verdict — useful as a one-shot after enabling the gate.
+CLI for inspection / FP trimming: `pkgward watchlist auto {list,remove,purge,backfill}`. The `backfill` subcommand walks scan history and adds every package that ever produced a double-confirmed verdict — useful as a one-shot after enabling the gate.
 
 ## Detonation service (Go)
 
@@ -228,12 +228,12 @@ cd detonation && make build           # Cross-compile for Linux
 
 **Isolation:** Detonation user is NOT in the `docker` group. Uses rootless Docker (separate daemon at `/run/user/<UID>/docker.sock`, separate storage). `DOCKER_HOST` env var set via `/etc/default/detonation-svc` (generated by `setup.sh`).
 
-**Intel overlay + SELinux:** the service reads a private overlay from `$PKGSENTRY_INTEL_PATH/detonation/{rules_data,noise_baseline}.toml` (set in `/etc/default/detonation-svc`), UNION-merged over the embedded baseline — operators pin extra noise filters + `{eco}_net_allow` domains/IPs there (mine FP destinations from the `trace_event` table). Under SELinux Enforcing, the service (`init_t`) cannot read `user_home_t` files, so `setup.sh` relabels the overlay to `public_content_t` and installs `deploy/selinux/detonation_intel_read.te`. Confirm with `intel_loaded source=baseline+overlay`. Build needs **Go 1.22+** (build-time only; not installed by `setup.sh`).
+**Intel overlay + SELinux:** the service reads a private overlay from `$PKGWARD_INTEL_PATH/detonation/{rules_data,noise_baseline}.toml` (set in `/etc/default/detonation-svc`), UNION-merged over the embedded baseline — operators pin extra noise filters + `{eco}_net_allow` domains/IPs there (mine FP destinations from the `trace_event` table). Under SELinux Enforcing, the service (`init_t`) cannot read `user_home_t` files, so `setup.sh` relabels the overlay to `public_content_t` and installs `deploy/selinux/detonation_intel_read.te`. Confirm with `intel_loaded source=baseline+overlay`. Build needs **Go 1.22+** (build-time only; not installed by `setup.sh`).
 
 ## Code conventions
 
 - `from __future__ import annotations` in every file
-- structlog for logging (`from pkgsentry.logging_setup import get_logger`)
+- structlog for logging (`from pkgward.logging_setup import get_logger`)
 - SQLAlchemy ORM models in `store/models.py`
 - Async pipeline (`pipeline.py`), sync analyzers
 - Findings use the `Finding` dataclass from `adapter.py`
@@ -274,11 +274,11 @@ Architecture and flow diagrams live in `docs/diagrams/` (draw.io format):
 
 ```bash
 # Thread dump
-docker exec --privileged pkgsentry py-spy dump --pid 1
+docker exec --privileged pkgward py-spy dump --pid 1
 
 # Reset stuck claimed items
-docker exec pkgsentry python -c "
-from pkgsentry.store.session import get_engine
+docker exec pkgward python -c "
+from pkgward.store.session import get_engine
 from sqlalchemy import text
 e = get_engine()
 with e.begin() as c:

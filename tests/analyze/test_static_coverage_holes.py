@@ -11,9 +11,9 @@ import tempfile
 import pathlib as _pl
 import tempfile as _tf
 
-from pkgsentry.analyze.iocs import _is_benign_url, _scan_file
-from pkgsentry.analyze.metadata import _dependency_confusion_version
-from pkgsentry.ecosystems.npm.installer import analyze_install_scripts
+from pkgward.analyze.iocs import _is_benign_url, _scan_file
+from pkgward.analyze.metadata import _dependency_confusion_version
+from pkgward.ecosystems.npm.installer import analyze_install_scripts
 
 
 def test_high_major_dep_confusion_version_caught():

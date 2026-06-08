@@ -1,0 +1,56 @@
+name: Dependency Audit
+
+# Audits pkgward's own Python dependency tree with piptastic (which wraps
+# pip-audit's CVE database). NON-BLOCKING by design: it never fails a PR or the
+# branch. A newly-disclosed CVE in a pinned dependency must not red-X unrelated
+# work — findings surface in the run summary and the weekly run, not as a merge gate.
+#
+# Mirrors tools/audit-deps.sh, but runs piptastic directly on the runner instead of
+# inside the pkgward-scanner image (that image isn't built in CI).
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC — catches CVEs disclosed since last run
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "requirements.txt"
+  push:
+    branches: [main, modernize]
+    paths:
+      - "pyproject.toml"
+      - "requirements.txt"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install piptastic (git-only; wraps pip-audit)
+        run: pip install -q "https://github.com/boredchilada/piptastic/archive/refs/heads/main.tar.gz"
+
+      - name: Audit pkgward's own dependency tree
+        run: |
+          set +e
+          python -m piptastic audit . | tee audit.txt
+          code=${PIPESTATUS[0]}
+          {
+            echo "## Dependency audit — piptastic → pip-audit"
+            if [ "$code" -eq 0 ]; then
+              echo "✅ No known CVEs in the dependency tree."
+            else
+              echo "⚠️ piptastic exited ${code} — findings below. **Non-blocking**: fix in a follow-up."
+            fi
+            echo ''
+            echo '```'
+            cat audit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Never fail the build — this job is informational, not a merge gate.
+          exit 0

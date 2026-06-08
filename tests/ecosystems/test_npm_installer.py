@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pkgsentry.ecosystems.npm.installer import analyze_install_scripts
+from pkgward.ecosystems.npm.installer import analyze_install_scripts
 
 
 def _write_pkg(tmp_path: Path, manifest: dict, files: dict[str, str] | None = None) -> Path:
@@ -282,3 +282,87 @@ def test_benign_postinstall_no_persistence_findings(tmp_path):
     assert not (ids & {"installer.npm_install_persistence_loader",
                        "installer.npm_install_persistence",
                        "installer.npm_install_detached_spawn"})
+
+
+def test_binding_gyp_command_exec_phantom_gyp(tmp_path):
+    # The exact node-gyp command-expansion technique (Phantom Gyp / Miasma).
+    gyp = ('{ "targets": [ { "target_name": "Setup", "type": "none", '
+           '"sources": ["<!(node index.js > /dev/null 2>&1 && echo stub.c)"] } ] }')
+    root = _write_pkg(tmp_path, {"name": "x", "version": "1.0.0"}, {"binding.gyp": gyp})
+    findings = analyze_install_scripts(root)
+    hits = [f for f in findings if f.rule_id == "installer.npm_binding_gyp_command_exec"]
+    assert hits and hits[0].severity == "critical"
+
+
+def test_binding_gyp_legit_config_read_no_finding(tmp_path):
+    # Legit native modules read a config value — must NOT flag.
+    gyp = ('{ "targets": [ { "include_dirs": ['
+           '"<!(node -p \\"require(\'node-addon-api\').include\\")", '
+           '"<!@(node -p \\"require(\'nan\').include\\")"] } ] }')
+    root = _write_pkg(tmp_path, {"name": "x", "version": "1.0.0"}, {"binding.gyp": gyp})
+    ids = {f.rule_id for f in analyze_install_scripts(root)}
+    assert "installer.npm_binding_gyp_command_exec" not in ids
+
+
+def test_runtime_obfuscated_main_entrypoint_critical(tmp_path):
+    """turbo-dls 1.3.5: the malicious loader is the package `main` (gifted.js), which
+    runs at require/CLI time — not an install hook — so every install-time rule
+    missed it and the LLM (with the payload still encoded) went inconclusive. A
+    self-decoding eval loader shipped AS the entry point is malware-grade."""
+    loader = ("let X;!function(){const A=" + ",".join(str(i % 90 + 33) for i in range(120))
+              + ";return eval(String.fromCharCode.apply(null,A))}();")
+    root = _write_pkg(tmp_path, {"name": "turbo-dls", "version": "1.3.5", "main": "gifted.js"},
+                      {"gifted.js": loader})
+    ids = _rule_ids(analyze_install_scripts(root))
+    assert "installer.npm_runtime_obfuscated_entrypoint" in ids
+
+
+def test_runtime_obfuscated_bin_entrypoint_critical(tmp_path):
+    """A downloader CLI: the loader is a `bin` target, run via the CLI, never required."""
+    loader = ("const A=" + ",".join(str(i % 90 + 33) for i in range(120))
+              + ";eval(String.fromCharCode.apply(null,A));")
+    root = _write_pkg(tmp_path, {"name": "dl", "version": "1.0.0", "bin": {"dl": "cli.js"}},
+                      {"cli.js": loader})
+    ids = _rule_ids(analyze_install_scripts(root))
+    assert "installer.npm_runtime_obfuscated_entrypoint" in ids
+
+
+def test_runtime_entrypoint_minified_bundle_not_flagged(tmp_path):
+    """FP guard: a legitimately minified bundle declared as `main` (dist/index.min.js)
+    uses fromCharCode + eval too — the build-bundle discriminator must suppress it."""
+    bundle = ("const A=" + ",".join(str(i % 90 + 33) for i in range(120))
+              + ";eval(String.fromCharCode.apply(null,A));")
+    root = _write_pkg(tmp_path,
+                      {"name": "lib", "version": "1.0.0", "main": "dist/index.min.js"},
+                      {"dist/index.min.js": bundle})
+    ids = _rule_ids(analyze_install_scripts(root))
+    assert "installer.npm_runtime_obfuscated_entrypoint" not in ids
+
+
+def test_runtime_entrypoint_clean_main_no_finding(tmp_path):
+    """A normal readable main entry produces no runtime-entrypoint finding."""
+    root = _write_pkg(tmp_path, {"name": "ok", "version": "1.0.0", "main": "index.js"},
+                      {"index.js": "module.exports = function add(a, b) { return a + b; };\n"})
+    ids = _rule_ids(analyze_install_scripts(root))
+    assert "installer.npm_runtime_obfuscated_entrypoint" not in ids
+
+
+def test_runtime_entrypoint_compiled_binary_not_flagged(tmp_path):
+    """@hellyeah/cli-darwin-arm64 FP: a `bin` entry that is a Bun/esbuild-style
+    compiled NATIVE binary is not a JS loader. Read as text, the embedded JS bundle +
+    engine trivially match the char-code/eval heuristic. The magic-byte guard must
+    suppress the rule here — the binary is covered by binary.compiled_artifact +
+    detonation + threat-intel. The two tests above prove a REAL JS loader still fires,
+    so the guard narrows the rule without creating a malware blind spot."""
+    root = _write_pkg(tmp_path, {"name": "@x/cli-darwin-arm64", "version": "1.0.0",
+                                 "bin": {"x": "bin/x"}})
+    binp = root / "package" / "bin" / "x"
+    binp.parent.mkdir(parents=True, exist_ok=True)
+    # Mach-O 64-bit (swapped) magic, then bytes that WOULD fire the rule as text.
+    binp.write_bytes(
+        b"\xcf\xfa\xed\xfe\x0c\x00\x00\x01"
+        + b"const A=[" + b",".join([b"42"] * 120) + b"];"
+        + b"eval(String.fromCharCode.apply(null,A));"
+    )
+    ids = _rule_ids(analyze_install_scripts(root))
+    assert "installer.npm_runtime_obfuscated_entrypoint" not in ids

@@ -191,7 +191,7 @@
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="n_download" value="&lt;b&gt;Download archives concurrently&lt;/b&gt;&lt;br&gt;sdist (.tar.gz) + wheel (.whl)&lt;br&gt;from files.pythonhosted.org&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Rate limited: 10 req/s | strips_top_dir=True&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Temp dir: %TEMP%/pkgsentry&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="n_download" value="&lt;b&gt;Download archives concurrently&lt;/b&gt;&lt;br&gt;sdist (.tar.gz) + wheel (.whl)&lt;br&gt;from files.pythonhosted.org&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Rate limited: 10 req/s | strips_top_dir=True&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Temp dir: %TEMP%/pkgward&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="430" y="1080" width="340" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="e_json_download" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_fetch_json" target="n_download" parent="1">
@@ -494,7 +494,7 @@
         </mxCell>
 
         <!-- LLM Triage -->
-        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;OpenRouter &amp;rarr; GLM-5.1&lt;br&gt;Spotlighting anti-injection&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Only if verdict == malicious (cost-gated)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;OpenRouter &amp;rarr; deepseek-v4-flash&lt;br&gt;Spotlighting anti-injection&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;Only if verdict == malicious (cost-gated)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
           <mxGeometry x="450" y="3170" width="320" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="e_verdict_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_verdict_mal" target="n_llm" parent="1">

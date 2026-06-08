@@ -1,0 +1,205 @@
+<mxfile host="app.diagrams.net" agent="pkgward" version="26.0.0">
+  <diagram id="gates-and-queue-decisions" name="Gates &amp; Queue Decisions">
+    <mxGraphModel dx="1600" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1320" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ==================== TITLE ==================== -->
+        <mxCell id="title" value="pkgward — Ingest Gates, Queue Decisions &amp; the Conviction Feedback Loop" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="380" y="16" width="900" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="A package version is ENQUEUED if ANY gate condition holds (focus.gate_decision); otherwise SKIPPED. A conviction feeds new entries back into the watchlist / scope / maintainer-watch gates." style="text;html=1;fontSize=12;align=center;verticalAlign=middle;whiteSpace=wrap;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="380" y="50" width="900" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== DISCOVERY ==================== -->
+        <mxCell id="discTitle" value="DISCOVERY — per-ecosystem feeds" style="text;html=1;fontSize=13;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="92" width="250" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="feedPypi" value="PyPI&#10;RSS + XML-RPC serial cursor" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#4fc3f7;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="240" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="feedCrates" value="Crates.io&#10;RSS feeds (+ reconcile backstop)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#4fc3f7;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="40" y="176" width="240" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="feedGo" value="Go modules&#10;index.golang.org NDJSON cursor" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#4fc3f7;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="40" y="232" width="240" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="feedNpm" value="npm&#10;CouchDB _changes seq cursor&#10;(resolves dist-tags.latest)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#4fc3f7;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="40" y="288" width="240" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="discEmit" value="emits (ecosystem, name, version) per poll&#10;bounded by *_ANOMALY_MAX_CHECKS" style="shape=note;whiteSpace=wrap;html=1;size=12;fillColor=#f5f5f5;strokeColor=#999999;fontSize=10;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="352" width="240" height="44" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== INGEST GATE ==================== -->
+        <mxCell id="gateBox" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#d6b656;strokeWidth=2;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="330" y="86" width="500" height="610" as="geometry" />
+        </mxCell>
+        <mxCell id="gateTitle" value="INGEST GATE — focus.gate_decision()&#10;enqueue if ANY holds; else SKIP" style="text;html=1;fontSize=13;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="340" y="92" width="480" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- condition rows: green=HIGH, yellow=force-scan, blue=NORMAL, red=SKIP -->
+        <mxCell id="g_focus" value="1. On FOCUS list (operator's own deps)&#10;&#8594; HIGH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="350" y="140" width="460" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="g_watchlist" value="2. On WATCHLIST (top-N popularity + auto-malicious sentinel)&#10;&#8594; HIGH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="350" y="192" width="460" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="g_scope" value="3. On SCOPE-WATCHLIST (npm @org / gomod path / pypi prefix)&#10;&#8594; HIGH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="350" y="244" width="460" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="g_maintwatch" value="4. On MAINTAINER-WATCH  (NEW — bounded, pypi/npm)&#10;caught maintainer's clean sibling, next 3 releases&#10;&#8594; HIGH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#2e7d32;strokeWidth=2;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="350" y="296" width="460" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="g_dep" value="5. KNOWN-BAD-DEPS gate (npm ingest): declares dep on a&#10;confirmed-malicious same-eco name &#8594; force-scan HIGH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="350" y="360" width="460" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="g_anomaly" value="6. VERSION-ANOMALY gate (established, non-watchlist update; npm/crates/pypi)&#10;diff registry metadata (no tarball): size_jump [ratio &#8805;3x AND &#8805;256KB]&#10;OR [abs &#8805;50KB AND base &#8805;256KB] · publisher change · install-hook bundled-exec&#10;&#8594; force-scan NORMAL  (npm bundled-exec dropper &#8594; HIGH)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="350" y="416" width="460" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="g_brandnew" value="7. BRAND-NEW package (first-ever publish)&#10;&#8594; NORMAL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="350" y="500" width="460" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="g_skip" value="8. ELSE — existing version update of a non-watched package&#10;&#8594; SKIP  (the IronWorm / 2026-06-07 blind spot the gates above close)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="350" y="554" width="460" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="g_exclusive" value="FOCUS_EXCLUSIVE=1 &#8594; ONLY rule 1 applies (watchlist/scope/brand-new gates + refresh skipped)" style="text;html=1;fontSize=10;fontStyle=2;align=left;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="350" y="606" width="460" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="g_dedup" value="enqueue(): dedup on UNIQUE (ecosystem, name, version); raise priority if higher" style="text;html=1;fontSize=10;fontStyle=2;align=left;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="350" y="642" width="460" height="34" as="geometry" />
+        </mxCell>
+
+        <!-- discovery -> gate -->
+        <mxCell id="e_disc_gate" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;" edge="1" source="discEmit" target="gateBox" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== QUEUE ==================== -->
+        <mxCell id="queueBox" value="ScanQueue&#10;(PENDING)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;verticalAlign=middle;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="900" y="150" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="schedNote" value="claim_next() — BACKLOG-WEIGHTED&#10;1) priority tiers strict: HIGH &#8594; NORMAL &#8594; LOW&#10;2) within tier, weighted sample across ecosystems:&#10;   • SCHED_RESERVED_FRACTION (0.4) split EQUALLY (floor — no starvation)&#10;   • remainder &#8733; backlog size&#10;   • clamp any eco at SCHED_MAX_ECO_SHARE (0.7)&#10;3) oldest item in chosen eco (CAS-on-status)" style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#E6F3FF;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="880" y="260" width="240" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="e_gate_queue" value="HIGH / NORMAL / LOW" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" source="gateBox" target="queueBox" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== WORKER / PIPELINE / VERDICT ==================== -->
+        <mxCell id="workerBox" value="WORKER (15-min timeout)&#10;claim &#8594; download+SHA verify &#8594; extract+hash&#10;&#8594; code-diff vs prev &#8594; analyze (16 layers) &#8594; SCORE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede7f6;strokeColor=#9673a6;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="120" width="300" height="76" as="geometry" />
+        </mxCell>
+        <mxCell id="verdictBox" value="SCORE verdict (detect/score.py)&#10;suspicious &#8805;20 · malicious &#8805;61 · behavioral chains auto-escalate&#10;&#8594; clean / suspicious / malicious" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="220" width="300" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="llmBox" value="LLM TRIAGE — cost-gated&#10;runs ONLY on suspicious|malicious&#10;can escalate suspicious&#8594;malicious, or clear&#10;MALICIOUS_CONF_FLOOR: sub-floor 'malicious' can't escalate&#10;verdicts: malicious / suspicious / benign / inconclusive" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fde9e7;strokeColor=#b85450;fontSize=11;verticalAlign=middle;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="318" width="300" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="alertBox" value="FINAL verdict + ALERT (fail-open)&#10;🚨 malicious  ·  🔍 needs_review (inconclusive)&#10;tags: llm_unverified · enqueue async detonation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="434" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e_queue_worker" value="backlog-weighted claim" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=10;labelBackgroundColor=#FFFFFF;" edge="1" source="queueBox" target="workerBox" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_worker_verdict" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;" edge="1" source="workerBox" target="verdictBox" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_verdict_llm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;" edge="1" source="verdictBox" target="llmBox" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_llm_alert" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;" edge="1" source="llmBox" target="alertBox" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== CONVICTION FEEDBACK LOOP ==================== -->
+        <mxCell id="loopBand" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#9673a6;strokeWidth=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="740" width="1620" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="loopTitle" value="CONVICTION FEEDBACK LOOP — on DOUBLE-CONFIRMED malicious (rules &#8743; LLM, conf-floor respected = _promote_ok)" style="text;html=1;fontSize=13;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="60" y="752" width="1100" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="convTrigger" value="DOUBLE-CONFIRMED MALICIOUS&#10;result.verdict == 'malicious'&#10;AND tri.verdict == 'malicious'&#10;(_auto_watchlist_qualifies:&#10;primary high/crit evidence + conf-floor)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="540" width="300" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="e_alert_conv" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;" edge="1" source="alertBox" target="convTrigger" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- four sibling defenses -->
+        <mxCell id="sibName" value="same NAME&#10;watchlist_auto&#10;MARK known-bad (sentinel rank);&#10;joins known_bad_deps;&#10;TTL 180d / per-eco cap" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="80" y="800" width="300" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="sibOrg" value="same ORG / scope&#10;scope_watchlist&#10;WATCH the @org / path-prefix&#10;namespace (every release)&#10;npm + gomod auto" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="410" y="800" width="300" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="sibPivot" value="same MAINTAINER&#10;maintainer_pivot  (NEW)&#10;FORCE-SCAN the account's whole&#10;catalog now (never watchlists);&#10;trigger: corr&#8805;2 OR high-fidelity;&#10;SHADOW-first" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d1c4e9;strokeColor=#673ab7;strokeWidth=2;fontSize=11;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="740" y="800" width="300" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="sibWatch" value="same MAINTAINER, LATER&#10;maintainer_watch  (NEW)&#10;bounded force-scan on CLEAN siblings'&#10;next 3 releases (count + TTL backstop);&#10;catches the poisoned-later sibling;&#10;FORCE-SCAN only, never known-bad" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d1c4e9;strokeColor=#673ab7;strokeWidth=2;fontSize=11;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="800" width="320" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="sibIntel" value="threat_intel autoseed — OFF (maintainer directive; enforced off in code)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#999999;fontSize=10;fontStyle=2;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="80" y="940" width="500" height="34" as="geometry" />
+        </mxCell>
+
+        <!-- conviction -> defenses -->
+        <mxCell id="e_conv_name" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;strokeColor=#673ab7;" edge="1" source="convTrigger" target="sibWatch" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_conv_pivot" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=1;strokeColor=#673ab7;dashed=1;" edge="1" source="convTrigger" target="sibPivot" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- feedback arrows: defenses populate the gates -->
+        <mxCell id="fb_name" value="feeds gate #2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;strokeColor=#673ab7;dashed=1;dashPattern=6 4;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" source="sibName" target="g_watchlist" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fb_org" value="feeds gate #3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;strokeColor=#673ab7;dashed=1;dashPattern=6 4;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" source="sibOrg" target="g_scope" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fb_watch" value="feeds gate #4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;strokeColor=#673ab7;dashed=1;dashPattern=6 4;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" source="sibWatch" target="g_maintwatch" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="323" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="fb_pivot" value="enqueues into ScanQueue (high)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;strokeColor=#673ab7;dashed=1;dashPattern=6 4;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" source="sibPivot" target="queueBox" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== LEGEND ==================== -->
+        <mxCell id="legendBox" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b3b3b3;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="900" y="470" width="400" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="legendTitle" value="Legend" style="text;html=1;fontSize=12;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="912" y="476" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="lg1" value="HIGH priority gate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="912" y="500" width="120" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lg2" value="force-scan trigger" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1042" y="500" width="120" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lg3" value="NORMAL / queue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1172" y="500" width="118" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lg4" value="SKIP / malicious" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="912" y="528" width="120" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lg5" value="sibling defense" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1042" y="528" width="120" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lg6" value="--- feedback &#8594; gate" style="text;html=1;fontSize=10;align=left;fontStyle=2;fontColor=#673ab7;" vertex="1" parent="1">
+          <mxGeometry x="1172" y="528" width="120" height="22" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

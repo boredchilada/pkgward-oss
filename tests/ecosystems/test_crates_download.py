@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 import hashlib
-from pkgsentry.ecosystems.crates.fetch.download import _build_download_url, _build_api_url
+from pkgward.ecosystems.crates.fetch.download import _build_download_url, _build_api_url
 
 
 def test_build_download_url():

@@ -6,7 +6,7 @@ non-top-N org package's compromised version bump was skipped by the ingest gate.
 """
 from __future__ import annotations
 
-from pkgsentry import scope_watchlist as sw
+from pkgward import scope_watchlist as sw
 
 
 # --- scope extraction (for auto-escalate) ---
@@ -62,7 +62,7 @@ def test_crates_unsupported():
 
 
 def test_disabled_via_env(monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_SCOPE_WATCHLIST", "0")
+    monkeypatch.setenv("PKGWARD_SCOPE_WATCHLIST", "0")
     assert not sw.is_scope_watchlisted(None, "npm", "@aws-sdk/x", scopes={"@aws-sdk"})
 
 

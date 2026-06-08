@@ -6,7 +6,7 @@ from typing import AsyncIterator
 
 import pytest
 
-from pkgsentry.adapter import (
+from pkgward.adapter import (
     ArchivePath,
     DiscoveredItem,
     EcosystemAdapter,

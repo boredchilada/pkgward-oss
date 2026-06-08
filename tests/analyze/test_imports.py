@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from pathlib import Path
 
-from pkgsentry.analyze.imports import analyze_imports
+from pkgward.analyze.imports import analyze_imports
 
 
 def test_clean_init(tmp_path):
@@ -104,3 +104,43 @@ def test_no_subprocess_in_function_body(tmp_path):
     )
     findings = analyze_imports(tmp_path)
     assert not any(f.rule_id.startswith("imports.subprocess") for f in findings)
+
+
+def test_marshalled_bytecode_loader_critical(tmp_path):
+    """The mps-xtrap shape: every module is a stub that marshal.load()s a hidden
+    .pyc and exec()s it ('compiled for IP protection'). A marshal-bytecode loader
+    feeding exec at import is a compiled-payload dropper — critical."""
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text(
+        "import marshal as _m, os as _o\n"
+        "_pyc = _o.path.join(_o.path.dirname(__file__), '_x.pyc')\n"
+        "with open(_pyc, 'rb') as _f:\n"
+        "    _f.read(16)\n"
+        "    _code = _m.load(_f)\n"
+        "exec(_code, globals())\n"
+    )
+    findings = analyze_imports(tmp_path)
+    hits = [f for f in findings if f.rule_id == "imports.marshalled_bytecode_loader"]
+    assert hits and hits[0].severity == "critical" and hits[0].confidence == "high"
+
+
+def test_marshal_loads_inline_exec_critical(tmp_path):
+    """The single-expression form: exec(marshal.loads(blob))."""
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text(
+        "import marshal\nexec(marshal.loads(open('x','rb').read()))\n"
+    )
+    findings = analyze_imports(tmp_path)
+    assert any(f.rule_id == "imports.marshalled_bytecode_loader"
+               and f.severity == "critical" for f in findings)
+
+
+def test_marshal_without_exec_does_not_fire(tmp_path):
+    """marshal.load used for legit caching (no exec/eval sink) must NOT fire the
+    loader rule — keep it high-precision."""
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text(
+        "import marshal\n_CACHE = marshal.load(open('cache.bin','rb'))\n"
+    )
+    findings = analyze_imports(tmp_path)
+    assert not any(f.rule_id == "imports.marshalled_bytecode_loader" for f in findings)

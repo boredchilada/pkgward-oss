@@ -1,0 +1,8 @@
+ecosystem = "npm"
+name = "weavedb-sdk-lookalike"
+version = "0.45.3"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["installer.npm_install_runs_bundled_binary"]
+notes = "IronWorm pattern: a preinstall hook directly executes a bundled native binary (./tools/setup — a packed Rust ELF dropper). Real-world: weavedb-sdk@0.45.3 / zkjson@0.8.5 (asteroiddao campaign), which we scanned CLEAN before this rule. The install-hook-runs-bundled-binary signature is the durable catch (UPX/encryption defeat deeper analysis)."
+provenance = "synthetic"

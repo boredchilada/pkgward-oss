@@ -12,7 +12,7 @@ import tempfile
 
 import pytest
 
-from pkgsentry.ecosystems.npm import url_deps as ud
+from pkgward.ecosystems.npm import url_deps as ud
 
 
 def _npm_pkg(deps: dict) -> pathlib.Path:

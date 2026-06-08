@@ -1,0 +1,8 @@
+{
+  "name": "buffer-helpers",
+  "version": "1.0.0",
+  "description": "Buffer utilities for the browser",
+  "main": "index.js",
+  "author": "Feross Aboukhadijeh <https://feross.org>",
+  "license": "MIT"
+}

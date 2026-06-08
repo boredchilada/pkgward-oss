@@ -1,8 +1,8 @@
-# pkgsentry
+# pkgward
 
 Multi-ecosystem malware scanner for package registries. Watches PyPI, crates.io, the Go module proxy, and npm for both supply-chain compromises on popular packages and lure / social-engineering attacks on brand-new names.
 
-When someone publishes a malicious package to one of these registries — a typosquat of a popular library, a hijacked release, or a fresh `wallet-checker`-style lure — pkgsentry aims to catch it shortly after it goes live. For each new release it downloads the package, runs a stack of static checks over the code, optionally executes it in an isolated sandbox to see what it actually does, and flags anything that looks like credential theft, a backdoor, or a dropper.
+When someone publishes a malicious package to one of these registries — a typosquat of a popular library, a hijacked release, or a fresh `wallet-checker`-style lure — pkgward aims to catch it shortly after it goes live. For each new release it downloads the package, runs a stack of static checks over the code, optionally executes it in an isolated sandbox to see what it actually does, and flags anything that looks like credential theft, a backdoor, or a dropper.
 
 > **Status: beta.** It runs continuously against the live feeds today, but it is maintained by one person and the open-source detection content is deliberately minimal. The baseline that ships here catches obviously-malicious inputs; the strongest, tuned detection lives in a separate **private intel pack** you supply (see [Engine + intel pack](#engine--intel-pack)). Think of this repo as a capable scanning *engine* you bring your own detection signatures to — much like ClamAV — rather than a turnkey product.
 
@@ -40,11 +40,11 @@ A dozen static-analysis layers (AST import analysis, IOC extraction, install-tim
 
 *Detonation* means installing or importing the package inside a locked-down, rootless-Docker container and recording the system calls it makes (via Tetragon eBPF tracing) — so a payload that only reveals itself at runtime still gets caught. It is **off in the default quickstart** and needs a separately-deployed service on a Linux host (see [Detonation](docs/detonation.md)). See `docs/detection-rules.md` for the full rule catalog.
 
-**Focus mode** — point the scanner at your own dependencies instead of (or in addition to) the live feeds: `pkgsentry focus load <file>`, or `pkgsentry run -f <file>` to scan *only* your dependency list. See `docs/operations.md`.
+**Focus mode** — point the scanner at your own dependencies instead of (or in addition to) the live feeds: `pkgward focus load <file>`, or `pkgward run -f <file>` to scan *only* your dependency list. See `docs/operations.md`.
 
 ## Engine + intel pack
 
-The engine is open-source (this repo, **AGPL-3.0**). The detection content — YARA rules, hash fingerprints, scoring thresholds, LLM prompt text, behavioral chain definitions — is loaded at runtime from an **intel pack**. A minimal **baseline pack** ships in-tree, licensed more permissively under **Apache-2.0** so its signatures can be freely reused (third-party YARA rules keep their own licenses — see `NOTICE`), and is enough to demonstrate the engine works against obviously malicious test inputs. Operators with their own tuned threat intel can plug in a **private overlay pack** via the `PKGSENTRY_INTEL_PATH` env var.
+The engine is open-source (this repo, **AGPL-3.0**). The detection content — YARA rules, hash fingerprints, scoring thresholds, LLM prompt text, behavioral chain definitions — is loaded at runtime from an **intel pack**. A minimal **baseline pack** ships in-tree, licensed more permissively under **Apache-2.0** so its signatures can be freely reused (third-party YARA rules keep their own licenses — see `NOTICE`), and is enough to demonstrate the engine works against obviously malicious test inputs. Operators with their own tuned threat intel can plug in a **private overlay pack** via the `PKGWARD_INTEL_PATH` env var.
 
 Overlay semantics:
 
@@ -58,8 +58,8 @@ This means a private operator's deployment continuously exercises the public bas
 Requires Docker + Docker Compose.
 
 ```bash
-git clone https://github.com/boredchilada/pkgsentry-oss
-cd pkgsentry-oss
+git clone https://github.com/boredchilada/pkgward-oss
+cd pkgward-oss
 cp .env.example .env
 # .env defaults to no Discord alerts; no editing required for a first run
 
@@ -70,7 +70,7 @@ docker compose -f docker-compose.standalone.yml up -d
 # docker compose up -d
 
 # Watch the scanner pick up live PyPI / crates.io / Go module traffic
-docker logs pkgsentry -f
+docker logs pkgward -f
 ```
 
 For dynamic analysis (rootless Docker + Tetragon sandbox, all ecosystems) you need a Linux host with kernel 5.8+ BTF support. See `docs/detonation.md`.
@@ -82,7 +82,7 @@ For dynamic analysis (rootless Docker + Tetragon sandbox, all ecosystems) you ne
 | [Operations](docs/operations.md) | Running in production, logs, queue stats, debugging |
 | [Intel pack](docs/intel-pack.md) | Building and loading private detection overlays |
 | [Detonation](docs/detonation.md) | Deploying the rootless-Docker + Tetragon sandbox |
-| [Detection rules](docs/detection-rules.md) | Full rule catalog across 13 detection layers |
+| [Detection rules](docs/detection-rules.md) | Full rule catalog (~120 baseline rule IDs across the detection layers) |
 | [Regression testing](docs/regression-testing.md) | Known-bad/known-good corpus suite to catch detection regressions |
 | [Ecosystems](docs/ecosystems-reference.md) | API reference and attack surface per ecosystem |
 
@@ -99,13 +99,13 @@ For dynamic analysis (rootless Docker + Tetragon sandbox, all ecosystems) you ne
 
 ## Comparison
 
-Several established tools address adjacent problems, and pkgsentry is not a drop-in replacement for all of them:
+Several established tools address adjacent problems, and pkgward is not a drop-in replacement for all of them:
 
 - **Socket, Phylum, Endor Labs** — commercial platforms with large proprietary detection corpora, IDE and CI integrations, and dependency-graph analysis. Best suited to teams that want a managed, supported product.
 - **Bumblebee** (Phylum, open source) — a mature command-line scanner focused on PyPI and npm.
 - **OSV-Scanner** — matches dependencies against known-vulnerability databases (CVEs), which is a distinct problem from classifying previously-unknown malicious packages.
 
-pkgsentry is self-hosted and deliberately focused: a single engine covering four ecosystems (PyPI, crates.io, Go, and npm), with first-publish scanning of brand-new packages, a rootless-Docker + Tetragon detonation sandbox across all four, focus-mode monitoring of your own dependencies, and plugin-loaded intel so you retain control of your detection content. It is intended for operators who prefer to run their own scanner against the live registries rather than rely on a hosted service.
+pkgward is self-hosted and deliberately focused: a single engine covering four ecosystems (PyPI, crates.io, Go, and npm), with first-publish scanning of brand-new packages, a rootless-Docker + Tetragon detonation sandbox across all four, focus-mode monitoring of your own dependencies, and plugin-loaded intel so you retain control of your detection content. It is intended for operators who prefer to run their own scanner against the live registries rather than rely on a hosted service.
 
 ## Known limitations
 
@@ -121,8 +121,8 @@ Disclosures: see `SECURITY.md`. Please do not file a public issue for an active 
 ## Acknowledgments
 
 - **[t0asts](https://github.com/t0asts)** — for information and guidance on the opengrep static-analysis integration.
-- **[Cyb3rjerry](https://github.com/Cyb3rjerry)** - for the upcoming feature of checking known bad dependencies against dependents.
+- **[Cyb3rjerry](https://github.com/cyb3rjerry)** — for the idea behind the known-malicious **dependency** gate: tracking packages that take a new dependency on a confirmed-malicious package (supply-chain propagation along the dependency edge).
 
 ## License
 
-The engine (this repo) is **AGPL-3.0** — see `LICENSE`. The baseline intel pack (`pkgsentry/intel/baseline/`) is licensed permissively under **Apache-2.0** so its detection signatures can be freely reused; see `NOTICE`.
+The engine (this repo) is **AGPL-3.0** — see `LICENSE`. The baseline intel pack (`pkgward/intel/baseline/`) is licensed permissively under **Apache-2.0** so its detection signatures can be freely reused; see `NOTICE`.

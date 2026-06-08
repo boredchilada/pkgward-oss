@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="app.diagrams.net" modified="2026-05-23T00:00:00.000Z" agent="pkgsentry" version="26.0.0" type="device">
+<mxfile host="app.diagrams.net" modified="2026-05-23T00:00:00.000Z" agent="pkgward" version="26.0.0" type="device">
   <diagram id="crates-pipeline" name="Crates.io Ecosystem Pipeline">
     <mxGraphModel dx="1800" dy="4500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="4400" math="0" shadow="0">
       <root>
@@ -10,7 +10,7 @@
         <mxCell id="title" value="&lt;b&gt;Crates.io Ecosystem Pipeline&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=20;" vertex="1" parent="1">
           <mxGeometry x="440" y="20" width="420" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="subtitle" value="pkgsentry — Rust crate ingest, analysis, and triage" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=13;fontStyle=2;fontColor=#555555;" vertex="1" parent="1">
+        <mxCell id="subtitle" value="pkgward — Rust crate ingest, analysis, and triage" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=13;fontStyle=2;fontColor=#555555;" vertex="1" parent="1">
           <mxGeometry x="460" y="55" width="380" height="30" as="geometry"/>
         </mxCell>
 
@@ -200,7 +200,7 @@
         </mxCell>
 
         <!-- User-Agent -->
-        <mxCell id="n_wl_ua" value="User-Agent:&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;pkgsentry/${VERSION} (+${CONTACT})&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+        <mxCell id="n_wl_ua" value="User-Agent:&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;pkgward/${VERSION} (+${CONTACT})&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="280" y="830" width="240" height="40" as="geometry"/>
         </mxCell>
         <mxCell id="e_seed_ua" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_wl_reinsert" target="n_wl_ua" parent="1">
@@ -284,7 +284,7 @@
         </mxCell>
 
         <!-- strips_top_dir + temp note -->
-        <mxCell id="n_fetch_notes" value="&lt;b&gt;strips_top_dir = True&lt;/b&gt;&lt;br&gt;Temp dir: %TEMP%/pkgsentry_crates" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
+        <mxCell id="n_fetch_notes" value="&lt;b&gt;strips_top_dir = True&lt;/b&gt;&lt;br&gt;Temp dir: %TEMP%/pkgward_crates" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontStyle=2;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="280" y="1470" width="200" height="40" as="geometry"/>
         </mxCell>
         <mxCell id="e_meta_notes" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_fetch_meta" target="n_fetch_notes" parent="1">
@@ -538,7 +538,7 @@
         </mxCell>
 
         <!-- Yes → LLM -->
-        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;OpenRouter &amp;rarr; GLM-5.1&lt;br&gt;Spotlighting anti-injection&lt;br&gt;Can override: malicious &amp;rarr; benign" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
+        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;OpenRouter &amp;rarr; deepseek-v4-flash&lt;br&gt;Spotlighting anti-injection&lt;br&gt;Can override: malicious &amp;rarr; benign" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;" vertex="1" parent="1">
           <mxGeometry x="440" y="3250" width="340" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="e_verdict_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="d_verdict" target="n_llm" parent="1">
@@ -578,7 +578,7 @@
         </mxCell>
 
         <!-- ===== CLEANUP + END ===== -->
-        <mxCell id="n_cleanup" value="&lt;b&gt;Persist + Cleanup&lt;/b&gt;&lt;br&gt;Upsert Package/Version, Scan, Findings, FileHash&lt;br&gt;Bump RuleHit counters&lt;br&gt;Remove temp dirs (%TEMP%/pkgsentry_crates)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="n_cleanup" value="&lt;b&gt;Persist + Cleanup&lt;/b&gt;&lt;br&gt;Upsert Package/Version, Scan, Findings, FileHash&lt;br&gt;Bump RuleHit counters&lt;br&gt;Remove temp dirs (%TEMP%/pkgward_crates)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="400" y="3580" width="420" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="e_discord_cleanup" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_discord" target="n_cleanup" parent="1">

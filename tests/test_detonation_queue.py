@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
-from pkgsentry.detonation_queue import (
+from pkgward.detonation_queue import (
     MAX_AUTO_ATTEMPTS,
     STALE_CLAIM_TIMEOUT_SECONDS,
     claim_next,
@@ -13,7 +13,7 @@ from pkgsentry.detonation_queue import (
     mark_failed,
     sweep_stale_claims,
 )
-from pkgsentry.store.models import DetonationQueue
+from pkgward.store.models import DetonationQueue
 
 
 def _enq(s, scan_id, *, priority="low", eco="npm", static="clean"):

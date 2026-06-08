@@ -1,6 +1,6 @@
 # Embedded baseline for the detonation Go service.
-# Mirror of pkgsentry/intel/baseline/detonation/noise_baseline.toml.
-# Overlay via $PKGSENTRY_INTEL_PATH/detonation/noise_baseline.toml — UNION semantics.
+# Mirror of pkgward/intel/baseline/detonation/noise_baseline.toml.
+# Overlay via $PKGWARD_INTEL_PATH/detonation/noise_baseline.toml — UNION semantics.
 
 pypi_file_noise = [
     "/site-packages/",

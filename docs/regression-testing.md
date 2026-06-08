@@ -1,6 +1,6 @@
 # Detection regression testing
 
-pkgsentry ships a **detection regression suite**: a labeled corpus of known-bad
+pkgward ships a **detection regression suite**: a labeled corpus of known-bad
 and known-good sample packages that are run through the real analyze→score path,
 so a code/rule/threshold/intel change that silently starts *missing* malware
 (false negative) or *over-flagging* clean packages (false-positive creep) fails
@@ -18,15 +18,18 @@ It complements the other two regression layers:
 
 opengrep and the Python deps aren't on bare dev hosts, so run against the
 scanner image with the working tree mounted (clean, doesn't touch the running
-scanner):
+scanner). Build the `pkgward-scanner` tag once first — the compose files don't
+pin an `image:` name, so `docker compose build` won't produce it:
 
 ```bash
+docker build -t pkgward-scanner .
+
 # Corpus + rule-coverage meta-test
-docker run --rm --entrypoint python -v "$PWD:/src" -w /src pkgsentry-scanner \
+docker run --rm --entrypoint python -v "$PWD:/src" -w /src pkgward-scanner \
   -m pytest tests/test_regression_corpus.py tests/test_rule_coverage.py -q
 
 # opengrep rules self-test (all four language dirs)
-docker run --rm --entrypoint bash -v "$PWD:/src" -w /src pkgsentry-scanner \
+docker run --rm --entrypoint bash -v "$PWD:/src" -w /src pkgward-scanner \
   tools/test_opengrep_rules.sh
 ```
 
@@ -36,9 +39,9 @@ Include your private corpus and the frozen-sample vault by setting the env vars
 ```bash
 docker run --rm --entrypoint python \
   -v "$PWD:/src" -v /path/to/private:/private -w /src \
-  -e PKGSENTRY_CORPUS_PATH=/private/corpus \
-  -e PKGSENTRY_VAULT_PATH=/private/vault \
-  pkgsentry-scanner -m pytest tests/test_regression_corpus.py -q
+  -e PKGWARD_CORPUS_PATH=/private/corpus \
+  -e PKGWARD_VAULT_PATH=/private/vault \
+  pkgward-scanner -m pytest tests/test_regression_corpus.py -q
 ```
 
 ## How a sample is checked
@@ -123,8 +126,8 @@ asserts:
 | Tier | Location | Intel pinning | Ships publicly |
 |------|----------|---------------|----------------|
 | public | `tests/corpus/` | baseline only (deterministic) | yes |
-| private | `tests/corpus_private/` or `$PKGSENTRY_CORPUS_PATH` | baseline + overlay | no (excluded from the OSS tarball) |
-| vault | `$PKGSENTRY_VAULT_PATH` | baseline + overlay | no |
+| private | `tests/corpus_private/` or `$PKGWARD_CORPUS_PATH` | baseline + overlay | no (excluded from the OSS tarball) |
+| vault | `$PKGWARD_VAULT_PATH` | baseline + overlay | no |
 
 Public samples are pinned to the **baseline** intel pack so their expectations
 are deterministic regardless of any operator overlay — keep them dependent only
@@ -137,13 +140,13 @@ Registries yank malicious packages quickly. The vault preserves the **original
 archive** of anything the engine flags `malicious`, so it remains a permanent
 regression anchor and forensic reference.
 
-- **Auto-capture:** when `$PKGSENTRY_VAULT_PATH` is set, the pipeline copies the
+- **Auto-capture:** when `$PKGWARD_VAULT_PATH` is set, the pipeline copies the
   flagged archive into the vault (inert, ZipCrypto pw `infected`) + a manifest,
   before the temp dir is cleaned. Unset (the public default), it's a no-op.
 - **Manual backfill:** import past catches with `tools/vault_import.py`:
 
   ```bash
-  PKGSENTRY_VAULT_PATH=/path/to/vault \
+  PKGWARD_VAULT_PATH=/path/to/vault \
     python tools/vault_import.py crates sui-move-build-helper@0.1.0 \
       --verdict malicious --expect crates.build_rs_net_exec_chain
   ```

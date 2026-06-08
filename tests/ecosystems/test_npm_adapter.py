@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
-from pkgsentry.adapter import adapter_registry
-from pkgsentry.ecosystems.npm.fetch.download import _normalize_metadata
+from pkgward.adapter import adapter_registry
+from pkgward.ecosystems.npm.fetch.download import _normalize_metadata
 
 
 def test_npm_adapter_registered():
-    import pkgsentry.ecosystems  # noqa: F401  -- trigger registration
+    import pkgward.ecosystems  # noqa: F401  -- trigger registration
     a = adapter_registry["npm"]
     assert a.ecosystem_id == "npm"
     assert a.install_archive_kind == "npm_tarball"

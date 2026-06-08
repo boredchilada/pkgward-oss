@@ -8,7 +8,7 @@ import zlib
 
 import pytest
 
-from pkgsentry.analyze import decode_engine as de
+from pkgward.analyze import decode_engine as de
 
 
 def _recover_bytes(data: bytes) -> list[bytes]:

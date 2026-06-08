@@ -1,23 +1,26 @@
 # Production compose — BYO Postgres + optional detonation + optional intel overlay.
 # For a self-contained setup with bundled Postgres, use docker-compose.standalone.yml.
 #
-# Requires PKGSENTRY_DB_URL in .env pointing at your Postgres instance.
+# Requires PKGWARD_DB_URL in .env pointing at your Postgres instance.
 # Detonation and intel overlay mounts are optional — remove them if not deployed.
 
 services:
   scanner:
-    build: .
-    container_name: pkgsentry
+    build:
+      context: .
+      args:
+        PKGWARD_BUILD_SHA: ${PKGWARD_BUILD_SHA:-unknown}
+    container_name: pkgward
     restart: unless-stopped
     volumes:
       - scanner-data:/data
-      # Frozen-sample vault (used only when PKGSENTRY_VAULT_PATH is set).
+      # Frozen-sample vault (used only when PKGWARD_VAULT_PATH is set).
       - vault-data:/data/vault
       # Optional: detonation sandbox socket (see docs/detonation.md)
       - /var/run/detonation/detonation.sock:/var/run/detonation/detonation.sock
       # Shared staging dir so the detonation service (host-side) can
       # bind-mount archives the scanner creates inside the container.
-      - /tmp/pkgsentry:/tmp/pkgsentry
+      - /tmp/pkgward:/tmp/pkgward
       # Optional: private intel overlay (see docs/intel-pack.md)
       - ./intel/private:/app/intel/private:ro
     env_file:
@@ -26,7 +29,7 @@ services:
       - PYTHONUNBUFFERED=1
       - SCANNER_INGEST=1
       - DETONATION_SOCKET=/var/run/detonation/detonation.sock
-      - PKGSENTRY_INTEL_PATH=/app/intel/private
+      - PKGWARD_INTEL_PATH=/app/intel/private
       # npm structurally out-paces one host, so cap its claim share harder and
       # give gomod/pypi/crates a bigger equal floor (they CAN stay current).
       # High-priority line-jumpers are unaffected (they beat all normal backlog).
@@ -40,10 +43,10 @@ services:
         limits:
           cpus: "4.0"
           memory: 6G
-    command: ["run", "--workers", "10"]
+    command: ["run", "--workers", "7"]
 
 volumes:
   scanner-data:
-    name: pkgsentry-data
+    name: pkgward-data
   vault-data:
-    name: pkgsentry-vault
+    name: pkgward-vault

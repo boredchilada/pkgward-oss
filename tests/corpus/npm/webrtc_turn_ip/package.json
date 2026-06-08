@@ -1,0 +1,7 @@
+{
+  "name": "rtc-liveness-sdk",
+  "version": "1.0.0",
+  "description": "WebRTC liveness capture client.",
+  "main": "src/rtc.js",
+  "license": "MIT"
+}

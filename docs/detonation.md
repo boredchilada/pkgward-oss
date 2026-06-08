@@ -11,7 +11,7 @@ by time window, filters host/build noise, then evaluates the Go behavioral rules
 ## Architecture
 
 ```
-pkgsentry scanner
+pkgward scanner
     └─ UNIX socket /var/run/detonation/detonation.sock
          └─ detonation-svc (Go, systemd, User=detonation)
               ├─ rootless Docker daemon      ← separate daemon, separate storage
@@ -20,6 +20,26 @@ pkgsentry scanner
               └─ tetragon (eBPF, root)       ← traces guest syscalls on the host
                    └─ /var/log/tetragon/tetragon.log  → behavioral rules → findings
 ```
+
+### Phase commands per ecosystem
+
+Each phase is a **separate `docker run --rm`** with only the package archive bind-mounted
+read-only — phases do **not** share a writable filesystem. Profiles live in
+`detonation/internal/sandbox/profile.go`.
+
+- **PyPI** — install: `pip install --no-deps`; import: in-process `import` of the top-level
+  module(s) + an in-process settle window (an import-time payload often runs in a daemon
+  thread that dies when the interpreter exits, so the sleep must be *inside* the process).
+- **npm** — install phase does the work (the import phase runs in a fresh container where
+  the package isn't installed, so `node -e require(<name>)` would just `MODULE_NOT_FOUND`).
+  It extracts the tarball, places deps with scripts off, runs the `preinstall`/`install`/
+  `postinstall` hooks, **then runs the package's runtime entry (`node <main>`, as an entry
+  module so `require.main === module`-gated payloads fire) and each `bin` target** —
+  backgrounded + time-boxed into the settle window. This is what catches a self-decoding
+  loader or downloader shipped as `main`/`bin` with no lifecycle hook (the turbo-dls class).
+- **crates** — `cargo install` (exercises `build.rs` at build time); no import phase.
+- **gomod** — extract zip → `go mod download` → `go generate ./...` → `go build ./...`
+  (Go has no install hook; the surface is `go:generate` + build-time execution).
 
 ### Rootless Docker isolation
 
@@ -104,14 +124,16 @@ sudo bash /home/detonation/deploy/setup.sh
 `setup.sh` fails fast if a prerequisite (Docker, BTF, the staged binary/deploy tree) is missing,
 then:
 
-1. Creates OS users `detonation` and `pkgsentry` (dedicated, no sudo, not in `docker`).
-2. Creates `/var/lib/detonation/`, `/var/run/detonation/`, `/var/lib/pkgsentry/`.
+1. Creates OS users `detonation` and `pkgward` (dedicated, no sudo, not in `docker`).
+2. Creates `/var/lib/detonation/`, `/var/run/detonation/`, `/var/lib/pkgward/`.
 3. Installs Tetragon v1.3.0 via Cilium's `install.sh` and enables it.
 4. Installs and enables the `detonation-svc` unit and cgroup slice.
 5. Provisions rootless Docker for the `detonation` user (installs `uidmap`,
    `docker-ce-rootless-extras`, `fuse-overlayfs`, `slirp4netns`).
-6. Pre-pulls the `python:3.11-slim`, `node:20-slim`, `rust:1-slim`, `golang:1.22-alpine` images.
-7. Builds the `pkgsentry-dnsforwarder` image into rootless Docker (DNS-aware abuse-host
+6. Pre-pulls the `python:3.13-slim-trixie`, `node:22-trixie-slim`, `rust:1-trixie`, `golang:1.24-trixie`
+   base images (the per-ecosystem `pkgward-det-<eco>` sandbox images are derived from these — see
+   `deploy/build-sandbox-images.sh`).
+7. Builds the `pkgward-dnsforwarder` image into rootless Docker (DNS-aware abuse-host
    detection). The service queries it via `docker exec`, so no host port is published. The
    build context is staged at `/home/detonation/src` by `bootstrap.sh`; if it is absent
    (standalone `setup.sh`), DNS capture stays off and detonation judges connects by IP until
@@ -177,7 +199,7 @@ requeue, none lost). After deploying a new binary:
 
 ```bash
 sudo systemctl restart detonation-svc
-docker restart pkgsentry        # re-binds the socket; never `docker compose up -d`
+docker restart pkgward        # re-binds the socket; never `docker compose up -d`
 ```
 
 ## Verifying the deployment
@@ -204,7 +226,7 @@ findings and a non-zero trace event count.
 
 ## Intel pack data in the Go service
 
-`detonation-svc` embeds baseline TOMLs at build time from `pkgsentry/intel/baseline/detonation/`
+`detonation-svc` embeds baseline TOMLs at build time from `pkgward/intel/baseline/detonation/`
 (the embedded copies live at `detonation/internal/intel/baseline/` — keep both in sync):
 
 - `rules_data.toml` — sensitive path/env/shell lists used by behavioral rules
@@ -220,13 +242,13 @@ findings and a non-zero trace event count.
     Cloudflare) — that would mask real exfil. Never allowlist internal infra.
 
 A private overlay extends the baseline (UNION merge) — point the service at it with the
-`PKGSENTRY_INTEL_PATH` env var (set in `/etc/default/detonation-svc`):
+`PKGWARD_INTEL_PATH` env var (set in `/etc/default/detonation-svc`):
 
 ```
-PKGSENTRY_INTEL_PATH=/path/to/your/intel/pack
+PKGWARD_INTEL_PATH=/path/to/your/intel/pack
 ```
 
-The service reads `$PKGSENTRY_INTEL_PATH/detonation/{rules_data,noise_baseline}.toml`. Operators
+The service reads `$PKGWARD_INTEL_PATH/detonation/{rules_data,noise_baseline}.toml`. Operators
 pin extra/private domains and observed registry IPs there (the npm/pypi/crates/gomod CDN IPs can
 be mined from the `trace_event` table — see `docs/operations.md`). Successful load logs
 `intel_loaded source=baseline+overlay`.
@@ -238,7 +260,7 @@ Tetragon reports a connect's **destination IP**, never the hostname. Serverless/
 ranges legitimate registry/CDN fetches use, so by IP a `workers.dev` C2 beacon is
 indistinguishable from a `jsdelivr` fetch. To tell them apart the service captures DNS:
 
-- A small `pkgsentry-dnsforwarder` container runs on the detonation bridge; each sandbox is
+- A small `pkgward-dnsforwarder` container runs on the detonation bridge; each sandbox is
   pointed at it (`--dns <forwarder>`), so every name a package resolves passes through and the
   forwarder records resolved-IP → hostname.
 - Before rules run, each `network`/`connect` event is annotated with the domain the sandbox
@@ -253,7 +275,7 @@ indistinguishable from a `jsdelivr` fetch. To tell them apart the service captur
   allows the bare host but **not** per-tenant `<bucket>.storage.googleapis.com` subdomains (the
   bucket-exfil shape), so path-style cloud CDNs can be allowlisted without opening every bucket.
 
-Gated by `DNS_FORWARDER_IMAGE` (default `pkgsentry-dnsforwarder`, built into rootless Docker by
+Gated by `DNS_FORWARDER_IMAGE` (default `pkgward-dnsforwarder`, built into rootless Docker by
 `setup.sh`). **Best-effort**: if the forwarder can't start, the service logs a loud `WARNING`,
 sandboxes fall back to a public resolver, and the filter degrades to IP-only matching — abuse-host
 detection is inert but detonation keeps working. Startup logs `dns capture: enabled|disabled`.
@@ -270,8 +292,8 @@ The fix (keeps a single private-intel source of truth — substitute your own pa
 
 ```bash
 # 1. relabel the private intel tree to shared-read content
-semanage fcontext -a -t public_content_t "$PKGSENTRY_INTEL_PATH(/.*)?"
-restorecon -Rv "$PKGSENTRY_INTEL_PATH"
+semanage fcontext -a -t public_content_t "$PKGWARD_INTEL_PATH(/.*)?"
+restorecon -Rv "$PKGWARD_INTEL_PATH"
 # 2. allow init_t to read public_content_t (minimal, scoped — NOT user_home_t)
 semodule -i detonation/deploy/selinux/detonation_intel_read.pp
 systemctl restart detonation-svc   # expect: intel_loaded source=baseline+overlay
@@ -285,25 +307,33 @@ The policy source is `detonation/deploy/selinux/detonation_intel_read.te` (build
 Rules in `internal/rules/definitions.go`, evaluated against phase-tagged Tetragon trace
 events (see `docs/detection-rules.md` Layer 10 for severity/confidence):
 
-| Rule ID | Signal |
-|---------|--------|
-| `dyn_import_exfil` | network connect() during the import phase |
-| `dyn_credential_read` | read of a sensitive file (`/root/.ssh`, cloud creds, `/etc/shadow`) |
-| `dyn_reverse_shell` | shell spawned with an open socket (dormant — needs socket-fd tracking) |
-| `dyn_proc_inject` | `ptrace` (ATTACH/SEIZE/POKE) or `process_vm_writev` injection |
-| `dyn_dns_exfil` | high-entropy DNS query (dormant — needs UDP-payload parsing) |
-| `dyn_env_harvest` | read of another process's environment via `/proc/<pid>/environ` |
-| `dyn_suspicious_write` | write to a persistence path (`/etc/cron`, `.bashrc`, authorized_keys) |
-| `dyn_fileless_exec` | `execveat(AT_EMPTY_PATH)` / `memfd_create` |
+| Rule ID | Severity | Signal |
+|---------|----------|--------|
+| `dyn_install_exfil` | high | **Chain**: a secret was read (`run_sensitive_access`) **and** an external-host connect, during the install phase |
+| `dyn_import_exfil` | high | **Chain**: secret read **and** external-host connect, during the import phase |
+| `dyn_install_egress` | low | Lone external connect during install (non-convicting note for visibility) |
+| `dyn_import_egress` | low | Lone external connect during import (non-convicting note) |
+| `dyn_abuse_hosting_callback` | critical | connect to an abuse-prone serverless/tunnel host (`workers.dev`, `ngrok`, …) — matched by hostname, so a shared-CDN IP can't hide it |
+| `dyn_honeytoken_exfil` | critical | a decoy credential planted in the sandbox surfaced in exec args / a file / a DNS name — proof of theft (no chain needed) |
+| `dyn_credential_read` | — | read of a sensitive file (`/root/.ssh`, cloud creds, `/etc/shadow`) |
+| `dyn_env_harvest` | — | read of another process's environment via `/proc/<pid>/environ` |
+| `dyn_screen_capture_probe` | high | exec of a screenshot/input-capture tool (`scrot`, `grim`, `xinput`, …) — desktop-surveillance staging |
+| `dyn_proc_inject` | — | `ptrace` (ATTACH/SEIZE/POKE) or `process_vm_writev` injection |
+| `dyn_suspicious_write` | — | write to a persistence path (`/etc/cron`, `.bashrc`, authorized_keys) |
+| `dyn_fileless_exec` | — | `execveat(AT_EMPTY_PATH)` / `memfd_create` |
+| `dyn_reverse_shell` | — | shell spawned with an open socket (**dormant** — needs socket-fd tracking) |
+| `dyn_dns_exfil` | — | high-entropy DNS query (**dormant** — needs UDP-payload parsing) |
 
-`dyn_install_exfil` (network connect during install) is **active**: the **`{eco}_net_allow`
-allowlist** (see above) drops install-phase connects to known registry/CDN hosts first, so only
-a connect to a non-allowlisted host — exfil-shaped — fires it. `dyn_import_exfil` (import-phase connect) is
-active but the **`{eco}_net_allow` allowlist** (see above) drops connections to known registry
-CDNs first, so normal dependency fetches no longer false-positive — this also resolved a
-pre-existing pypi FP (packages flagged for connecting to `files.pythonhosted.org`). All events
-are attributed to the sandbox container by its `docker` id before rules run (see "Event
-attribution" below), so concurrent detonations and host activity don't cross-contaminate.
+`dyn_install_exfil` / `dyn_import_exfil` are the first **dynamic behavioral chain**: a bare
+network connect is dual-use (fetching deps, prebuilt binaries, params) and used to false-positive
+constantly, so exfil now requires the data-theft *shape* — a secret was touched in the same
+detonation **and** the connect leaves the sandbox for an external host (private/loopback/bridge
+addresses, incl. the DNS forwarder, are infra, never egress). A lone external connect emits the
+low, non-convicting `dyn_install_egress` / `dyn_import_egress` note instead. The
+**`{eco}_net_allow` allowlist** (see above) still drops connects to known registry/CDN hosts
+first. All events are attributed to the sandbox container by its `docker` id before rules run
+(see "Event attribution" below), so concurrent detonations and host activity don't
+cross-contaminate.
 
 Findings from the detonation layer are returned to the scanner, merged into the package's
 finding set, and feed the re-scoring step before LLM triage.
@@ -423,9 +453,9 @@ CFS controller, so `--cpus` makes `docker run` fail. The sandbox omits `--cpus`
 (`internal/sandbox/gvisor.go`); keep it omitted.
 
 **Detonations stop after restarting `detonation-svc`** (`[Errno 111] Connection
-refused` in the scanner): the service recreated the socket inode, but the `pkgsentry`
+refused` in the scanner): the service recreated the socket inode, but the `pkgward`
 container bind-mounts the socket *file*, so it holds the dead inode. Run
-`docker restart pkgsentry` (single container — never `docker compose up -d`). Durable
+`docker restart pkgward` (single container — never `docker compose up -d`). Durable
 fix: bind-mount the parent directory instead of the socket file.
 
 **detonation-svc fails to start:**
@@ -449,5 +479,5 @@ Verify BTF: `ls /sys/kernel/btf/vmlinux`. Verify the tracing policy is loaded:
 **Socket permission denied from scanner container:**
 
 The scanner process must run as a user in the `detonation` group, or the socket permissions
-must be widened. The `pkgsentry` OS user is added to the `detonation` group by `setup.sh`.
+must be widened. The `pkgward` OS user is added to the `detonation` group by `setup.sh`.
 Inside Docker, ensure the container's UID maps to a group with socket read/write access.

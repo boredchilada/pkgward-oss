@@ -3,8 +3,8 @@
 the Discord alert can surface *who* published (first-order supply-chain signal)."""
 from __future__ import annotations
 
-from pkgsentry.ecosystems.gomod.fetch.download import _publisher_from_path
-from pkgsentry.ecosystems.npm.fetch.download import _normalize_metadata
+from pkgward.ecosystems.gomod.fetch.download import _publisher_from_path
+from pkgward.ecosystems.npm.fetch.download import _normalize_metadata
 
 
 def test_gomod_publisher_from_forge_path():

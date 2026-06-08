@@ -1,21 +1,29 @@
 # Intel Pack Reference
 
-pkgsentry loads all detection content — YARA rules, threat-intel hashes, scoring thresholds,
+pkgward loads all detection content — YARA rules, threat-intel hashes, scoring thresholds,
 LLM prompts, behavioral chains, and more — from an **intel pack** at process start. This
 data-driven design lets operators tune detection without modifying engine code.
 
 ## How it works
 
-On startup, `pkgsentry.intel.load()` loads the **baseline pack** (ships in-tree at
-`pkgsentry/intel/baseline/`), then optionally merges a **private overlay** on top of it.
+On startup, `pkgward.intel.load()` loads the **baseline pack** (ships in-tree at
+`pkgward/intel/baseline/`), then optionally merges a **private overlay** on top of it.
 The overlay directory is set via:
 
 ```bash
-PKGSENTRY_INTEL_PATH=/path/to/your/overlay
+PKGWARD_INTEL_PATH=/path/to/your/overlay
 ```
 
-If unset, the engine runs with baseline only — generic, publicly-derivable detection content
-sufficient for demonstrating the engine works.
+If unset, the engine runs with baseline only. The baseline is not a stub: it ships a
+first-party set of **technique-level** detection content across all four ecosystems
+(~77 static rule IDs, 32 YARA rules, the opengrep taint rules) — enough to catch the
+common supply-chain attack classes on its own. What it deliberately omits is the
+**campaign- and family-specific** content (tuned YARA for tracked families, threat-intel
+fingerprints of live catches, FP-tuning mined from production). That is the operator
+overlay — the moat. The split rule: a publicly-documented *technique* belongs in the
+baseline; a *specific campaign/family you are actively tracking* belongs in the overlay,
+and a given rule lives in exactly one tier (a duplicate rule identifier across the
+UNION-merged YARA dirs is a hard compile error).
 
 After loading, a structured log line confirms what's active:
 
@@ -29,13 +37,14 @@ A pack is a directory with this convention (every file is optional):
 
 ```
 intel_pack.toml                     # Manifest (name, version, extends)
-yara/                               # YARA rule files (*.yar)
-  community_sigbase.yar             # (baseline) community signatures
-  my_rules.yar                      # (overlay) operator-supplied rules
+yara/                               # YARA rule files (*.yar), one rule per file
+  sigbase_python_ssh_backdoor.yar   # (baseline) one rule, file == rule name
+  my_campaign_rule.yar              # (overlay) operator-supplied rules
 opengrep/                           # opengrep static-analysis rules (*.yaml)
   python/
   rust/
   go/
+  javascript/
 hashes/
   known_malicious.jsonl             # One threat-intel hash per line
 prompts/
@@ -48,6 +57,7 @@ lure_keywords.toml                  # Social-engineering keyword categories
 ioc_whitelist.toml                  # Known-benign domains (IOC false-positive suppression)
 malware_patterns.toml               # Install-time file target lists
 gomod_benign_tools.toml             # go:generate tool whitelist
+npm_benign_tools.toml               # package.json lifecycle-script tool whitelist
 detonation/
   rules_data.toml                   # Sensitive paths, env vars, shell binaries
   noise_baseline.toml               # Per-ecosystem trace noise filters
@@ -73,6 +83,7 @@ When an overlay is loaded on top of the baseline, each field merges with specifi
 | `ioc_whitelist.toml` | UNION | Overlay domains are added to the benign set. |
 | `malware_patterns.toml` | UNION | Overlay file targets are added per-detector. |
 | `gomod_benign_tools.toml` | UNION | Overlay tools are added to the whitelist. |
+| `npm_benign_tools.toml` | UNION | Overlay tools are added to the whitelist. |
 | `detonation/rules_data.toml` | UNION | Overlay entries are added per-list (paths, env prefixes, shell binaries). |
 | `detonation/noise_baseline.toml` | UNION | Overlay noise patterns are added per-ecosystem. |
 
@@ -125,8 +136,10 @@ chain_ids = [
     "imports.network_subprocess_chain",
     "malware.deobfuscation_exec_chain",
     "malware.discord_webhook",
-    "malware.env_bulk_exfil",
-    "malware.pth_import_injection",
+    "malware.env_exfil_tainted",
+    "malware.pth_exec_injection",
+    "installer.npm_install_obfuscated_entrypoint",
+    "installer.npm_install_persistence_loader",
     "dyn_install_exfil",
     "dyn_reverse_shell",
     "dyn_proc_inject",
@@ -215,7 +228,7 @@ Seed fingerprints into the database (idempotent — re-running upserts, backfill
 added fields onto existing entries without clobbering present values):
 
 ```bash
-python -m pkgsentry.store.seed_intel
+python -m pkgward.store.seed_intel
 ```
 
 ### `prompts/triage_system.txt`
@@ -257,7 +270,7 @@ gomod_exec_noise  = ["/go", "/compile", "/link", "/unzip", ...]
 
 All four ecosystems support `{eco}_file_noise` / `{eco}_exec_noise` / `{eco}_net_allow`.
 These files are consumed by the **detonation Go service** (which loads the same baseline +
-`PKGSENTRY_INTEL_PATH` overlay independently); the Python loader also parses them, but only
+`PKGWARD_INTEL_PATH` overlay independently); the Python loader also parses them, but only
 the Go service filters with them.
 
 ## Detection data → consumer (which ecosystems use what)
@@ -288,7 +301,7 @@ the Go service filters with them.
 3. Point the engine at it:
 
    ```bash
-   export PKGSENTRY_INTEL_PATH=/path/to/my-overlay
+   export PKGWARD_INTEL_PATH=/path/to/my-overlay
    ```
 
 4. Restart. Verify with the `intel_loaded` log line.
@@ -301,7 +314,7 @@ baseline. You only need to include new entries — baseline entries are always p
 
 ## Example: adding a YARA rule
 
-Create `my-overlay/yara/custom_rules.yar` with your rule(s). Set `PKGSENTRY_INTEL_PATH` to
+Create `my-overlay/yara/custom_rules.yar` with your rule(s). Set `PKGWARD_INTEL_PATH` to
 `my-overlay/`. On next restart, the engine compiles your rules alongside the baseline rules.
 
 YARA files are namespaced by parent directory name to prevent rule-name collisions between
@@ -326,7 +339,7 @@ Create `my-overlay/hashes/known_malicious.jsonl` with one hash per line. These a
 (UNION) with any baseline hashes. Then seed them into the database:
 
 ```bash
-python -m pkgsentry.store.seed_intel
+python -m pkgward.store.seed_intel
 ```
 
 ## Versioning your overlay
@@ -338,5 +351,5 @@ We recommend keeping your overlay in a separate git repository. This lets you:
 - Keep private detection content out of the public engine repo
 - Track changes to thresholds and scoring over time
 
-On your deployment host, clone the overlay repo and set `PKGSENTRY_INTEL_PATH` to point at it.
+On your deployment host, clone the overlay repo and set `PKGWARD_INTEL_PATH` to point at it.
 Updates are `git pull` + container restart.

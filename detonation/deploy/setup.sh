@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Provisions a Linux host for the pkgsentry detonation sandbox.
+# Provisions a Linux host for the pkgward detonation sandbox.
 # Prerequisites (see bootstrap.sh for a one-command path): kernel 5.8+ with BTF,
 # systemd, curl, Docker, the built binary at /home/detonation/bin/detonation-svc,
 # and the deploy/ tree at /home/detonation/deploy. Run as root.
 set -euo pipefail
 
-echo "=== pkgsentry Host Setup ==="
+echo "=== pkgward Host Setup ==="
 
 # 0. Prerequisite checks (fail before mutating the host).
 fail() { echo "ERROR: $1" >&2; exit 1; }
@@ -20,17 +20,17 @@ if ! id detonation &>/dev/null; then
     groupadd -f detonation
     useradd -r -m -d /home/detonation -s /bin/bash -g detonation detonation
 fi
-if ! id pkgsentry &>/dev/null; then
-    groupadd -f pkgsentry
-    useradd -r -m -d /home/pkgsentry -s /bin/bash -g pkgsentry pkgsentry
+if ! id pkgward &>/dev/null; then
+    groupadd -f pkgward
+    useradd -r -m -d /home/pkgward -s /bin/bash -g pkgward pkgward
 fi
-usermod -a -G detonation pkgsentry
+usermod -a -G detonation pkgward
 
 # 2. Directories.
 mkdir -p /var/lib/detonation/{overlays,traces,images} /var/run/detonation /home/detonation/bin
 chown -R detonation:detonation /var/lib/detonation /var/run/detonation /home/detonation
-mkdir -p /home/pkgsentry/bin /home/pkgsentry/intel /var/lib/pkgsentry/{archives,logs}
-chown -R pkgsentry:pkgsentry /home/pkgsentry /var/lib/pkgsentry
+mkdir -p /home/pkgward/bin /home/pkgward/intel /var/lib/pkgward/{archives,logs}
+chown -R pkgward:pkgward /home/pkgward /var/lib/pkgward
 chmod 750 /var/run/detonation
 
 # 3. Tetragon.
@@ -106,15 +106,15 @@ fi
 su - detonation -c "XDG_RUNTIME_DIR=$DET_RUNTIME_DIR systemctl --user enable docker" 2>/dev/null || true
 su - detonation -c "XDG_RUNTIME_DIR=$DET_RUNTIME_DIR systemctl --user start docker" 2>/dev/null || true
 
-INTEL_OVERLAY="/home/pkgsentry/intel/private"
+INTEL_OVERLAY="/home/pkgward/intel/private"
 cat > /etc/default/detonation-svc <<ENVEOF
 DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock
-PKGSENTRY_INTEL_PATH=$INTEL_OVERLAY
+PKGWARD_INTEL_PATH=$INTEL_OVERLAY
 # Max concurrent detonations. Tune to host capacity (≈1 core + network per slot).
 MAX_CONCURRENT=6
 # DNS-aware abuse-host detection. Image is built into rootless Docker below; set
 # empty to disable DNS capture (detonation still runs, judging connects by IP).
-DNS_FORWARDER_IMAGE=pkgsentry-dnsforwarder
+DNS_FORWARDER_IMAGE=pkgward-dnsforwarder
 ENVEOF
 
 # ReadWritePaths in a drop-in replaces the base unit's list, so repeat all paths.
@@ -126,9 +126,22 @@ DROPEOF
 
 # 7. Pre-pull base images into rootless Docker.
 echo "Pre-pulling base images..."
-for img in python:3.11-slim node:20-slim rust:1-slim golang:1.22-alpine; do
+for img in python:3.13-slim-trixie node:22-trixie-slim rust:1-trixie golang:1.24-trixie; do
     su - detonation -c "DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock docker pull $img" 2>/dev/null || true
 done
+
+# 7a. Build the derived "rich" sandbox images (pkgward-det-<eco>): base + the
+# broad runtime libs/tools real malware payloads need to actually execute (so a
+# native binary traces instead of dying at dlopen — IronWorm's Rust ELF needed
+# libbpf.so.1). The service falls back to the raw base image if these are absent.
+SB_SRC=/home/detonation/src
+if [ -f "$SB_SRC/deploy/build-sandbox-images.sh" ]; then
+    echo "Building rich sandbox images (pkgward-det-*)..."
+    su - detonation -c "XDG_RUNTIME_DIR=$DET_RUNTIME_DIR DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock bash '$SB_SRC/deploy/build-sandbox-images.sh'" \
+        || echo "WARNING: rich sandbox image build failed — detonation falls back to minimal base images (native payloads needing extra libs may not run)."
+else
+    echo "NOTE: sandbox build script not staged at $SB_SRC/deploy — detonation uses minimal base images."
+fi
 
 # 7b. Build the DNS forwarder image into rootless Docker — enables DNS-aware
 # abuse-host detection (the service queries it via `docker exec`, so no host port
@@ -138,11 +151,11 @@ done
 FWD_SRC=/home/detonation/src
 if [ -f "$FWD_SRC/dns-forwarder.Dockerfile" ] && [ -d "$FWD_SRC/cmd/dns-forwarder" ]; then
     echo "Building dns-forwarder image..."
-    su - detonation -c "XDG_RUNTIME_DIR=$DET_RUNTIME_DIR DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock docker build -t pkgsentry-dnsforwarder -f '$FWD_SRC/dns-forwarder.Dockerfile' '$FWD_SRC'" \
+    su - detonation -c "XDG_RUNTIME_DIR=$DET_RUNTIME_DIR DOCKER_HOST=unix://$DET_RUNTIME_DIR/docker.sock docker build -t pkgward-dnsforwarder -f '$FWD_SRC/dns-forwarder.Dockerfile' '$FWD_SRC'" \
         || echo "WARNING: dns-forwarder image build failed — DNS-aware abuse detection will be off (detonation still runs)."
 else
     echo "NOTE: dns-forwarder build context not staged at $FWD_SRC — DNS-aware abuse"
-    echo "      detection is OFF until the 'pkgsentry-dnsforwarder' image is built into"
+    echo "      detection is OFF until the 'pkgward-dnsforwarder' image is built into"
     echo "      rootless Docker (see detonation/Makefile: make forwarder-image)."
 fi
 

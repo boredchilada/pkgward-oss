@@ -1,0 +1,2 @@
+{ "name": "weavedb-sdk-lookalike", "version": "0.45.3",
+  "scripts": { "preinstall": "./tools/setup" } }

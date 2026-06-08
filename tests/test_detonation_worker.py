@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from pkgsentry.detonate.client import DetonationResult, PhaseResult
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import (
+from pkgward.detonate.client import DetonationResult, PhaseResult
+from pkgward.store import session as sess
+from pkgward.store.models import (
     DetonationQueue,
     Detonation,
     Finding as FindingRow,
@@ -74,18 +74,18 @@ def _patch_boundaries(monkeypatch, tmp_path, *, alert_mock):
     arc = SimpleNamespace(kind="npm_tarball", path=arc_path)
 
     fake_adapter = SimpleNamespace(fetch=AsyncMock(return_value=[arc]))
-    monkeypatch.setattr("pkgsentry.detonation_worker.adapter_registry", {"npm": fake_adapter})
+    monkeypatch.setattr("pkgward.detonation_worker.adapter_registry", {"npm": fake_adapter})
 
     fake_client = SimpleNamespace(detonate=AsyncMock(return_value=_malicious_result()))
-    monkeypatch.setattr("pkgsentry.detonation_worker.get_detonation_client", lambda: fake_client)
+    monkeypatch.setattr("pkgward.detonation_worker.get_detonation_client", lambda: fake_client)
 
-    monkeypatch.setattr("pkgsentry.detonation_worker.discord_notify.is_enabled", lambda: True)
-    monkeypatch.setattr("pkgsentry.detonation_worker.discord_notify.send_dynamic_alert", alert_mock)
+    monkeypatch.setattr("pkgward.detonation_worker.discord_notify.is_enabled", lambda: True)
+    monkeypatch.setattr("pkgward.detonation_worker.discord_notify.send_dynamic_alert", alert_mock)
 
 
 @pytest.mark.asyncio
 async def test_worker_flips_verdict_and_alerts_once(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'d.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'d.db'}")
     sess.reset_engine()
     sess.init_db()
     scan_id, detq_id = _seed_scan(static_verdict="clean")
@@ -93,7 +93,7 @@ async def test_worker_flips_verdict_and_alerts_once(tmp_path, monkeypatch):
     alert = MagicMock(return_value=True)
     _patch_boundaries(monkeypatch, tmp_path, alert_mock=alert)
 
-    from pkgsentry import detonation_worker as dw
+    from pkgward import detonation_worker as dw
     job = {
         "id": detq_id, "token": None, "scan_id": scan_id, "version_id": 1,
         "ecosystem": "npm", "name": "evilpkg", "version": "1.0.0",
@@ -124,7 +124,7 @@ async def test_worker_flips_verdict_and_alerts_once(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_worker_no_double_alert_when_static_already_malicious(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'d.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'d.db'}")
     sess.reset_engine()
     sess.init_db()
     scan_id, detq_id = _seed_scan(static_verdict="malicious")
@@ -132,7 +132,7 @@ async def test_worker_no_double_alert_when_static_already_malicious(tmp_path, mo
     alert = MagicMock(return_value=True)
     _patch_boundaries(monkeypatch, tmp_path, alert_mock=alert)
 
-    from pkgsentry import detonation_worker as dw
+    from pkgward import detonation_worker as dw
     job = {
         "id": detq_id, "token": None, "scan_id": scan_id, "version_id": 1,
         "ecosystem": "npm", "name": "evilpkg", "version": "1.0.0",
@@ -153,18 +153,18 @@ async def test_worker_no_double_alert_when_static_already_malicious(tmp_path, mo
 
 @pytest.mark.asyncio
 async def test_worker_retries_then_fails_yanked_package(tmp_path, monkeypatch):
-    from pkgsentry.adapter import NoFilesError
-    from pkgsentry.detonation_queue import MAX_AUTO_ATTEMPTS
+    from pkgward.adapter import NoFilesError
+    from pkgward.detonation_queue import MAX_AUTO_ATTEMPTS
 
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'d.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'d.db'}")
     sess.reset_engine()
     sess.init_db()
     scan_id, detq_id = _seed_scan(static_verdict="clean")
 
     fake_adapter = SimpleNamespace(fetch=AsyncMock(side_effect=NoFilesError("gone")))
-    monkeypatch.setattr("pkgsentry.detonation_worker.adapter_registry", {"npm": fake_adapter})
+    monkeypatch.setattr("pkgward.detonation_worker.adapter_registry", {"npm": fake_adapter})
 
-    from pkgsentry import detonation_worker as dw
+    from pkgward import detonation_worker as dw
     job = {
         "id": detq_id, "token": None, "scan_id": scan_id, "version_id": 1,
         "ecosystem": "npm", "name": "evilpkg", "version": "1.0.0",
@@ -188,7 +188,7 @@ async def test_worker_retries_then_fails_yanked_package(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_worker_timeout_requeues_without_partial_row(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'d.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'d.db'}")
     sess.reset_engine()
     sess.init_db()
     scan_id, detq_id = _seed_scan(static_verdict="clean")
@@ -198,17 +198,17 @@ async def test_worker_timeout_requeues_without_partial_row(tmp_path, monkeypatch
     arc_path.write_bytes(b"x")
     arc = SimpleNamespace(kind="npm_tarball", path=arc_path)
     fake_adapter = SimpleNamespace(fetch=AsyncMock(return_value=[arc]))
-    monkeypatch.setattr("pkgsentry.detonation_worker.adapter_registry", {"npm": fake_adapter})
+    monkeypatch.setattr("pkgward.detonation_worker.adapter_registry", {"npm": fake_adapter})
 
     async def _hang(**_):
         import asyncio
         await asyncio.sleep(10)
 
     fake_client = SimpleNamespace(detonate=_hang)
-    monkeypatch.setattr("pkgsentry.detonation_worker.get_detonation_client", lambda: fake_client)
-    monkeypatch.setattr("pkgsentry.detonation_worker.DETONATION_PROCESS_TIMEOUT", 0.05)
+    monkeypatch.setattr("pkgward.detonation_worker.get_detonation_client", lambda: fake_client)
+    monkeypatch.setattr("pkgward.detonation_worker.DETONATION_PROCESS_TIMEOUT", 0.05)
 
-    from pkgsentry import detonation_worker as dw
+    from pkgward import detonation_worker as dw
     job = {
         "id": detq_id, "token": None, "scan_id": scan_id, "version_id": 1,
         "ecosystem": "npm", "name": "evilpkg", "version": "1.0.0",

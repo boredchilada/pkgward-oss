@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-from pkgsentry.adapter import Finding
-from pkgsentry.analyze.version_diff import PreviousVersion, analyze_version_diff
+from pkgward.adapter import Finding
+from pkgward.analyze.version_diff import PreviousVersion, analyze_version_diff
 
 
 def _finding(rule_id, severity="medium", confidence="medium"):

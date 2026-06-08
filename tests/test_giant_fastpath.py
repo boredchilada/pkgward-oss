@@ -3,7 +3,7 @@
 packages so they don't blow the per-package timeout under shared-GIL contention."""
 from __future__ import annotations
 
-import pkgsentry.pipeline as pl
+import pkgward.pipeline as pl
 
 
 def test_giant_lite_triggers_on_file_count(tmp_path, monkeypatch):

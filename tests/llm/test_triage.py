@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from pkgsentry.adapter import Finding
-from pkgsentry.llm import triage as triage_mod
-from pkgsentry.llm.triage import (
+from pkgward.adapter import Finding
+from pkgward.llm import triage as triage_mod
+from pkgward.llm.triage import (
     LLMTriageResult,
     MAX_CODE_BYTES,
     _build_messages,

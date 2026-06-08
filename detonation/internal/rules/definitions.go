@@ -142,6 +142,14 @@ func destLabel(evt trace.TraceEvent) string {
 // is infrastructure, not egress, and must never read as exfil. Unknown/unparseable
 // addresses are treated as external (conservative for detection).
 func isExternalDest(evt trace.TraceEvent) bool {
+	// A connect to a DNS resolver (port 53) is name resolution, NOT a data-exfil
+	// endpoint — the real exfil is the connect to the *resolved* host. The sandbox's
+	// own forwarder (172.17.0.2:53) and the public fallback (1.1.1.1:53) both land
+	// here; reporting either as the exfil destination is wrong. DNS-tunneling exfil is
+	// a separate signal (dyn_dns_exfil on qname entropy), not a raw connect.
+	if port, ok := evt.Detail["port"].(float64); ok && int(port) == 53 {
+		return false
+	}
 	addr, _ := evt.Detail["addr"].(string)
 	if addr == "" {
 		return true

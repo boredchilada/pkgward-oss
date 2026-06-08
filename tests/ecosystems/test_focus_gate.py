@@ -4,15 +4,15 @@ import pytest
 from sqlalchemy import select
 from unittest.mock import AsyncMock
 
-from pkgsentry import focus
-from pkgsentry.focus import FocusEntry
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import ScanQueue, Watchlist
+from pkgward import focus
+from pkgward.focus import FocusEntry
+from pkgward.store import session as sess
+from pkgward.store.models import ScanQueue, Watchlist
 
 
 def _fresh(tmp_path, monkeypatch, name):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/name}")
-    monkeypatch.delenv("PKGSENTRY_FOCUS_EXCLUSIVE", raising=False)
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/name}")
+    monkeypatch.delenv("PKGWARD_FOCUS_EXCLUSIVE", raising=False)
     sess.reset_engine()
     sess.init_db()
 
@@ -32,8 +32,12 @@ EMPTY_XML = b"""<?xml version="1.0"?><rss version="2.0"><channel></channel></rss
 
 @pytest.mark.asyncio
 async def test_pypi_feeds_additive_enqueues_focus_only_name(httpx_mock, tmp_path, monkeypatch):
-    from pkgsentry.ecosystems.pypi.ingest import feeds
+    from pkgward.ecosystems.pypi.ingest import feeds
     _fresh(tmp_path, monkeypatch, "a.db")
+    # This test exercises the focus/watchlist gate, not the anomaly gate; disable
+    # the latter (a module-level constant read at import) so the skipped update
+    # (randompkg) doesn't fire an unmocked metadata fetch.
+    monkeypatch.setattr(feeds, "PYPI_ANOMALY_GATE", False)
     with sess.session_scope() as s:
         s.add(Watchlist(ecosystem="pypi", name="wlpkg", rank=1))
         focus.upsert_focus(s, "pypi", [FocusEntry("focuspkg")])
@@ -49,9 +53,9 @@ async def test_pypi_feeds_additive_enqueues_focus_only_name(httpx_mock, tmp_path
 
 @pytest.mark.asyncio
 async def test_pypi_feeds_exclusive_skips_watchlist(httpx_mock, tmp_path, monkeypatch):
-    from pkgsentry.ecosystems.pypi.ingest import feeds
+    from pkgward.ecosystems.pypi.ingest import feeds
     _fresh(tmp_path, monkeypatch, "e.db")
-    monkeypatch.setenv("PKGSENTRY_FOCUS_EXCLUSIVE", "1")
+    monkeypatch.setenv("PKGWARD_FOCUS_EXCLUSIVE", "1")
     with sess.session_scope() as s:
         s.add(Watchlist(ecosystem="pypi", name="wlpkg", rank=1))
         focus.upsert_focus(s, "pypi", [FocusEntry("focuspkg")])
@@ -65,9 +69,9 @@ async def test_pypi_feeds_exclusive_skips_watchlist(httpx_mock, tmp_path, monkey
 
 @pytest.mark.asyncio
 async def test_crates_feeds_exclusive(tmp_path, monkeypatch):
-    from pkgsentry.ecosystems.crates.ingest import feeds
+    from pkgward.ecosystems.crates.ingest import feeds
     _fresh(tmp_path, monkeypatch, "c.db")
-    monkeypatch.setenv("PKGSENTRY_FOCUS_EXCLUSIVE", "1")
+    monkeypatch.setenv("PKGWARD_FOCUS_EXCLUSIVE", "1")
     with sess.session_scope() as s:
         s.add(Watchlist(ecosystem="crates", name="serde", rank=1))
         focus.upsert_focus(s, "crates", [FocusEntry("mycrate")])
@@ -83,9 +87,9 @@ async def test_crates_feeds_exclusive(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_gomod_cursor_exclusive_case_insensitive(tmp_path, monkeypatch):
-    from pkgsentry.ecosystems.gomod.ingest import cursor
+    from pkgward.ecosystems.gomod.ingest import cursor
     _fresh(tmp_path, monkeypatch, "g.db")
-    monkeypatch.setenv("PKGSENTRY_FOCUS_EXCLUSIVE", "1")
+    monkeypatch.setenv("PKGWARD_FOCUS_EXCLUSIVE", "1")
     with sess.session_scope() as s:
         # focus stored with different casing than the index entry
         focus.upsert_focus(s, "gomod", [FocusEntry("github.com/Foo/Bar")])

@@ -1,0 +1,10 @@
+ecosystem = "npm"
+name = "ai-agent-cli-pro"
+version = "1.1.0"
+label = "bad"
+expected_verdict = "malicious"
+# Conviction anchors that MUST survive the Tier-2 LLM-endpoint allowlist — the
+# secret harvest + postinstall network, never the (allowlisted) destination.
+expect_rules = ["malware.credential_store_sweep", "installer.npm_install_script_network"]
+notes = "Adversarial twin of ai_agent_websearch_regex_fp: harvests ~/.ssh, ~/.aws, .npmrc, wallet + secret-named env vars from a postinstall hook and exfils them base64'd inside a chat-completions body to the ALLOWLISTED host api.anthropic.com. The LLM-endpoint allowlist must NEVER clear this — conviction is the secret harvest + postinstall network, not the destination. Blind-spot guard for the Shai-Hulud/miasma 'allowlisted host as exfil sink' case."
+provenance = "synthetic"

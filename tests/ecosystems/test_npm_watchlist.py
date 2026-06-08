@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
-from pkgsentry.ecosystems.npm.ingest.watchlist import (
+from pkgward.ecosystems.npm.ingest.watchlist import (
     CRITICAL_INFRA,
     _MD_LINK_RE,
     _NPM_NAME_RE,
     is_watchlist,
 )
-from pkgsentry.store.models import Watchlist
+from pkgward.store.models import Watchlist
 
 
 def test_npm_name_regex_accepts_valid():

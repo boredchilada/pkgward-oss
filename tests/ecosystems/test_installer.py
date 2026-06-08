@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from pathlib import Path
 
-from pkgsentry.ecosystems.pypi.installer import analyze_install_scripts
+from pkgward.ecosystems.pypi.installer import analyze_install_scripts
 
 
 def _write(p: Path, content: str) -> None:

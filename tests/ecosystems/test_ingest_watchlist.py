@@ -2,9 +2,9 @@
 import json
 import pytest
 
-from pkgsentry.ecosystems.pypi.ingest import watchlist as wl
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import ScanQueue, Watchlist
+from pkgward.ecosystems.pypi.ingest import watchlist as wl
+from pkgward.store import session as sess
+from pkgward.store.models import ScanQueue, Watchlist
 from sqlalchemy import select
 
 
@@ -19,7 +19,7 @@ SAMPLE_TOP = {
 
 @pytest.mark.asyncio
 async def test_refresh_writes_watchlist(httpx_mock, tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'w.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'w.db'}")
     sess.reset_engine()
     sess.init_db()
     httpx_mock.add_response(url=wl.TOP_URL, json=SAMPLE_TOP)
@@ -32,7 +32,7 @@ async def test_refresh_writes_watchlist(httpx_mock, tmp_path, monkeypatch):
 
 
 def test_is_watchlist_lookup(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'w2.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'w2.db'}")
     sess.reset_engine()
     sess.init_db()
     from datetime import datetime, timezone
@@ -45,7 +45,7 @@ def test_is_watchlist_lookup(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_poll_watchlist_releases_enqueues_high(httpx_mock, tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'w3.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'w3.db'}")
     sess.reset_engine()
     sess.init_db()
     from datetime import datetime, timezone

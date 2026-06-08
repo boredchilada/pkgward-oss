@@ -19,7 +19,7 @@ jobs:
         run: pip install ruff==0.6.9 black==24.8.0
 
       - name: ruff
-        run: ruff check pkgsentry/ tests/
+        run: ruff check pkgward/ tests/
 
       - name: black
-        run: black --check pkgsentry/ tests/
+        run: black --check pkgward/ tests/

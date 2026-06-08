@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
-from pkgsentry.ecosystems.gomod.ingest.cursor import (
+from pkgward.ecosystems.gomod.ingest.cursor import (
     _cursor_to_since,
     _is_pseudo_version,
     _parse_ndjson,
     _ts_to_cursor,
 )
-from pkgsentry.ecosystems.gomod.ingest.watchlist import _drop_pseudo
+from pkgward.ecosystems.gomod.ingest.watchlist import _drop_pseudo
 
 
 def test_pseudo_version_detected():

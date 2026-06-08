@@ -22,10 +22,30 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"detonation/internal/honeytokens"
 )
+
+// imageResolved memoizes whether the derived sandbox image exists (one `docker
+// image inspect` per ecosystem, not per detonation).
+var imageResolved sync.Map // derived-image -> chosen image string
+
+// runImage returns the container image to run: the derived `pkgward-det-<eco>`
+// (rich runtime, native payloads execute) if it was built, else the raw BaseImage.
+func (s *Sandbox) runImage() string {
+	derived := s.profile.Image()
+	if v, ok := imageResolved.Load(derived); ok {
+		return v.(string)
+	}
+	chosen := s.profile.BaseImage
+	if exec.Command("docker", "image", "inspect", derived).Run() == nil {
+		chosen = derived
+	}
+	imageResolved.Store(derived, chosen)
+	return chosen
+}
 
 type SandboxConfig struct {
 	ID            string
@@ -178,7 +198,7 @@ func (s *Sandbox) RunPhase(ctx context.Context, phase string, cmd []string, time
 	_ = os.MkdirAll(filepath.Dir(cidFile), 0o755)
 	_ = os.Remove(cidFile)
 
-	runArgs := s.Config.DockerRunArgs(s.profile.BaseImage, cmd, cidFile)
+	runArgs := s.Config.DockerRunArgs(s.runImage(), cmd, cidFile)
 	c := exec.CommandContext(ctx, "docker", runArgs...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr

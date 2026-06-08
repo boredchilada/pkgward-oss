@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Block accidental commits of private intel pack content.
 
-The public engine ships a baseline intel pack at `pkgsentry/intel/baseline/`.
+The public engine ships a baseline intel pack at `pkgward/intel/baseline/`.
 The operator's private overlay lives under `intel/` at the repo root and is
 gitignored. This hook fails the commit if any path under `intel/` (other than
 the gitignore itself) is staged for commit.
@@ -27,7 +27,7 @@ def main(argv: list[str]) -> int:
             "Refusing to commit private intel pack files:\n"
             + "".join(f"  {p}\n" for p in blocked)
             + "\nThe `intel/` directory is gitignored on purpose. The public\n"
-              "baseline intel pack lives at `pkgsentry/intel/baseline/` and\n"
+              "baseline intel pack lives at `pkgward/intel/baseline/` and\n"
               "is the only intel content that ships with the open-source engine.\n"
         )
         return 1

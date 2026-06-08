@@ -1,0 +1,11 @@
+ecosystem = "npm"
+name = "crypto-config-loader"
+version = "1.0.0"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = [
+    "obfuscation.decrypt_then_exec",
+    "installer.npm_runtime_obfuscated_entrypoint",
+]
+notes = "Legit AES config decryptor declared as `main`: a createDecipheriv call and a Function('return this') globalThis shim sit >600 chars apart with no data flow between them. The proximity gate (_crypto_feeds_eval) must NOT read this as a decrypt->eval loader — the ainx / @expo-apple-utils createDecipheriv FP, where a bundled crypto helper is dead code far from a dependency's eval."
+provenance = "synthetic"

@@ -1,4 +1,4 @@
-# Self-contained pkgsentry stack — includes PostgreSQL.
+# Self-contained pkgward stack — includes PostgreSQL.
 #
 # Use this if you don't have your own Postgres instance.
 # For production with an external DB, use docker-compose.yml instead.
@@ -10,16 +10,16 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: pkgsentry-db
+    container_name: pkgward-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: pkgsentry
-      POSTGRES_PASSWORD: pkgsentry
-      POSTGRES_DB: pkgsentry
+      POSTGRES_USER: pkgward
+      POSTGRES_PASSWORD: pkgward
+      POSTGRES_DB: pkgward
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pkgsentry"]
+      test: ["CMD-SHELL", "pg_isready -U pkgward"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -31,7 +31,7 @@ services:
 
   scanner:
     build: .
-    container_name: pkgsentry
+    container_name: pkgward
     restart: unless-stopped
     depends_on:
       postgres:
@@ -47,9 +47,9 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - SCANNER_INGEST=1
-      - PKGSENTRY_DB_URL=postgresql://pkgsentry:pkgsentry@postgres:5432/pkgsentry
+      - PKGWARD_DB_URL=postgresql://pkgward:pkgward@postgres:5432/pkgward
       # Uncomment alongside the volume mount above:
-      # - PKGSENTRY_INTEL_PATH=/app/intel/private
+      # - PKGWARD_INTEL_PATH=/app/intel/private
       # Uncomment alongside the detonation socket mount above:
       # - DETONATION_SOCKET=/var/run/detonation/detonation.sock
     deploy:
@@ -61,6 +61,6 @@ services:
 
 volumes:
   pgdata:
-    name: pkgsentry-pgdata
+    name: pkgward-pgdata
   scanner-data:
-    name: pkgsentry-data
+    name: pkgward-data

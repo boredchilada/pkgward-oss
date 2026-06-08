@@ -39,14 +39,14 @@ func main() {
 		"Tetragon JSONL export log path (read for trace events during each detonation)")
 	flag.Parse()
 
-	// Load intel pack (baseline + optional PKGSENTRY_INTEL_PATH overlay).
+	// Load intel pack (baseline + optional PKGWARD_INTEL_PATH overlay).
 	intel.Load()
 
 	cfg := api.Config{
 		MaxConcurrent:     *maxConcurrent,
 		BaseDir:           *baseDir,
 		TetragonLogPath:   *tetragonLog,
-		DNSForwarderImage: envDefault("DNS_FORWARDER_IMAGE", "pkgsentry-dnsforwarder"),
+		DNSForwarderImage: envDefault("DNS_FORWARDER_IMAGE", "pkgward-dnsforwarder"),
 	}
 
 	if *listenAddr != "" {

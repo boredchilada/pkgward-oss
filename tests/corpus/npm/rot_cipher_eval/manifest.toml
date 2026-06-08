@@ -1,0 +1,8 @@
+ecosystem = "npm"
+name = "rot-cipher-eval"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["obfuscation.rot_cipher_eval"]
+notes = "index.js decodes its payload with a runtime ROT/Caesar cipher (replace /[a-zA-Z]/ + charCodeAt %26) and evals it — the Mini Shai-Hulud letter-rotation wrapper. Coverage pin for obfuscation.rot_cipher_eval."
+provenance = "synthetic"

@@ -1,0 +1,29 @@
+# PENDING — not yet globbed by the harness (filename is `manifest.pending.toml`).
+# Rename to `manifest.toml` to activate, but ONLY after the Tier-2 cookie
+# destination discriminator lands. Until then yara.stealer_browser_credential_theft
+# fires on the cookie read+decrypt *technique* and scores this `malicious`, which
+# would fail the known-good gate.
+#
+# Provenance: cookie-reader.ts verbatim from opencode-usage-sidebar==0.2.0 (npm),
+# flagged MALICIOUS (rule 32 + LLM 95%, double-confirmed) on 2026-06-07.
+# Root cause: the package reads the local Chrome/Firefox `sessionKey` cookie for
+# claude.ai, decrypts it locally (standard Chrome v10 AES-128-CBC via the Safe
+# Storage keychain), and uses it ONLY as a Cookie header to call
+# https://claude.ai/api/organizations/{org}/usage — the user's OWN first-party
+# usage endpoint. The cookie never leaves the machine except back to the domain
+# it came from. Benign self-auth, not credential theft.
+#
+# Tier-2 discriminator: when every external destination host is a subset of the
+# domains whose cookies were read (same-origin self-auth) and NO other external
+# host receives the secret, de-escalate the stealer verdict to needs_review.
+# A real stealer that also POSTs the cookie to attacker.example must STILL fire.
+ecosystem = "npm"
+name = "usage-sidebar-fp"
+version = "0.2.0"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = [
+    "yara.stealer_browser_credential_theft",
+]
+notes = "Claude/Codex usage sidebar: reads local sessionKey cookie -> sends ONLY to first-party claude.ai usage API. Same-origin self-auth, not theft. The opencode-usage-sidebar FP."
+provenance = "reduced-real"

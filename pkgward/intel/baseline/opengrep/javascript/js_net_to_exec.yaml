@@ -1,0 +1,53 @@
+rules:
+  - id: js_net_to_exec
+    mode: taint
+    message: >-
+      Network response is tainted into child_process exec / eval / Function in
+      JavaScript. The canonical npm "fetch then run remote code" supply-chain
+      shape — most dangerous inside a lifecycle (postinstall) script.
+    languages: [js, ts]
+    severity: ERROR
+    metadata:
+      severity: critical
+      confidence: high
+      category: installer
+      pkgward_layer: opengrep
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: fetch(...)
+              - pattern: $H.get(...)
+              - pattern: $H.request(...)
+              - pattern: axios(...)
+              - pattern: axios.get(...)
+              - pattern: axios.post(...)
+              - pattern: require('http').get(...)
+              - pattern: require('https').get(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: eval(...)
+              - pattern: Function(...)
+              - pattern: new Function(...)
+              # Destructured imports: `const { exec, execFile } = require('child_process')`.
+              - pattern: exec(...)
+              - pattern: execSync(...)
+              - pattern: execFile(...)
+              - pattern: execFileSync(...)
+              # Qualified child_process methods whose names do NOT collide with
+              # RegExp.prototype.exec / String methods — safe to match broadly.
+              - pattern: $CP.execSync(...)
+              - pattern: $CP.execFile(...)
+              - pattern: $CP.execFileSync(...)
+              - pattern: $CP.spawn(...)
+              - pattern: $CP.spawnSync(...)
+              # `.exec` is ambiguous with RegExp.prototype.exec(str) — `$CP.exec(...)`
+              # alone matched `someRegex.exec(html)` and false-positived on every
+              # package that regex-parses a fetched HTTP body (arise-jinwoo-cli class).
+              # Constrain the receiver to known child_process handles.
+              - pattern: require('child_process').exec(...)
+              - patterns:
+                  - pattern: $CP.exec(...)
+                  - metavariable-regex:
+                      metavariable: $CP
+                      regex: ^(cp|childProcess|child_process|childProc|cproc|cprocess|proc|subprocess)$

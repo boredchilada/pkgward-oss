@@ -1,0 +1,13 @@
+ecosystem = "pypi"
+name = "qsim-extrap"
+version = "2.2.2"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["imports.marshalled_bytecode_loader"]
+notes = """Regression anchor for the mps-xtrap 2.2.2 miss (2026-06-06/08). Every module
+is a stub that marshal.load()s a hidden .pyc ('compiled for IP protection') and exec()s
+it; the .pyc is not even shipped (payload staged/fetched at runtime). The old rules only
+gave imports.exec_at_import (high, capped at 30 -> 'suspicious'), and the LLM (deepseek)
+flip-flopped malicious->benign->benign and ultimately CLEARED it. A marshal-bytecode loader
+feeding exec is now critical -> malicious on rules alone, no LLM dependency."""
+provenance = "synthetic"

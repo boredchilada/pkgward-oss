@@ -1,0 +1,190 @@
+<mxfile host="app.diagrams.net" agent="pkgward" version="26.0.0" type="device">
+  <diagram id="pkgward-deploy" name="Deployment Topology">
+    <mxGraphModel dx="1500" dy="950" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="950" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- TITLE -->
+        <mxCell id="title" value="pkgward &amp;mdash; Deployment Topology (multi-host)" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="420" y="10" width="660" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="Generic / role-only. Concrete real-infra map is private (intel/private/deployment-map.md). Mirrors docs/diagrams/deployment-topology.md." style="text;html=1;fontSize=11;fontStyle=2;align=center;verticalAlign=middle;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="320" y="46" width="860" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- REGISTRIES (blue) -->
+        <mxCell id="reg_group" value="Package registries" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;verticalAlign=top;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="90" width="640" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_pypi" value="PyPI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="118" width="130" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_npm" value="npm" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="270" y="118" width="130" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_crates" value="crates.io" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="118" width="130" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="reg_go" value="Go module index" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="570" y="118" width="150" height="32" as="geometry" />
+        </mxCell>
+
+        <!-- DEV + FORGE (orange) -->
+        <mxCell id="dev" value="&lt;b&gt;Developer workstation&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;edit + test&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="230" width="220" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="repo_code" value="&lt;b&gt;Code repo&lt;/b&gt; (git)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="305" width="100" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="repo_intel" value="&lt;b&gt;Intel overlay&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;separate repo&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="220" y="305" width="100" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- PRIMARY HOST (dashed group) -->
+        <mxCell id="primary_group" value="PRIMARY host &amp;mdash; ingest + scan + detonate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef3fb;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;verticalAlign=top;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="430" y="220" width="560" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest" value="&lt;b&gt;Ingest / cursors&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;SCANNER_INGEST=1 (only here)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="455" y="265" width="230" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="pri_scan" value="&lt;b&gt;Scan worker pool&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="725" y="265" width="240" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="det_svc" value="&lt;b&gt;Detonation service&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;rootless Docker + eBPF tracer&lt;br&gt;DETONATION_SOCKET set&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="455" y="370" width="230" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="det_pool" value="&lt;b&gt;Detonation worker pool&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;drains DetonationQueue&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="725" y="375" width="240" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="pri_note" value="&lt;font style=&quot;font-size:9px&quot;&gt;Alerts node-tagged (node_id.py); only this host runs ingest + the detonation service.&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontColor=#777777;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="455" y="500" width="510" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- WORKER HOST(S) (dashed group) -->
+        <mxCell id="worker_group" value="SCAN-WORKER host(s) &amp;mdash; scan only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef6ee;strokeColor=#82b366;fontStyle=1;fontSize=13;verticalAlign=top;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="220" width="370" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="wk_scan" value="&lt;b&gt;Scan worker pool&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;SCANNER_INGEST=0&lt;br&gt;DETONATION_ENABLED=1&lt;br&gt;(enqueues detonation for the primary)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="270" width="320" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- DATA (purple cylinders) -->
+        <mxCell id="data_group" value="Data services (private VLAN)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3eef9;strokeColor=#9673a6;fontStyle=1;fontSize=12;verticalAlign=top;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="430" y="610" width="560" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="pg" value="&lt;b&gt;PostgreSQL&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;ScanQueue + DetonationQueue&lt;br&gt;(claim-token CAS)&lt;br&gt;Scan / Finding / Detonation&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;size=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="470" y="640" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="rd" value="&lt;b&gt;Redis&lt;/b&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;size=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="820" y="650" width="130" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- EXTERNAL (blue) -->
+        <mxCell id="discord" value="&lt;b&gt;Discord webhook&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;alerts (node-tagged)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="600" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="llm" value="&lt;b&gt;LLM triage&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;OpenRouter&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="675" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- EDGES: registries -->
+        <mxCell id="e_reg_ingest" value="poll feeds" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;fontSize=9;" edge="1" parent="1" source="reg_group" target="ingest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_reg_priscan" value="download" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;fontSize=9;dashed=1;" edge="1" parent="1" source="reg_group" target="pri_scan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_reg_wkscan" value="download" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;fontSize=9;dashed=1;" edge="1" parent="1" source="reg_group" target="wk_scan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- EDGES: dev/forge -->
+        <mxCell id="e_dev_code" value="git push" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;fontSize=9;" edge="1" parent="1" source="dev" target="repo_code">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_dev_intel" value="push (private)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;fontSize=9;" edge="1" parent="1" source="dev" target="repo_intel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_code_primary" value="build image / git pull" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;fontSize=9;" edge="1" parent="1" source="repo_code" target="primary_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_code_worker" value="deploy-worker.sh (git pull)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;fontSize=9;" edge="1" parent="1" source="repo_code" target="worker_group">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="360" y="200" />
+              <mxPoint x="1225" y="200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_intel_worker" value="sync-worker.sh (rsync)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;fontSize=9;dashed=1;" edge="1" parent="1" source="repo_intel" target="worker_group">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="370" y="210" />
+              <mxPoint x="1215" y="210" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- EDGES: queue coordination -->
+        <mxCell id="e_ingest_pg" value="enqueue" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9673a6;fontSize=9;" edge="1" parent="1" source="ingest" target="pg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_priscan_pg" value="claim / persist" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9673a6;fontSize=9;startArrow=classic;startFill=1;" edge="1" parent="1" source="pri_scan" target="pg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_wkscan_pg" value="claim / persist + enqueue detonation" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9673a6;fontSize=9;startArrow=classic;startFill=1;" edge="1" parent="1" source="wk_scan" target="pg">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1000" y="720" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_detpool_pg" value="drain" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9673a6;fontSize=9;startArrow=classic;startFill=1;" edge="1" parent="1" source="det_pool" target="pg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_detpool_svc" value="detonate" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;fontSize=9;" edge="1" parent="1" source="det_pool" target="det_svc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- EDGES: external -->
+        <mxCell id="e_priscan_llm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;fontSize=9;" edge="1" parent="1" source="pri_scan" target="llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_priscan_disc" value="alert" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;fontSize=9;" edge="1" parent="1" source="pri_scan" target="discord">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_detpool_disc" value="flip-to-malicious alert" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;fontSize=9;dashed=1;" edge="1" parent="1" source="det_pool" target="discord">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- LEGEND -->
+        <mxCell id="legend_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#b3b3b3;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="600" width="300" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_t" value="&lt;b&gt;Legend&lt;/b&gt;" style="text;html=1;fontSize=12;align=left;" vertex="1" parent="1">
+          <mxGeometry x="112" y="606" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="lg1" value="ingest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="112" y="630" width="80" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="lg2" value="worker pool" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="200" y="630" width="90" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="lg3" value="datastore" style="shape=cylinder3;whiteSpace=wrap;html=1;size=8;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="300" y="628" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg4" value="external / registry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="112" y="664" width="130" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="lg5" value="node / artifact" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="664" width="130" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="lg_note" value="&lt;font style=&quot;font-size:9px&quot;&gt;Dashed edge = download / async / overlay path.&lt;br&gt;Double-headed = claim + persist.&lt;br&gt;Only the primary ingests and detonates;&lt;br&gt;workers only drain the shared queue.&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="112" y="694" width="280" height="60" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

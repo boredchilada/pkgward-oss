@@ -1,0 +1,26 @@
+# PENDING — not yet globbed by the harness (filename is `manifest.pending.toml`,
+# the discover_samples glob keys on exactly `manifest.toml`). Rename to
+# `manifest.toml` to activate, but ONLY after the Tier-2 LLM-endpoint IOC
+# allowlist lands — until then this sample scores `suspicious` on the
+# iocs.url_suspicious hits and would fail the known-good gate.
+#
+# Provenance: reduced faithful repro of arise-jinwoo-cli==1.0.15 (npm), an
+# opencode fork flagged MALICIOUS by LLM triage on 2026-06-07. Root cause:
+#   (1) js_net_to_exec conflated RegExp.prototype.exec(html) with
+#       child_process.exec  -> FIXED in js_net_to_exec.yaml (Tier 1).
+#   (2) iocs.url_suspicious fired on first-party LLM provider endpoints,
+#       scoring the package to `suspicious` -> needs Tier-2 allowlist.
+#   (3) env_to_net read `Authorization: Bearer ${apiKey}` to the provider as
+#       credential exfil -> Tier-2 destination discriminator.
+ecosystem = "npm"
+name = "ai-agent-cli-fp"
+version = "1.0.0"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = [
+    "opengrep.js_net_to_exec",
+    "opengrep.shadow_js_net_to_exec",
+    "iocs.url_suspicious",
+]
+notes = "AI coding agent: web-search regex.exec(html) is string matching not command exec; child_process is the user-driven bash tool; API key -> provider /chat/completions is auth. None is malicious. The arise-jinwoo-cli FP."
+provenance = "reduced-real"

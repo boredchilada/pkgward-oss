@@ -1,6 +1,6 @@
 # Embedded baseline for the detonation Go service.
-# Mirror of pkgsentry/intel/baseline/detonation/rules_data.toml.
-# Overlay via $PKGSENTRY_INTEL_PATH/detonation/rules_data.toml — UNION semantics.
+# Mirror of pkgward/intel/baseline/detonation/rules_data.toml.
+# Overlay via $PKGWARD_INTEL_PATH/detonation/rules_data.toml — UNION semantics.
 
 sensitive_path_prefixes = [
     "/root/.ssh/",

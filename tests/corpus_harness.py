@@ -10,9 +10,9 @@ Three tiers are auto-discovered:
   - PUBLIC  — synthetic samples shipped in-tree under ``tests/corpus/``. Pinned to
               the baseline intel pack so expectations are deterministic regardless
               of any operator overlay.
-  - PRIVATE — loose samples under ``$PKGSENTRY_CORPUS_PATH`` (same layout). Run
+  - PRIVATE — loose samples under ``$PKGWARD_CORPUS_PATH`` (same layout). Run
               against baseline + the operator's private overlay.
-  - VAULT   — frozen *real* catches under ``$PKGSENTRY_VAULT_PATH``: the original
+  - VAULT   — frozen *real* catches under ``$PKGWARD_VAULT_PATH``: the original
               archive preserved inside a password-protected zip (pw ``infected``)
               + a plaintext ``<stem>.manifest.toml`` sidecar. The harness decrypts,
               extracts the archive, and statically analyzes it — never detonates.
@@ -124,10 +124,10 @@ def discover_samples() -> list[Sample]:
     # In-repo private samples (present only on the dev checkout).
     samples += _discover_dir(_PRIVATE_CORPUS, "private")
     # External private corpus + vault, pointed to by env vars.
-    corpus_path = os.environ.get("PKGSENTRY_CORPUS_PATH", "").strip()
+    corpus_path = os.environ.get("PKGWARD_CORPUS_PATH", "").strip()
     if corpus_path:
         samples += _discover_dir(Path(corpus_path), "private")
-    vault_path = os.environ.get("PKGSENTRY_VAULT_PATH", "").strip()
+    vault_path = os.environ.get("PKGWARD_VAULT_PATH", "").strip()
     if vault_path:
         samples += _discover_vault(Path(vault_path))
     return samples
@@ -141,12 +141,23 @@ def materialize(sample: Sample, work_dir: Path) -> Path:
     prod layout for the ecosystem.
     """
     if sample.source_dir is not None:
-        return sample.source_dir
+        # Copy the loose sample OUT of the tests/ tree before analysis. Analyzing
+        # in place would let path-based "test file" heuristics (e.g. iocs._is_test_file
+        # keying on a `tests`/`fixtures` path part) fire on the corpus dir itself —
+        # something that never happens in prod, where a package extracts to a temp
+        # dir. Exclude the harness-only manifest.toml so it isn't scanned as content.
+        import shutil
+        dest = work_dir / "pkg"
+        shutil.copytree(
+            sample.source_dir, dest,
+            ignore=shutil.ignore_patterns("manifest.toml"),
+        )
+        return dest
 
     assert sample.vault_archive is not None
-    import pkgsentry.ecosystems  # noqa: F401  (populates adapter_registry)
-    from pkgsentry.adapter import adapter_registry
-    from pkgsentry.util.extract import safe_extract
+    import pkgward.ecosystems  # noqa: F401  (populates adapter_registry)
+    from pkgward.adapter import adapter_registry
+    from pkgward.util.extract import safe_extract
 
     inner_dir = work_dir / "inner"
     inner_dir.mkdir(parents=True, exist_ok=True)
@@ -163,7 +174,7 @@ def materialize(sample: Sample, work_dir: Path) -> Path:
 
 
 def _pin_intel(tier: str) -> None:
-    from pkgsentry import intel
+    from pkgward import intel
     intel.reset()
     if tier == "public":
         intel.load(use_env=False)        # baseline-only, deterministic
@@ -175,12 +186,12 @@ async def run_sample(sample: Sample, work_dir: Path):
     """Run the sample through the real static analyze→score path.
 
     Returns (ScoreResult, fired_scored_rule_ids)."""
-    import pkgsentry.ecosystems  # noqa: F401  (populates adapter_registry)
-    from pkgsentry.adapter import adapter_registry
-    from pkgsentry.analyze.metadata import MetadataContext, analyze_metadata
-    from pkgsentry.analyze.version_diff import PreviousVersion, analyze_version_diff
-    from pkgsentry.detect.score import _is_shadow_finding, score_and_verdict
-    from pkgsentry.pipeline import run_static_analyzers
+    import pkgward.ecosystems  # noqa: F401  (populates adapter_registry)
+    from pkgward.adapter import adapter_registry
+    from pkgward.analyze.metadata import MetadataContext, analyze_metadata
+    from pkgward.analyze.version_diff import PreviousVersion, analyze_version_diff
+    from pkgward.detect.score import _is_shadow_finding, score_and_verdict
+    from pkgward.pipeline import run_static_analyzers
 
     _pin_intel(sample.tier)
 

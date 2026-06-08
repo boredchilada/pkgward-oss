@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 import pytest
 from sqlalchemy import select
 
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import (
+from pkgward.store import session as sess
+from pkgward.store.models import (
     Finding,
     Package,
     Scan,
@@ -18,10 +18,10 @@ from pkgsentry.store.models import (
 
 
 def test_enqueue_one(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'r.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'r.db'}")
     sess.reset_engine()
     sess.init_db()
-    from pkgsentry.runtime import enqueue_one
+    from pkgward.runtime import enqueue_one
     enqueue_one(ecosystem="pypi", name="x", version="1", priority="high")
     with sess.session_scope() as s:
         row = s.scalars(select(ScanQueue)).one()
@@ -29,7 +29,7 @@ def test_enqueue_one(tmp_path, monkeypatch):
 
 
 def test_show_findings_prints_results(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'r2.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'r2.db'}")
     sess.reset_engine()
     sess.init_db()
     with sess.session_scope() as s:
@@ -39,7 +39,7 @@ def test_show_findings_prints_results(tmp_path, monkeypatch, capsys):
         s.add(Finding(scan_id=scan.id, rule_id="installer.urlopen_exec_chain",
                       category="installer", severity="critical", confidence="high",
                       file="setup.py", line=3, evidence="chain"))
-    from pkgsentry.runtime import show_findings
+    from pkgward.runtime import show_findings
     show_findings(ecosystem="pypi", name="bad", version="1.0")
     out = capsys.readouterr().out
     assert "malicious" in out
@@ -47,14 +47,14 @@ def test_show_findings_prints_results(tmp_path, monkeypatch, capsys):
 
 
 def test_backfill_days_uses_cursor(tmp_path, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'r3.db'}")
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'r3.db'}")
     sess.reset_engine()
     sess.init_db()
-    from pkgsentry.runtime import backfill_days
+    from pkgward.runtime import backfill_days
     called = {}
     def fake_pull(max_items=None):
         called["pulled"] = True
         return 0
-    monkeypatch.setattr("pkgsentry.ecosystems.pypi.ingest.cursor.pull_since", fake_pull)
+    monkeypatch.setattr("pkgward.ecosystems.pypi.ingest.cursor.pull_since", fake_pull)
     backfill_days(days=1)
     assert called.get("pulled") is True

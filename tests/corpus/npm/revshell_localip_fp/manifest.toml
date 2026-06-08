@@ -1,0 +1,8 @@
+ecosystem = "npm"
+name = "sysinfo-helper"
+version = "1.0.0"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = ["yara.reverse_shell_pattern"]
+notes = "Benign Python shipped in an npm package: socket.connect(('8.8.8.8',80)) local-IP detection (no packets sent — getsockname idiom) + subprocess.run for a system command + a generated '#!/bin/bash' run.sh launcher. None is a reverse shell; the shell path is a shebang, not a quote-adjacent subprocess/pty arg. reverse_shell_pattern must NOT fire (the @innvisor/conny-ai conny_init.py FP)."
+provenance = "synthetic"

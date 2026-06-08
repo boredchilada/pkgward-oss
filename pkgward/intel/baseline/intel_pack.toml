@@ -1,0 +1,14 @@
+# pkgward baseline intel pack
+#
+# Ships with the open-source engine. Provides generic, publicly-derivable
+# detection content sufficient to demonstrate the engine works against
+# obviously malicious test inputs. Operators with their own tuned threat
+# intel should layer a private overlay via PKGWARD_INTEL_PATH.
+#
+# Per-field merge semantics (overlay vs baseline) defined in
+# pkgward/intel/pack.py:IntelPack.merge().
+
+name = "pkgward-baseline"
+version = "0.1.0"
+extends = "none"
+license = "Apache-2.0"

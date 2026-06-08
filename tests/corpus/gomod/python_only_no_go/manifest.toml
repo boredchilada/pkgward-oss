@@ -1,0 +1,11 @@
+ecosystem = "gomod"
+name = "github.com/QuantumDatalytica-LLC/quantum-core-engine"
+version = "v3.0.0"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = [
+    "yara.cross_ecosystem_python_in_go",
+    "yara.pyarmor_suspicious_deps",
+]
+notes = "A NON-Go repo (Python + PyArmor, no go.mod / no .go) the Go module proxy indexed on demand. The cross-ecosystem + pyarmor rules fire on the Python content and escalate a non-Go-module FP. With no Go present the module has no Go-import attack surface, so these Go-context findings are suppressed. (yara.pyarmor_obfuscation lives in the private overlay, not baseline — listed for documentation; harmless if absent.)"
+provenance = "synthetic"

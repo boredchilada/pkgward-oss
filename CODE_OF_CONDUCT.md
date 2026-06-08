@@ -2,7 +2,7 @@
 
 ## Our pledge
 
-We want taking part in pkgsentry to be a respectful, welcoming experience for
+We want taking part in pkgward to be a respectful, welcoming experience for
 everyone, regardless of background or identity. We are committed to interacting in
 ways that keep the community open, friendly, and healthy.
 

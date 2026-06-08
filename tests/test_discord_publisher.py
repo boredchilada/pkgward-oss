@@ -3,9 +3,9 @@
 longer truncated so short of showing the exfil host."""
 from __future__ import annotations
 
-from pkgsentry.adapter import Finding
-from pkgsentry.llm.triage import LLMTriageResult
-from pkgsentry.notify.discord import _build_embed, _publisher_field
+from pkgward.adapter import Finding
+from pkgward.llm.triage import LLMTriageResult
+from pkgward.notify.discord import _build_embed, _publisher_field
 
 
 def _tri():
@@ -34,7 +34,7 @@ def test_full_exfil_host_not_truncated():
            "maintainers": None, "upload_user": "arielsimon"}
     e = _build_embed(pkg_name="ai-sdk-helpers", pkg_version="1.3.1", ecosystem="npm",
                      rule_verdict="malicious", rule_score=83, n_findings=9, triage=_tri(),
-                     top_findings=[f], downloads_weekly=0, publisher=pub)
+                     findings=[f], downloads_weekly=0, publisher=pub)
     hits = next(fld["value"] for fld in e["fields"] if fld["name"] == "Top Rule Hits")
     # The full host survives (the old [:80] cut it at "...logger-22883"); it's defanged,
     # so check the distinctive tail parts rather than the raw dotted host.

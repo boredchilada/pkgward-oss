@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Build context = the detonation module root.
-#   docker build -t pkgsentry-dnsforwarder -f deploy/dns-forwarder.Dockerfile .
+#   docker build -t pkgward-dnsforwarder -f deploy/dns-forwarder.Dockerfile .
 FROM golang:1.22-alpine AS build
 WORKDIR /src
 COPY . .

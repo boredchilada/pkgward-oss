@@ -1,8 +1,19 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
+import os
+
 import pytest
-from pkgsentry.analyze.lure_names import analyze_lure_name, score_name
+from pkgward.analyze.lure_names import analyze_lure_name, score_name
+
+# Some TrapDoor campaign names only flag once the operator intel overlay is
+# loaded (its lure-keyword list is broader than the baseline pack). On a
+# baseline-only checkout (`PKGWARD_INTEL_PATH` unset — e.g. the public repo)
+# these can't fire, so they skip. Same convention as test_staged_payload_rule.
+_OVERLAY_LOADED = bool(os.environ.get("PKGWARD_INTEL_PATH"))
+_overlay_only = pytest.mark.skipif(
+    not _OVERLAY_LOADED, reason="needs the private intel overlay (PKGWARD_INTEL_PATH)"
+)
 
 
 class TestScoreName:
@@ -17,6 +28,7 @@ class TestScoreName:
         assert "security_theater" in hits
         assert len(hits) >= 2
 
+    @_overlay_only
     def test_three_categories(self):
         hits = score_name("crypto-credential-scanner")
         assert len(hits) >= 3
@@ -43,29 +55,38 @@ class TestAnalyzeLureName:
         assert findings[0].severity == "medium"
         assert findings[0].rule_id == "metadata.lure_name"
 
+    @_overlay_only
     def test_high_three_categories(self):
         findings = analyze_lure_name("crypto-credential-scanner")
         assert len(findings) == 1
         assert findings[0].severity == "high"
         assert findings[0].rule_id == "metadata.lure_name_combo"
 
-    # TrapDoor campaign package names
+    # TrapDoor campaign names the baseline pack detects on its own.
     @pytest.mark.parametrize("name", [
-        "eth-security-auditor",
         "defi-risk-scanner",
         "wallet-security-checker",
         "wallet-backup-verifier",
         "crypto-credential-scanner",
         "web3-secrets-detector",
+        "defi-threat-scanner",
+    ])
+    def test_trapdoor_names_flagged(self, name):
+        findings = analyze_lure_name(name)
+        assert len(findings) >= 1, f"{name} should trigger lure name detection"
+
+    # TrapDoor names that only flag with the operator intel overlay loaded.
+    @_overlay_only
+    @pytest.mark.parametrize("name", [
+        "eth-security-auditor",
         "mnemonic-safety-check",
         "eth-wallet-sentinel",
         "cryptowallet-safety",
         "solidity-deploy-guard",
-        "defi-threat-scanner",
         "chain-key-validator",
         "deployment-key-auditor",
     ])
-    def test_trapdoor_names_flagged(self, name):
+    def test_trapdoor_names_flagged_overlay(self, name):
         findings = analyze_lure_name(name)
         assert len(findings) >= 1, f"{name} should trigger lure name detection"
 

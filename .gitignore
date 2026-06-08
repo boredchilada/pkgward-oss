@@ -30,6 +30,9 @@ pypi_scanner_diff_cache/
 *.swo
 .DS_Store
 Thumbs.db
+# draw.io editor temp/lock files (appear while a diagram is open)
+.$*.dtmp
+*.dtmp
 
 # Secrets
 .env
@@ -43,14 +46,18 @@ Thumbs.db
 *.db-shm
 *.db-wal
 
-# Private intel pack — overlay loaded at runtime via PKGSENTRY_INTEL_PATH.
-# The public baseline lives at pkgsentry/intel/baseline/ and IS tracked.
+# Private intel pack — overlay loaded at runtime via PKGWARD_INTEL_PATH.
+# The public baseline lives at pkgward/intel/baseline/ and IS tracked.
 # Leading slash anchors this pattern to the repo root so it does NOT also
-# match `pkgsentry/intel/` or `tests/intel/`.
+# match `pkgward/intel/` or `tests/intel/`.
 /intel/
 
 # Internal session state
 HANDOFF.md
+
+# Loose scratch tree is committed compressed as scratch-archive.tar.xz instead
+# (the embtest venv is regenerable and excluded entirely).
+/.scratch/
 
 # Stale workspace artifacts
 pypi_scanner/
@@ -70,3 +77,10 @@ detonation/bin/
 .profile
 .claude/
 .git.broken-bak
+
+# distributed-worker host list (IPs/keys) — never commit
+tools/worker-hosts.conf
+
+# Local malware-analysis scratch — downloaded samples + decoded payload layers.
+# NEVER commit live malware. Kept on disk for RE/detonation, ignored by git.
+tmp_inspect/

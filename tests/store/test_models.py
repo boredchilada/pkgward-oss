@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from pkgsentry.store.models import (
+from pkgward.store.models import (
     Finding,
     Package,
     Scan,
@@ -91,7 +91,7 @@ def test_rulehit_counter(db_session):
 
 def test_detonation_model(db_session):
     """Detonation row links to scan with phase and trace metadata."""
-    from pkgsentry.store.models import Detonation
+    from pkgward.store.models import Detonation
 
     pkg = Package(ecosystem="pypi", name="evil-pkg")
     db_session.add(pkg)
@@ -130,7 +130,7 @@ def test_detonation_model(db_session):
 
 def test_trace_event_model(db_session):
     """TraceEvent rows link to detonation with structured detail."""
-    from pkgsentry.store.models import Detonation, TraceEvent
+    from pkgward.store.models import Detonation, TraceEvent
 
     pkg = Package(ecosystem="pypi", name="evil-pkg")
     db_session.add(pkg)

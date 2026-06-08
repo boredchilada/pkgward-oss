@@ -5,14 +5,14 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from pkgsentry.cli import app
+from pkgward.cli import app
 
 runner = CliRunner()
 
 
 def _use_temp_db(tmp_path: Path, monkeypatch):
-    from pkgsentry.store import session as sess
-    monkeypatch.setenv("PKGSENTRY_DB_URL", f"sqlite:///{tmp_path/'cli.db'}")
+    from pkgward.store import session as sess
+    monkeypatch.setenv("PKGWARD_DB_URL", f"sqlite:///{tmp_path/'cli.db'}")
     sess.reset_engine()
     sess.init_db()
     return sess
@@ -30,7 +30,7 @@ def test_focus_load_list_clear(tmp_path, monkeypatch):
 
     # The pinned version was enqueued for scanning.
     from sqlalchemy import select
-    from pkgsentry.store.models import ScanQueue, FocusList
+    from pkgward.store.models import ScanQueue, FocusList
     with sess.session_scope() as s:
         q = s.scalars(select(ScanQueue).where(ScanQueue.name == "requests")).all()
         assert len(q) == 1 and q[0].version == "2.31.0" and q[0].priority == "high"
@@ -53,7 +53,7 @@ def test_focus_load_no_enqueue_pinned(tmp_path, monkeypatch):
     r = runner.invoke(app, ["focus", "load", str(f), "-e", "pypi", "--no-enqueue-pinned"])
     assert r.exit_code == 0 and "0 pinned versions enqueued" in r.output
     from sqlalchemy import select
-    from pkgsentry.store.models import ScanQueue
+    from pkgward.store.models import ScanQueue
     with sess.session_scope() as s:
         assert s.scalars(select(ScanQueue)).all() == []
 
@@ -68,7 +68,7 @@ def test_focus_load_rejects_bad_ecosystem(tmp_path, monkeypatch):
 
 def test_focus_list_warns_when_exclusive_empty(tmp_path, monkeypatch):
     _use_temp_db(tmp_path, monkeypatch)
-    monkeypatch.setenv("PKGSENTRY_FOCUS_EXCLUSIVE", "1")
+    monkeypatch.setenv("PKGWARD_FOCUS_EXCLUSIVE", "1")
     r = runner.invoke(app, ["focus", "list"])
     assert r.exit_code == 0
     assert "WARNING" in r.output and "idle" in r.output
@@ -88,7 +88,7 @@ def test_focus_load_combined_file_all_ecosystems(tmp_path, monkeypatch):
     assert "crates, gomod, pypi" in r.output  # all three scopes loaded
 
     from sqlalchemy import select
-    from pkgsentry.store.models import FocusList, ScanQueue
+    from pkgward.store.models import FocusList, ScanQueue
     with sess.session_scope() as s:
         by_eco = {}
         for f in s.scalars(select(FocusList)).all():
@@ -112,7 +112,7 @@ def test_focus_load_combined_is_authoritative(tmp_path, monkeypatch):
     f2.write_text("[pypi]\nrequests\n", encoding="utf-8")
     runner.invoke(app, ["focus", "load", str(f2)])
     from sqlalchemy import select
-    from pkgsentry.store.models import FocusList
+    from pkgward.store.models import FocusList
     with sess.session_scope() as s:
         names = {f.name for f in s.scalars(select(FocusList)).all()}
     assert names == {"requests"}

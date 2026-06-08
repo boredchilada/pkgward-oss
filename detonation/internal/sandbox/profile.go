@@ -11,10 +11,19 @@ type Profile struct {
 	ExtraPackages     []string
 }
 
+// Image is the container image the sandbox actually runs. The derived
+// `pkgward-det-<eco>` image (BaseImage + the broad runtime libs/tools real
+// payloads need — see deploy/build-sandbox-images.sh) is preferred so native
+// binaries execute and trace instead of dying at dlopen; we fall back to the raw
+// BaseImage only if the derived image was never built.
+func (p *Profile) Image() string {
+	return "pkgward-det-" + p.Ecosystem
+}
+
 var profiles = map[string]*Profile{
 	"pypi": {
 		Ecosystem:         "pypi",
-		BaseImage:         "python:3.11-slim",
+		BaseImage:         "python:3.13-slim-trixie",
 		InstallTimeoutSec: 120,
 		ImportTimeoutSec:  30,
 		InstallCmd: func(name, version, archivePath string) []string {
@@ -55,7 +64,7 @@ var profiles = map[string]*Profile{
 	},
 	"npm": {
 		Ecosystem:         "npm",
-		BaseImage:         "node:20-slim",
+		BaseImage:         "node:22-trixie-slim",
 		InstallTimeoutSec: 120,
 		ImportTimeoutSec:  30,
 		InstallCmd: func(name, version, archivePath string) []string {
@@ -81,6 +90,22 @@ var profiles = map[string]*Profile{
 				"  s=$(node -e \"try{var x=(require('./package.json').scripts||{})['$h']||'';process.stdout.write(x)}catch(e){}\")\n" +
 				"  if [ -n \"$s\" ]; then echo \"[det] $h: $s\"; sh -c \"$s\"; fi\n" +
 				"done\n" +
+				// Runtime entry + CLI bins fire at require/CLI time, NOT install. The
+				// import phase runs in a fresh container where this package isn't
+				// resolvable (only the archive is mounted), so `node -e require(name)`
+				// MODULE_NOT_FOUNDs and a require-time payload — a self-decoding loader
+				// shipped as `main`, or a downloader `bin` — never executes (turbo-dls
+				// 1.3.5). Run them HERE where the package is extracted, as ENTRY modules
+				// (node <file>, not require()) so payloads gated on require.main===module
+				// fire. Backgrounded + time-boxed so a blocking/looping entry can't eat
+				// the settle window; Tetragon traces whatever they exec/connect/write.
+				"main=$(node -e \"try{var m=require('./package.json').main||'index.js';process.stdout.write(typeof m==='string'?m:'')}catch(e){}\")\n" +
+				"for f in \"$main\" index.js; do\n" +
+				"  if [ -n \"$f\" ] && [ -f \"$f\" ]; then echo \"[det] entry: $f\"; timeout 15 node \"$f\" >/dev/null 2>&1 & break; fi\n" +
+				"done\n" +
+				"node -e \"try{var b=require('./package.json').bin;if(typeof b==='string')console.log(b);else if(b)Object.keys(b).forEach(function(k){console.log(b[k])})}catch(e){}\" | while IFS= read -r bp; do\n" +
+				"  if [ -n \"$bp\" ] && [ -f \"$bp\" ]; then echo \"[det] bin: $bp\"; timeout 15 node \"$bp\" >/dev/null 2>&1 & fi\n" +
+				"done\n" +
 				// Settle window: many loaders spawn the real payload DETACHED and
 				// exit immediately (logger-active: `node utils.js` -> detached
 				// --bg agent that does the credential sweep). Without this the
@@ -96,7 +121,7 @@ var profiles = map[string]*Profile{
 	},
 	"crates": {
 		Ecosystem:         "crates",
-		BaseImage:         "rust:1-slim",
+		BaseImage:         "rust:1-trixie",
 		InstallTimeoutSec: 180,
 		ImportTimeoutSec:  0,
 		InstallCmd: func(name, version, archivePath string) []string {
@@ -109,7 +134,7 @@ var profiles = map[string]*Profile{
 	},
 	"gomod": {
 		Ecosystem:         "gomod",
-		BaseImage:         "golang:1.22-alpine",
+		BaseImage:         "golang:1.24-trixie",
 		InstallTimeoutSec: 240,
 		ImportTimeoutSec:  0,
 		// Go has no install-time hook the way pip/npm do. Its dynamic attack

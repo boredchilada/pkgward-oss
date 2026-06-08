@@ -1,0 +1,8 @@
+ecosystem = "npm"
+name = "rtc-liveness-sdk"
+version = "1.0.0"
+label = "good"
+expected_verdict = "clean"
+forbid_rules = ["iocs.hardcoded_wan_ip_port"]
+notes = "WebRTC liveness/KYC SDK: iceServers with turn:/stun: relay IP:port literals (a real routable AWS IP). A hardcoded TURN server in an iceServers config is normal client setup, not a C2 beacon — the @b8safe react-native-safe FP. iocs.hardcoded_wan_ip_port must NOT fire here."
+provenance = "synthetic"

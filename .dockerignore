@@ -25,3 +25,9 @@ Thumbs.db
 scan.log
 instructions.txt
 .claude/
+
+# Large local artifacts — kept in git, never needed in the image
+samples/
+.scratch/
+scratch-archive.tar.xz
+intel/private/

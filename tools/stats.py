@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""pkgsentry live stats / data-mining snapshot.
+"""pkgward live stats / data-mining snapshot.
 
 One-shot view of queue depth, throughput, verdicts, the async detonation queue,
 and detection-quality signals — the things worth watching during a soak:
@@ -10,8 +10,8 @@ and detection-quality signals — the things worth watching during a soak:
   - detonation-driven verdict flips (what dynamic analysis caught that static missed)
 
 Run:
-    docker exec pkgsentry python tools/stats.py
-    docker exec pkgsentry python tools/stats.py --window-min 30
+    docker exec pkgward python tools/stats.py
+    docker exec pkgward python tools/stats.py --window-min 30
 """
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select, text
 
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import DetonationQueue, ScanQueue, Scan
+from pkgward.store import session as sess
+from pkgward.store.models import DetonationQueue, ScanQueue, Scan
 
 _ECOS = ("pypi", "crates", "gomod", "npm")
 
@@ -31,7 +31,7 @@ def _hr(title: str) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="pkgsentry live stats snapshot")
+    ap = argparse.ArgumentParser(description="pkgward live stats snapshot")
     ap.add_argument("--window-min", type=int, default=60, help="throughput window (minutes)")
     args = ap.parse_args()
 

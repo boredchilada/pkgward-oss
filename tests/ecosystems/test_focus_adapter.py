@@ -3,9 +3,9 @@
 registers the focus poller."""
 import pytest
 
-from pkgsentry.ecosystems.pypi.adapter import PyPIAdapter
-from pkgsentry.ecosystems.crates.adapter import CratesAdapter
-from pkgsentry.ecosystems.gomod.adapter import GoModAdapter
+from pkgward.ecosystems.pypi.adapter import PyPIAdapter
+from pkgward.ecosystems.crates.adapter import CratesAdapter
+from pkgward.ecosystems.gomod.adapter import GoModAdapter
 
 
 class _StubScheduler:
@@ -25,7 +25,7 @@ CASES = [
 
 @pytest.mark.parametrize("adapter_cls,focus_id,wl_id", CASES)
 def test_additive_registers_both(adapter_cls, focus_id, wl_id, monkeypatch):
-    monkeypatch.delenv("PKGSENTRY_FOCUS_EXCLUSIVE", raising=False)
+    monkeypatch.delenv("PKGWARD_FOCUS_EXCLUSIVE", raising=False)
     sch = _StubScheduler()
     adapter_cls().schedule_jobs(sch)
     assert focus_id in sch.ids
@@ -34,7 +34,7 @@ def test_additive_registers_both(adapter_cls, focus_id, wl_id, monkeypatch):
 
 @pytest.mark.parametrize("adapter_cls,focus_id,wl_id", CASES)
 def test_exclusive_omits_watchlist_keeps_focus(adapter_cls, focus_id, wl_id, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_FOCUS_EXCLUSIVE", "1")
+    monkeypatch.setenv("PKGWARD_FOCUS_EXCLUSIVE", "1")
     sch = _StubScheduler()
     adapter_cls().schedule_jobs(sch)
     assert focus_id in sch.ids

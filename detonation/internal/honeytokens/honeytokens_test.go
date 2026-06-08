@@ -9,7 +9,7 @@ import (
 // The whole point is that a worm cannot tell these are decoys. Guard against ever
 // re-introducing a "decoy"/"honeypot"/"test"/"fake" tell into a planted value.
 func TestNoSelfIdentifyingTells(t *testing.T) {
-	tells := []string{"decoy", "honeypot", "honeytoken", "fake", "dummy", "notreal", "pkgsentry", "example"}
+	tells := []string{"decoy", "honeypot", "honeytoken", "fake", "dummy", "notreal", "pkgward", "example"}
 	for label, val := range secretValues {
 		low := strings.ToLower(val)
 		for _, tell := range tells {

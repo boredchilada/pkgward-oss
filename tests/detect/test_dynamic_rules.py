@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
-from pkgsentry.adapter import Finding
-from pkgsentry.detect.rules import BEHAVIORAL_CHAIN_RULES, DYNAMIC_CHAIN_RULES
-from pkgsentry.detect.score import score_and_verdict
+from pkgward.adapter import Finding
+from pkgward.detect.rules import BEHAVIORAL_CHAIN_RULES, DYNAMIC_CHAIN_RULES
+from pkgward.detect.score import score_and_verdict
 
 
 def test_dynamic_chain_rules_exist():

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Tests for `pkgsentry.finding_reuse.carry_forward_findings` — the
+"""Tests for `pkgward.finding_reuse.carry_forward_findings` — the
 SHA-unchanged-file carry-forward used on auto-watchlisted packages.
 
 Attacker pattern: byte-identical re-publish under a bumped version → most
@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from pkgsentry.finding_reuse import carry_forward_findings
-from pkgsentry.store.models import (
+from pkgward.finding_reuse import carry_forward_findings
+from pkgward.store.models import (
     FileHash, Finding, Package, Scan, Version,
 )
 
@@ -110,7 +110,7 @@ def test_no_prior_scan_returns_empty(db_session):
 
 
 def test_ttl_window_excludes_old_scans(db_session, monkeypatch):
-    monkeypatch.setenv("PKGSENTRY_FINDING_REUSE_DAYS", "7")
+    monkeypatch.setenv("PKGWARD_FINDING_REUSE_DAYS", "7")
     # Prior scan 30 days ago — outside the TTL window.
     _make_pkg_scan(
         db_session, "npm", "stale-bad", "1.0.0",
@@ -166,7 +166,7 @@ def test_dedup_against_existing_findings(db_session):
         findings=[],
     )
     # The current run already produced the same finding on the same file.
-    from pkgsentry.adapter import Finding as FDC
+    from pkgward.adapter import Finding as FDC
     existing = [FDC(rule_id="threat_intel.known_malicious_sha256", category="threat_intel",
                     severity="critical", confidence="high", file="dist/x.js", line=None,
                     evidence="")]

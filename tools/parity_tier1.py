@@ -29,10 +29,10 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from pkgsentry import intel
-from pkgsentry.detect.score import score_and_verdict
-from pkgsentry.store import session as sess
-from pkgsentry.store.models import Finding, Package, Scan, Version, Watchlist
+from pkgward import intel
+from pkgward.detect.score import score_and_verdict
+from pkgward.store import session as sess
+from pkgward.store.models import Finding, Package, Scan, Version, Watchlist
 
 
 def _watchlist_rank(session: Session, ecosystem: str, name: str) -> Optional[int]:
@@ -67,7 +67,7 @@ def run(*, ecosystem: Optional[str], limit: Optional[int], show_diffs: int) -> i
                 select(Finding).where(Finding.scan_id == scan.id)
             ).all()
             rank = _watchlist_rank(s, pkg.ecosystem, pkg.name)
-            from pkgsentry.adapter import Finding as FindingDC
+            from pkgward.adapter import Finding as FindingDC
             findings_dc = [
                 FindingDC(
                     rule_id=f.rule_id,

@@ -5,17 +5,19 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from pkgsentry import threat_intel_auto as tia
-from pkgsentry.analyze import threat_intel
-from pkgsentry.store.models import (
+from pkgward import threat_intel_auto as tia
+from pkgward.analyze import threat_intel
+from pkgward.store.models import (
     FileHash, Finding, Package, Scan, ThreatIntelHash, Version,
 )
 
 
 @pytest.fixture(autouse=True)
 def _enable_autoseed(monkeypatch):
-    # Auto-seeding defaults OFF since 0.5.2; this module exercises the mechanism.
-    monkeypatch.setenv("PKGSENTRY_THREATINTEL_AUTOSEED", "1")
+    # Auto-seeding is HARD-DISABLED in prod (is_enabled() returns False, env ignored).
+    # These tests exercise the seed *logic* in isolation, so patch is_enabled directly.
+    import pkgward.threat_intel_auto as tia
+    monkeypatch.setattr(tia, "is_enabled", lambda: True)
 
 
 def _make_malicious_scan(s, name, *, sha, ssdeep="3:abcd:ef", tlsh="T1" + "A" * 68,
@@ -72,8 +74,8 @@ def test_backfill_processes_malicious_scans(db_session):
 def test_auto_fingerprint_uses_tight_tlsh(db_session, monkeypatch):
     # auto-seeds must reject a LOOSELY-similar file (the chain-signer FP class) while
     # the curated baseline keeps its looser threshold.
-    from pkgsentry.analyze import threat_intel
-    from pkgsentry.util import capabilities as caps
+    from pkgward.analyze import threat_intel
+    from pkgward.util import capabilities as caps
     db_session.add(ThreatIntelHash(sha256="a" * 64, tlsh="T1" + "A" * 68, campaign="auto:npm:x",
                                    label="malicious", source="auto", file_pattern="*.js"))
     db_session.add(ThreatIntelHash(sha256="b" * 64, tlsh="T1" + "B" * 68, campaign="curated-pack",
@@ -104,8 +106,8 @@ def test_seed_skips_compiled_binary(db_session):
 
 
 def test_auto_is_exact_only_then_promote_enables_fuzzy(db_session, monkeypatch):
-    from pkgsentry.analyze import threat_intel
-    from pkgsentry.util import capabilities as caps
+    from pkgward.analyze import threat_intel
+    from pkgward.util import capabilities as caps
     db_session.add(ThreatIntelHash(sha256="a" * 64, tlsh="T1" + "A" * 68, campaign="auto:npm:fam",
                                    label="malicious", source="auto", file_pattern="*.js"))
     db_session.flush()
@@ -127,7 +129,7 @@ def test_auto_is_exact_only_then_promote_enables_fuzzy(db_session, monkeypatch):
 
 
 def test_remove_deletes_campaign_fingerprints(db_session):
-    from pkgsentry.analyze import threat_intel
+    from pkgward.analyze import threat_intel
     db_session.add(ThreatIntelHash(sha256="c" * 64, campaign="auto:pypi:benign-pth",
                                    label="malicious", source="auto", file_pattern="*.pth"))
     db_session.add(ThreatIntelHash(sha256="d" * 64, campaign="auto:pypi:keep-me",
@@ -140,3 +142,10 @@ def test_remove_deletes_campaign_fingerprints(db_session):
     assert threat_intel.check_file(db_session, sha256="d" * 64, filename="x.pth") is not None
     # removing a non-existent campaign is a no-op
     assert tia.remove(db_session, "does-not-exist") == 0
+
+
+def test_autoseed_hard_disabled_ignores_env(monkeypatch):
+    # Prod guard: auto-seeding must stay dead even if the env flag is set to 1.
+    monkeypatch.undo()  # drop the autouse is_enabled patch — test the REAL guard
+    monkeypatch.setenv("PKGWARD_THREATINTEL_AUTOSEED", "1")
+    assert tia.is_enabled() is False

@@ -1,0 +1,11 @@
+{
+  "name": "usage-sidebar-fp",
+  "version": "0.2.0",
+  "description": "TUI sidebar plugin displaying Claude and Codex account usage statistics",
+  "type": "module",
+  "exports": { "./tui": "./src/tui.tsx" },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "peerDependencies": { "@opencode-ai/plugin": "^1.4.3" }
+}

@@ -2,7 +2,7 @@
 """Abuse-prone hosting / tunnel callback detection (by domain)."""
 from __future__ import annotations
 
-from pkgsentry.analyze.iocs import _is_abuse_hosting_url as is_abuse
+from pkgward.analyze.iocs import _is_abuse_hosting_url as is_abuse
 
 
 def test_abuse_hosts_flagged():

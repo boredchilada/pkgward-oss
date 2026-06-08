@@ -12,10 +12,10 @@ import shutil
 
 import pytest
 
-from pkgsentry.analyze.binary import (
+from pkgward.analyze.binary import (
     UNPACKED_SUFFIX, _detect_packer, analyze_binary_artifacts,
 )
-from pkgsentry.analyze.unpack import unpack_packed_executables, upx_available
+from pkgward.analyze.unpack import unpack_packed_executables, upx_available
 
 ELF = b"\x7fELF\x02\x01\x01\x00"
 
@@ -55,7 +55,7 @@ def test_upx_with_unpacked_sibling_downgrades_to_medium(tmp_path):
 
 
 def test_unpack_noop_without_upx(tmp_path, monkeypatch):
-    monkeypatch.setattr("pkgsentry.analyze.unpack.shutil.which", lambda _: None)
+    monkeypatch.setattr("pkgward.analyze.unpack.shutil.which", lambda _: None)
     (tmp_path / "cr16").write_bytes(ELF + b"UPX!" + b"\x00" * 64)
     assert unpack_packed_executables(tmp_path) == []
 
@@ -76,7 +76,7 @@ def test_unpack_real_upx_roundtrip(tmp_path):
 def test_looks_like_compiled_binary_detects_disguised_elf(tmp_path):
     # An ELF wearing a source extension (esbuild/swc/cxpher native-CLI pattern) is
     # detected by content so the source-text analyzers skip it.
-    from pkgsentry.analyze.binary import looks_like_compiled_binary
+    from pkgward.analyze.binary import looks_like_compiled_binary
     p = tmp_path / "cXpher.js"
     p.write_bytes(ELF + b"\x90" * 512)
     assert looks_like_compiled_binary(p) is True
@@ -86,7 +86,7 @@ def test_looks_like_compiled_binary_does_not_skip_encrypted_text_payload(tmp_pat
     # A genuinely-obfuscated/encrypted blob hidden in a .py is NOT a compiled image —
     # it must still reach entropy/obfuscation (strict magic-byte match, no NUL heuristic).
     import os
-    from pkgsentry.analyze.binary import looks_like_compiled_binary
+    from pkgward.analyze.binary import looks_like_compiled_binary
     p = tmp_path / "payload.py"
     p.write_bytes(os.urandom(2048))
     assert looks_like_compiled_binary(p) is False

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from __future__ import annotations
 
-from pkgsentry.detonate.client import (
+from pkgward.detonate.client import (
     DetonationClient,
     DetonationResult,
     PhaseResult,

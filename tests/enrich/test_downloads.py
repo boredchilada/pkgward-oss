@@ -4,7 +4,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from pkgsentry.enrich import downloads
+from pkgward.enrich import downloads
 
 
 class _Resp:

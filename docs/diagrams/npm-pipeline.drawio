@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="app.diagrams.net" modified="2026-05-26T00:00:00.000Z" agent="pkgsentry" version="26.0.0" type="device">
+<mxfile host="app.diagrams.net" modified="2026-05-26T00:00:00.000Z" agent="pkgward" version="26.0.0" type="device">
   <diagram id="npm-pipeline" name="npm Ecosystem Pipeline (PLANNED)">
     <mxGraphModel dx="1800" dy="4500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="4600" math="0" shadow="0">
       <root>
@@ -10,12 +10,12 @@
         <mxCell id="title" value="&lt;b&gt;npm (JavaScript) Ecosystem Pipeline &amp;mdash; PLANNED&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=20;fontColor=#757575;" vertex="1" parent="1">
           <mxGeometry x="380" y="20" width="620" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="subtitle" value="pkgsentry &amp;mdash; npm package ingest, analysis, and triage (NOT YET IMPLEMENTED)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=13;fontStyle=2;fontColor=#9e9e9e;" vertex="1" parent="1">
+        <mxCell id="subtitle" value="pkgward &amp;mdash; npm package ingest, analysis, and triage (NOT YET IMPLEMENTED)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=13;fontStyle=2;fontColor=#9e9e9e;" vertex="1" parent="1">
           <mxGeometry x="380" y="55" width="620" height="30" as="geometry"/>
         </mxCell>
 
         <!-- ===== STATUS BANNER ===== -->
-        <mxCell id="planned_banner" value="&lt;b&gt;IMPLEMENTED &amp;mdash; ACTIVE since 0.5.0.&lt;/b&gt; npm is the fourth ecosystem alongside PyPI, crates.io, and Go modules. It plugs into pkgsentry's universal ingest &amp;rarr; analyze &amp;rarr; score &amp;rarr; detonate &amp;rarr; triage flow." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#43a047;strokeWidth=2;fontColor=#2e7d32;fontSize=11;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="planned_banner" value="&lt;b&gt;IMPLEMENTED &amp;mdash; ACTIVE since 0.5.0.&lt;/b&gt; npm is the fourth ecosystem alongside PyPI, crates.io, and Go modules. It plugs into pkgward's universal ingest &amp;rarr; analyze &amp;rarr; score &amp;rarr; detonate &amp;rarr; triage flow." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#43a047;strokeWidth=2;fontColor=#2e7d32;fontSize=11;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="380" y="92" width="620" height="60" as="geometry"/>
         </mxCell>
 
@@ -199,7 +199,7 @@
         </mxCell>
 
         <!-- UA note -->
-        <mxCell id="n_wl_ua" value="User-Agent:&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;pkgsentry/${VERSION} (+${CONTACT})&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
+        <mxCell id="n_wl_ua" value="User-Agent:&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;1&quot;&gt;pkgward/${VERSION} (+${CONTACT})&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;dashed=1;dashPattern=8 4;fontStyle=2;fontSize=10;fontColor=#9e9e9e;" vertex="1" parent="1">
           <mxGeometry x="260" y="925" width="150" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="e_wl_ua" style="dashed=1;strokeColor=#CCCCCC;" edge="1" source="n_wl_reinsert" target="n_wl_ua" parent="1">
@@ -503,7 +503,7 @@
         </mxCell>
 
         <!-- llm -->
-        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;OpenRouter &amp;rarr; GLM-5.1 (cost-gated)&lt;br&gt;Spotlighting anti-injection&lt;br&gt;Can override: malicious &amp;rarr; benign" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+        <mxCell id="n_llm" value="&lt;b&gt;LLM Triage&lt;/b&gt;&lt;br&gt;OpenRouter &amp;rarr; deepseek-v4-flash (cost-gated)&lt;br&gt;Spotlighting anti-injection&lt;br&gt;Can override: malicious &amp;rarr; benign" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
           <mxGeometry x="440" y="3190" width="340" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="e_verdict_yes" value="Yes" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;fontColor=#757575;" edge="1" source="d_verdict" target="n_llm" parent="1">
@@ -543,7 +543,7 @@
         </mxCell>
 
         <!-- cleanup -->
-        <mxCell id="n_cleanup" value="&lt;b&gt;Persist + Cleanup&lt;/b&gt;&lt;br&gt;Upsert Package/Version, Scan, Findings, FileHash&lt;br&gt;Bump RuleHit counters&lt;br&gt;Remove temp dirs (pkgsentry_npm)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
+        <mxCell id="n_cleanup" value="&lt;b&gt;Persist + Cleanup&lt;/b&gt;&lt;br&gt;Upsert Package/Version, Scan, Findings, FileHash&lt;br&gt;Bump RuleHit counters&lt;br&gt;Remove temp dirs (pkgward_npm)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#bdbdbd;dashed=1;dashPattern=8 4;fontColor=#757575;" vertex="1" parent="1">
           <mxGeometry x="400" y="3520" width="420" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="e_discord_cleanup" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#bdbdbd;" edge="1" source="n_discord" target="n_cleanup" parent="1">

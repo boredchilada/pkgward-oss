@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-_RULES_ROOT = Path(__file__).resolve().parent.parent.parent / "pkgsentry" / "intel" / "baseline" / "opengrep"
+_RULES_ROOT = Path(__file__).resolve().parent.parent.parent / "pkgward" / "intel" / "baseline" / "opengrep"
 
 
 def _opengrep_bin() -> str | None:

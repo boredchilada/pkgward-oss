@@ -1,4 +1,4 @@
-# pkgsentry Detection Rules Reference
+# pkgward Detection Rules Reference
 
 Complete catalog of every detection rule, organized by layer. Each rule produces a `Finding` with a unique `rule_id`, severity, and confidence.
 
@@ -38,8 +38,10 @@ Source: `analyze/iocs.py`
 | `iocs.ipv4` | low | low | Non-private/non-reserved IPv4 literal |
 | `iocs.hardcoded_wan_ip_port` | high | medium | A routable IPv4 literal with an explicit `:port` (C2-beacon shape) — excludes private/loopback/link-local/doc ranges and public DNS resolvers. Malware hardcodes IP+port to dodge DNS/sinkholes |
 | `iocs.cloud_metadata_endpoint` | medium | high | Cloud metadata SSRF / credential-theft endpoint (`169.254.169.254` AWS IMDS, `169.254.170.2` ECS task-role) — flagged despite the link-local skip |
-| `iocs.encoded_url` | medium | medium | A non-benign URL found inside a decoded base64 / hex / `\xNN` blob — deliberate concealment |
-| `iocs.encoded_ip` | high | medium | A routable / C2 / cloud-metadata IP found inside a decoded base64 / hex / `\xNN` blob |
+| `iocs.encoded_url` | medium | medium | A non-benign URL found inside a decoded blob — single-layer base64 / hex / `\xNN`, **or** a multi-layer chain recovered by the recursive decode engine (b64→gzip→b64, …) |
+| `iocs.encoded_ip` | high | medium | A routable / C2 / cloud-metadata IP found inside a decoded blob (single- or multi-layer) |
+| `iocs.decoded_executable` | critical | high | Source decodes a hidden native executable (PE/ELF/Mach-O) or shebang script through a base64/compression chain — dropper shape. Via the recursive decode engine (`analyze/decode_engine.py`, `recover()`) |
+| `iocs.decoded_code` | high | medium | Executable code (eval/exec/child_process/socket …) recovered through a **≥2-layer** decode chain — concealed payload behind nested encoding |
 | `iocs.onion` | high | high | Tor .onion address |
 | `iocs.oast_callback` | high | high | URL host is a known out-of-band-interaction / request-capture service (oastify.com, interact.sh, oast.*, burpcollaborator.net, webhook.site, requestbin, dnslog.cn, canarytokens, …) — near-certain exfil/C2 at install time. Also fires on a **bare/concatenated** OAST-domain literal (`'http://'+x+'.oastify.com'`) the full-URL matcher misses |
 | `iocs.abuse_hosting_callback` | medium | high | URL host is an abuse-prone serverless/tunnel/paste service (`workers.dev`, `pages.dev`, `trycloudflare`, `ngrok`, `deno.dev`, …) — favored for C2 because it inherits a big provider's trusted IPs |
@@ -146,7 +148,7 @@ Rules analyze Go source files and go.mod. The `init_*` rules extract the actual 
 | `gomod.cgo_import` | medium | medium | `import "C"` (compiles C code at build time) |
 | `gomod.unsafe_import` | low | medium | `import "unsafe"` |
 | `gomod.encoded_payload` | medium | medium | Large base64/hex payload in Go source |
-| `gomod.replace_local_path` | high | high | `go.mod` replace pointing to local filesystem |
+| `gomod.replace_local_path` | low | high | `go.mod` replace pointing to a local path. Informational: Go ignores `replace` in dependency modules, so it's inert downstream (monorepo/dev artifact); escalates only when paired with a real behavioral chain |
 | `gomod.replace_directive` | medium | high | `go.mod` replace pointing to remote target |
 
 ## Layer 6c: npm lifecycle scripts
@@ -170,12 +172,13 @@ followed and scanned for network + `child_process`/eval.
 | `installer.npm_install_script_decode_exec` | high | medium | Referenced install `.js` base64-decodes then executes |
 | `installer.npm_install_script_encoded_payload` | medium | medium | Large encoded payload in referenced install `.js` |
 | `installer.npm_install_remote_binary_drop` | high/low | high/medium | Install `.js` downloads → writes → chmod-executes a binary. **high** when the download host is unrelated to the package's declared repo/homepage and isn't a known release host (GitHub/githubusercontent/npm registry/nodejs.org/…); **medium** when the URL is built dynamically; **low** when the script also SHA-256/512-verifies the download (the legit prebuilt-binary pattern — esbuild/swc/native-wrapper). On the low/verified case, the detonation re-score also recognizes an install-time connect to that same vendor host as the legit self-download, so `dyn_install_exfil` to it won't chain to malicious |
-| `installer.npm_url_dependency` | high/medium | high | A dependency spec is a raw tarball **URL** (not a registry range). high on a suspicious file host (cloud bucket / abuse host / paste site — the dependency-confusion delivery shape); medium otherwise. For suspicious hosts the second-stage tarball is fetched + statically analyzed (see `PKGSENTRY_FETCH_URL_DEPS`) |
+| `installer.npm_url_dependency` | high/medium | high | A dependency spec is a raw tarball **URL** (not a registry range). high on a suspicious file host (cloud bucket / abuse host / paste site — the dependency-confusion delivery shape); medium otherwise. For suspicious hosts the second-stage tarball is fetched + statically analyzed (see `PKGWARD_FETCH_URL_DEPS`) |
 | `installer.npm_install_host_recon` | medium | medium | Install script/JS gathers host info (`os.hostname`/`userInfo`, `whoami`/`uname`/`id -un`) |
 | `installer.npm_install_network_recon` | medium | medium | Install script/JS enumerates network interfaces / internal IPs (`os.networkInterfaces`, `ifconfig`/`ipconfig`) |
 | `installer.npm_install_ci_secret_harvest` | high | medium | Install script/JS reads CI/registry secrets (`GITHUB_TOKEN`/`ACTOR`/`REPOSITORY`, `NPM_TOKEN`, `CIRCLECI`/`JENKINS_URL`/`GITLAB_CI`) |
 | `installer.npm_install_recon_exfil` | high | high | Recon (host/network/secret) co-occurs with a network send in an install hook — the recon→exfil chain |
 | `installer.npm_install_obfuscated_entrypoint` | critical | high | A lifecycle hook runs a local script that self-decodes (char-code / runtime-crypto `createDecipheriv`) into `eval`/`Function`. Behavioral-chain → malicious. Catches the `@redhat-cloud-services` worm's `preinstall: node index.js` (Caesar→AES→eval), invisible to the net/base64 rules because the payload is encoded |
+| `installer.npm_runtime_obfuscated_entrypoint` | critical | high | The package's own `main` or a `bin` entry **is** a self-decoding eval loader (char-code / runtime-crypto → `eval`/`Function`) — the runtime-time twin of the install-hook rule above, for payloads that fire at `require()`/CLI time rather than install. Behavioral-chain → malicious. Reuses the obfuscation analyzer's proximity + build-bundle discriminators so a minified `dist` bundle declared as `main` doesn't FP. Catches `turbo-dls` 1.3.5 (`main: gifted.js`), which has no lifecycle hooks at all |
 | `installer.npm_install_persistence_loader` | critical | high | A lifecycle hook registers **OS persistence** (systemd `--user` unit / launchd `.plist` / Windows Run-key·`.vbs` / XDG autostart / cron) **and** spawns a **detached, unref'd** background process — the resident-agent loader fingerprint. Behavioral-chain → malicious. Catches the `logger-active`/`utils-terminal` stealer family at the loader, independent of the payload's YARA signature |
 | `installer.npm_install_persistence` | high | high | Lifecycle hook registers OS persistence (above), without the detached-spawn half |
 | `installer.npm_install_detached_spawn` | high | medium | Lifecycle hook spawns a detached, unref'd background process (keeps a dropped payload resident after install exits) |
@@ -183,15 +186,20 @@ followed and scanned for network + `child_process`/eval.
 
 ## Layer 7: YARA signature matching (all ecosystems)
 
-Source: `analyze/yara_scan.py` + baseline rules in `pkgsentry/intel/baseline/yara/`.
+Source: `analyze/yara_scan.py` + baseline rules in `pkgward/intel/baseline/yara/`.
 
 Rule IDs are emitted as `yara.{rule_name}`; severity/confidence come from each rule's
-YARA metadata. The baseline ships community signatures (adapted from
+YARA metadata. Rules are **one per `.yar` file** (the file name matches the rule name);
+the loader globs every `*.yar` in each pack directory, so the groupings below are
+logical, not per-file. The baseline ships community signatures (adapted from
 [Neo23x0/signature-base](https://github.com/Neo23x0/signature-base) under their own
-licenses — see `NOTICE`) plus a small first-party rule. Operators add their own
-private YARA via `$PKGSENTRY_INTEL_PATH/yara/`, UNION-merged over the baseline at load.
+licenses — see `NOTICE`) plus a first-party set of **technique-level** rules covering
+all four ecosystems (self-decoding loaders, the crates.io `build.rs` surface, npm
+install-time exfil, supply-chain mismatch patterns). Campaign- and family-specific
+rules are not shipped here — operators add those via the private overlay
+(`$PKGWARD_INTEL_PATH/yara/`), UNION-merged over the baseline at load.
 
-### community_sigbase.yar (11 rules)
+### Community signatures — `sigbase_*` / `community_*` (11 rules)
 
 | rule_id | Sev | Conf | What it detects |
 |---------|-----|------|-----------------|
@@ -207,11 +215,55 @@ private YARA via `$PKGSENTRY_INTEL_PATH/yara/`, UNION-merged over the baseline a
 | `yara.community_dyndns_c2` | medium | medium | Dynamic DNS domain for C2 |
 | `yara.community_ip_lookup_recon` | low | medium | External IP lookup service (recon) |
 
-### python_baseline.yar (1 rule)
+### Baseline Python rules (5 rules)
 
 | rule_id | Sev | Conf | What it detects |
 |---------|-----|------|-----------------|
 | `yara.base64_exec_chain` | high | high | Base64 decode piped to `exec`/`eval` |
+| `yara.staged_subprocess_shell` | high | medium | Downloads content then runs it via `subprocess(..., shell=True)` |
+| `yara.reverse_shell_pattern` | critical | high | Python reverse shell — `socket.socket(`+`.connect(` with `dup2`+`fileno`, `pty.spawn`, or `subprocess`+`/bin/sh` |
+| `yara.ssh_key_exfiltration` | critical | high | Reads SSH private keys (`.ssh/id_*`) and sends them to a network sink |
+| `yara.dns_exfiltration` | high | medium | DNS-based data exfil — resolver/`getaddrinfo` + encode + sensitive-data source |
+
+### Baseline Rust rules (6 rules — crates.io `build.rs` surface)
+
+| rule_id | Sev | Conf | What it detects |
+|---------|-----|------|-----------------|
+| `yara.rust_buildrs_network_exec` | critical | high | `build.rs` has both a network crate (`reqwest`/`ureq`/`hyper`/`attohttpc`) and command execution |
+| `yara.rust_buildrs_env_harvest` | high | high | `build.rs` reads 3+ sensitive env vars (SSH/AWS/GH/cargo-registry tokens, `PRIVATE_KEY`, `DATABASE_URL`) |
+| `yara.rust_buildrs_outdir_escape` | high | medium | `build.rs` writes to paths outside `OUT_DIR` (`/`, `$HOME`, `/tmp`) |
+| `yara.rust_obfuscated_include_bytes` | high | medium | `include_bytes!` of an `.exe`/`.dll`/`.so`/`.sh`/`.ps1` |
+| `yara.rust_encoded_payload_buildrs` | medium | medium | Large base64/hex-encoded payload in `build.rs` |
+| `yara.rust_typosquat_indicator` | medium | low | Crate name resembles a popular-crate typosquat (`serde_jsom`, `tokiio`, `reqwests`, …) |
+
+### Self-decoding loader family (3 rules)
+
+Char-code / crypto / self-referential reconstruction feeding `eval` — packers that hide
+the payload until runtime. Companion to the static `obfuscation.charcode_eval` analyzer
+and the `installer.npm_runtime_obfuscated_entrypoint` chain rule (Layer 6c).
+
+| rule_id | Sev | Conf | What it detects |
+|---------|-----|------|-----------------|
+| `yara.caesar_charcode_eval` | critical | high | Charcode array decoded via ROT/Caesar then `eval` (TeamPCP `.pth` bun dropper `_index.js`) |
+| `yara.xor_self_referencing_eval` | critical | high | XOR key derived from a function's own `toString()` feeding `eval` (turbo-btns anti-tamper packer) |
+| `yara.aes_gcm_hardcoded_eval` | critical | high | AES-GCM decrypt with a hardcoded hex key/IV feeding `eval` (TeamPCP `.pth` stage-1) |
+
+### Supply-chain pattern rules (4 rules)
+
+| rule_id | Sev | Conf | What it detects |
+|---------|-----|------|-----------------|
+| `yara.npm_install_base64_domain_exfil` | critical | high | npm install hook base64-decodes a domain and sends recon data (fhirproxy-utils pattern) |
+| `yara.pth_bun_dropper` | critical | high | Python `.pth` startup file downloads + executes the Bun JS runtime (TeamPCP / Mini Shai-Hulud) |
+| `yara.cross_ecosystem_python_in_go` | high | medium | Go module shipping Python source + `setup.py` + a runtime exec framework — cross-ecosystem mismatch |
+| `yara.pyarmor_suspicious_deps` | high | medium | `setup.py` bundles PyArmor's pytransform alongside stealer-associated deps (boto3/cryptography/requests/psutil) — flags for review |
+
+### Behavioral evasion rules (3 rules)
+
+| rule_id | Sev | Conf | What it detects |
+|---------|-----|------|-----------------|
+| `yara.evasion_workflow_secrets_exfil` | critical | high | GitHub Actions workflow serializes ALL repo secrets (`toJSON(secrets)`) and writes/uploads them — CI secret-exfil (IronWorm / Shai-Hulud second path) |
+| `yara.evasion_anti_ci_payload_gate` | high | medium | Payload gated to run only *outside* CI/analysis (negated `if(!CI)` / `not GITHUB_ACTIONS`) around a live network/exec sink — sandbox-evasion gating |
+| `yara.evasion_media_stego_loader` | high | high | Steganographic media loader: reads audio/image frame bytes, base64/XOR-decodes, pipes the result into an interpreter — media-parse + decode + exec chain |
 
 ## Layer 8: Version diff (all ecosystems)
 
@@ -234,6 +286,31 @@ Source: `analyze/threat_intel.py`
 
 The baseline ships **no** fingerprints (`hashes/known_malicious.jsonl` is empty). Campaign rows appear under `intel.{campaign}` only when an intel pack that provides fingerprints is loaded; the campaign name is substituted from that pack.
 
+## Layer 9b: Known-malicious dependency intel (npm + pypi)
+
+Source: `analyze/dep_intel.py` (scan-time finding) + `known_bad_deps.py` (data) +
+the npm ingest gate in `ecosystems/npm/ingest/{anomaly.py,cursor.py}`.
+
+When a package is double-confirmed malicious it lands on the auto-watchlist (sentinel
+rank). A *different* package that declares a dependency on one of those confirmed-bad
+names is itself suspect — compromised, complicit, or a victim pulling the payload in.
+This follows the malice along the dependency edge, a different axis than file
+fingerprints (Layer 9), name re-catch (auto-watchlist), or namespace (scope-watch).
+
+| rule_id | Sev | Conf | What it detects |
+|---------|-----|------|-----------------|
+| `dep_intel.depends_on_known_malicious` | critical | high | A dependency on a confirmed-malicious same-ecosystem package that is **newly added** in this version (the inject moment) |
+| `dep_intel.depends_on_known_malicious` | high | high | A pre-existing dependency on a confirmed-malicious same-ecosystem package |
+
+The check is per-ecosystem (a known-bad npm name never matches a pypi dep — avoids
+name-collision FPs) and covers npm + pypi at scan time (the ecosystems whose
+`requires_dist` is populated). It is a **scan trigger + weighted evidence, not a
+verdict** — a single critical caps at the per-category 30 points, landing *suspicious*
+(LLM triage adjudicates), never auto-malicious; this deliberately avoids a
+self-confirming convict loop. On **npm ingest**, the same signal force-scans a
+normally-skipped version-update at high priority the moment it adds a bad-dep edge,
+so the catch isn't lost in the npm backlog. `KNOWN_BAD_DEPS_GATE=0` disables.
+
 ## Layer 12: opengrep static analysis (all ecosystems)
 
 Source: `analyze/opengrep_scan.py`
@@ -251,8 +328,8 @@ that the regex-based `crates/build_rs.py` and AST-based
 * `OPENGREP_SHADOW=0` — findings emit as `opengrep.<id>` and enter scoring.
   The legacy install-time analyzers for PyPI and Crates are skipped.
 
-Rules ship in `pkgsentry/intel/baseline/opengrep/{python,rust,go,javascript}/`. Operators
-add private rules via `$PKGSENTRY_INTEL_PATH/opengrep/<lang>/*.yaml`. UNION
+Rules ship in `pkgward/intel/baseline/opengrep/{python,rust,go,javascript}/`. Operators
+add private rules via `$PKGWARD_INTEL_PATH/opengrep/<lang>/*.yaml`. UNION
 merge semantics, identical to YARA dirs. Each rule directory ships co-located
 `opengrep --test` fixtures (`<id>.{py,rs,go,js}`); run `tools/test_opengrep_rules.sh`.
 
@@ -270,7 +347,7 @@ Baseline rule set (11 rules, deliberately small):
 | `opengrep.init_env_to_net` | high | high | Go: sensitive env var inside init() tainted into network |
 | `opengrep.js_net_to_exec` | critical | high | JS/TS: net response tainted into child_process/eval/Function |
 | `opengrep.js_decode_to_exec` | high | high | JS/TS: base64-decoded data tainted into eval/Function/exec |
-| `opengrep.js_env_to_net` | high | medium | JS/TS: `process.env` secrets tainted into a network call |
+| `opengrep.js_env_to_net` | high | medium | JS/TS: a **credential-named** `process.env` read (token/key/secret/…) tainted into a network call. Source is name-filtered to secrets — a bare `process.env` or non-secret var (PORT/NODE_ENV) is no longer a source (was a 2% precision firehose). |
 
 ## Layer 10: Dynamic analysis / detonation (all ecosystems)
 
@@ -351,9 +428,10 @@ raising file entropy). Scans install-reachable source (`.js/.mjs/.cjs/.ts/.py`�
 | `obfuscation.homoglyph_identifiers` | medium | medium | >=1 confusable identifier after stripping strings + comments: a token mixing ASCII Latin with Cyrillic/Greek (`rеquests` with a Cyrillic `е`) or containing fullwidth-Latin. Requires the *mix* (or fullwidth) so legit pure-Cyrillic (Russian) / pure-Greek (scientific `α`/`β`) identifiers don't false-positive |
 | `obfuscation.charcode_eval` | high | high | A char-code decode (`String.fromCharCode` / `.charCodeAt` / a long decimal `[n,n,…]` array) feeding `eval`/`Function` (JS self-decoding packer — the `@redhat-cloud-services` worm layer 1) |
 | `obfuscation.decrypt_then_exec` | high | high | A runtime crypto-decrypt (`createDecipheriv`) feeding `eval`/`Function` (staged self-decoding payload — the worm's AES-128-GCM stage) |
+| `obfuscation.rot_cipher_eval` | high | high | A ROT/Caesar-cipher wrapper (`.replace(/[a-zA-Z]/, …charCodeAt…%26…)`) decoding its payload at runtime then feeding `eval` (the Mini Shai-Hulud letter-rotation loader) |
 
-The alphabet/CJK passes scan files up to `PKGSENTRY_OBFUSCATION_MAX_MB` (10); the
-cheap `eval`+charcode/crypto packer scan runs up to `PKGSENTRY_OBFUSCATION_PACKER_MAX_MB`
+The alphabet/CJK passes scan files up to `PKGWARD_OBFUSCATION_MAX_MB` (10); the
+cheap `eval`+charcode/crypto packer scan runs up to `PKGWARD_OBFUSCATION_PACKER_MAX_MB`
 (32), so a multi-MB hand-packed install file isn't skipped.
 
 ---
@@ -365,6 +443,7 @@ canonical list is `intel/baseline/behavioral_chains.toml` (overlay-extendable):
 
 - `installer.urlopen_exec_chain`
 - `installer.npm_install_obfuscated_entrypoint`
+- `installer.npm_runtime_obfuscated_entrypoint`
 - `installer.npm_install_persistence_loader`
 - `imports.network_subprocess_chain`
 - `malware.deobfuscation_exec_chain`
@@ -401,16 +480,16 @@ canonical list is `intel/baseline/behavioral_chains.toml` (overlay-extendable):
 
 ## Adding custom rules
 
-**YARA rules:** Drop `.yar` files into `pkgsentry/yara_rules/`. Rules compile at container startup. Use YARA metadata fields `severity` and `confidence` to control scoring. Rule name becomes `yara.{rule_name}`.
+**YARA rules:** Add `.yar` files to an intel pack's `yara/` directory — `pkgward/intel/baseline/yara/` for the shipped baseline, or your private overlay's `yara/` dir loaded via `PKGWARD_INTEL_PATH` (UNION-merged over baseline). Rules compile at process start. Use YARA metadata fields `severity` and `confidence` to control scoring. Rule name becomes `yara.{rule_name}`.
 
-**Threat intel hashes:** Add entries to the `ThreatIntelHash` table via `python -m pkgsentry.store.seed_intel` or direct DB insert. Fields: `sha256`, `ssdeep`, `tlsh`, `campaign`, `source`.
+**Threat intel hashes:** Add entries to the `ThreatIntelHash` table via `python -m pkgward.store.seed_intel` or direct DB insert. Fields: `sha256`, `ssdeep`, `tlsh`, `campaign`, `source`.
 
 ## Counts
 
 | Category | Count |
 |----------|-------|
-| Static rule IDs | ~72 |
-| YARA rules (baseline, via `yara.{name}`) | 12 |
-| Dynamic sandbox rules | 12 (2 dormant) |
+| Static rule IDs | ~77 |
+| YARA rules (baseline, via `yara.{name}`) | 32 |
+| Dynamic sandbox rules | 14 (2 dormant) |
 | Threat intel (via `intel.{campaign}`) | 0 in baseline; added by a loaded intel pack |
-| **Total distinct rule IDs (baseline)** | **~96** |
+| **Total distinct rule IDs (baseline)** | **~120** |

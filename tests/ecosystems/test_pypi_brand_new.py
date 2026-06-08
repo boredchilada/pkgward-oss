@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pkgsentry.ecosystems.pypi.ingest.feeds import (
+from pkgward.ecosystems.pypi.ingest.feeds import (
     parse_feed,
     parse_new_package_names,
 )
@@ -82,9 +82,9 @@ def test_cursor_brand_new_create_tracked_before_version_check(sqlite_engine, mon
     """A 'create' event (version=None) must populate _created_in_batch
     so the subsequent 'new release X' event for the same package is
     recognized as brand-new."""
-    from pkgsentry.ecosystems.pypi.ingest import cursor
-    from pkgsentry.store import session as sess
-    from pkgsentry.store.models import ScanQueue, ScanCursor
+    from pkgward.ecosystems.pypi.ingest import cursor
+    from pkgward.store import session as sess
+    from pkgward.store.models import ScanQueue, ScanCursor
 
     # Wire test DB
     monkeypatch.setattr(sess, "_engine", sqlite_engine)
@@ -119,9 +119,9 @@ def test_cursor_brand_new_create_tracked_before_version_check(sqlite_engine, mon
 def test_cursor_create_alone_does_not_enqueue(sqlite_engine, monkeypatch):
     """A 'create' event with no subsequent release should NOT enqueue
     (we have no version to scan yet)."""
-    from pkgsentry.ecosystems.pypi.ingest import cursor
-    from pkgsentry.store import session as sess
-    from pkgsentry.store.models import ScanQueue, ScanCursor
+    from pkgward.ecosystems.pypi.ingest import cursor
+    from pkgward.store import session as sess
+    from pkgward.store.models import ScanQueue, ScanCursor
 
     monkeypatch.setattr(sess, "_engine", sqlite_engine)
     from sqlalchemy.orm import sessionmaker
@@ -147,9 +147,9 @@ def test_cursor_create_alone_does_not_enqueue(sqlite_engine, monkeypatch):
 def test_cursor_non_watchlist_version_update_skipped(sqlite_engine, monkeypatch):
     """Existing non-watchlist package publishing a new version (no preceding
     create in same batch) should be skipped — that's the gate."""
-    from pkgsentry.ecosystems.pypi.ingest import cursor
-    from pkgsentry.store import session as sess
-    from pkgsentry.store.models import ScanQueue, ScanCursor
+    from pkgward.ecosystems.pypi.ingest import cursor
+    from pkgward.store import session as sess
+    from pkgward.store.models import ScanQueue, ScanCursor
 
     monkeypatch.setattr(sess, "_engine", sqlite_engine)
     from sqlalchemy.orm import sessionmaker

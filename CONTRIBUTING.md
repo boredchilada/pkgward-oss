@@ -1,19 +1,19 @@
-# Contributing to pkgsentry
+# Contributing to pkgward
 
-Thanks for considering a contribution. pkgsentry catches supply-chain malware in package registries — the more eyes on the engine, the harder it is for attackers to hide.
+Thanks for considering a contribution. pkgward catches supply-chain malware in package registries — the more eyes on the engine, the harder it is for attackers to hide.
 
 ## Ground rules
 
 - **DCO required.** Every commit must carry a `Signed-off-by:` trailer (`git commit -s`). See [DCO](#dco-developer-certificate-of-origin) below. PRs without DCO are blocked by the [probot/dco](https://github.com/apps/dco) bot.
 - **No PII in test fixtures or examples.** Use synthetic data. If you're adding a new YARA rule with a real-world reference, cite the public writeup (Phylum / ReversingLabs / Unit42 / etc.); don't paste live credentials or attribution-stripped malware samples.
 - **No hardcoded secrets.** Use env vars + `.env.example`. The repo has `gitleaks` running in pre-commit; commits with secret-like strings will fail to push.
-- **No private intel content in baseline.** The public baseline pack (`pkgsentry/intel/baseline/`) ships generic, publicly-derivable detection content. Operator-tuned content — full IOC whitelists, complete keyword categories, threat-intel hash seeds, tuned scoring thresholds — belongs in a private overlay pack loaded via `PKGSENTRY_INTEL_PATH`, not in this repo.
+- **No private intel content in baseline.** The public baseline pack (`pkgward/intel/baseline/`) ships generic, publicly-derivable detection content. Operator-tuned content — full IOC whitelists, complete keyword categories, threat-intel hash seeds, tuned scoring thresholds — belongs in a private overlay pack loaded via `PKGWARD_INTEL_PATH`, not in this repo.
 
 ## Development setup
 
 ```bash
-git clone https://github.com/boredchilada/pkgsentry-oss
-cd pkgsentry-oss
+git clone https://github.com/boredchilada/pkgward-oss
+cd pkgward-oss
 
 # Python env
 python -m venv .venv
@@ -30,12 +30,33 @@ pre-commit install
 cd detonation && go test ./... && go build ./...
 ```
 
+### Auditing our own dependencies
+
+The scanner audits its own Python dependency tree for drift + known CVEs (via
+[piptastic](https://github.com/boredchilada/piptastic), which wraps `pip-audit`):
+
+```bash
+bash tools/audit-deps.sh                 # human-readable drift + CVE table
+bash tools/audit-deps.sh --format sarif  # SARIF, for CI / GitHub code scanning
+```
+
+It runs in a throwaway scanner-image container against the tree mounted read-only —
+nothing is installed on the host. Keep it at zero CVEs; bump a flagged pin to its
+`min safe` version and re-run the suite before committing.
+
+CI also runs this audit (`.github/workflows/audit-deps.yml`) on a weekly schedule, on
+manual dispatch, and on PRs that touch `pyproject.toml` / `requirements.txt` — so a
+newly-disclosed CVE in a pinned dep gets surfaced even without a code change. It is
+**non-blocking**: findings appear in the run summary but never fail a PR or the branch
+(fix them in a follow-up). The CI job installs piptastic directly on the runner rather
+than via the scanner image, which isn't built in CI.
+
 ## How to add an analyzer
 
-Analyzers live in `pkgsentry/analyze/`. Each is a module exporting a single `analyze_<name>(extracted_root: Path, changed_files: set[str] | None) -> list[Finding]` function:
+Analyzers live in `pkgward/analyze/`. Each is a module exporting a single `analyze_<name>(extracted_root: Path, changed_files: set[str] | None) -> list[Finding]` function:
 
 ```python
-from pkgsentry.adapter import Finding
+from pkgward.adapter import Finding
 
 CATEGORY = "<category>"
 
@@ -59,11 +80,11 @@ def analyze_<name>(extracted_root, changed_files=None):
     return findings
 ```
 
-Wire the analyzer into the pipeline at `pkgsentry/pipeline.py::_run_analyzers`. Add a unit test under `tests/analyze/` that exercises both positive and negative cases. Aim for finding-level high confidence; false-positive sensitivity matters more than coverage.
+Wire the analyzer into the pipeline at `pkgward/pipeline.py::_run_analyzers`. Add a unit test under `tests/analyze/` that exercises both positive and negative cases. Aim for finding-level high confidence; false-positive sensitivity matters more than coverage.
 
 ## How to add a YARA rule
 
-Public, well-documented patterns belong in `pkgsentry/intel/baseline/yara/python_baseline.yar` (or `rust_baseline.yar`). Rule template:
+Public, well-documented patterns belong in `pkgward/intel/baseline/yara/`, **one rule per `.yar` file** named after the rule (the loader globs every `*.yar`). Rule template:
 
 ```yara
 rule <rule_name>
@@ -90,7 +111,7 @@ Submit a fixture sample under `tests/fixtures/yara/<rule_name>/` with at least o
 
 ## How to propose intel-pack schema changes
 
-The intel pack format is defined in `pkgsentry/intel/pack.py` and validated in `pkgsentry/intel/schema.py`. Schema changes need:
+The intel pack format is defined in `pkgward/intel/pack.py` and validated in `pkgward/intel/schema.py`. Schema changes need:
 
 1. A backwards-compatible migration story for existing private overlays
 2. Schema docs in `docs/intel-pack.md`
@@ -120,7 +141,7 @@ Full DCO text: [developercertificate.org](https://developercertificate.org).
 ## Reporting bugs
 
 For non-security bugs, open a GitHub issue with:
-- pkgsentry version (`pkgsentry --version`)
+- pkgward version (`pip show pkgward`)
 - Python / Go versions if relevant
 - Steps to reproduce
 - Expected vs actual behavior

@@ -3,8 +3,8 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pkgsentry"
-version = "0.5.2"
+name = "pkgward"
+version = "0.5.3"
 description = "Multi-ecosystem supply-chain malware scanner for PyPI, crates.io, Go modules, and npm."
 requires-python = ">=3.11"
 readme = "README.md"
@@ -28,7 +28,7 @@ classifiers = [
 dependencies = [
     "sqlalchemy==2.0.23",
     "psycopg2-binary>=2.9",
-    "httpx==0.27.2",
+    "httpx==0.28.1",
     "apscheduler==3.10.4",
     "typer==0.25.1",
     "structlog==24.4.0",
@@ -41,24 +41,24 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest==8.3.3",
-    "pytest-asyncio==0.24.0",
-    "pytest-httpx==0.32.0",
-    "black==24.8.0",
+    "pytest==9.0.3",
+    "pytest-asyncio==1.4.0",
+    "pytest-httpx==0.36.2",
+    "black==26.3.1",
     "ruff==0.6.9",
 ]
 
 [project.scripts]
-pkgsentry = "pkgsentry.cli:app"
+pkgward = "pkgward.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/boredchilada/pkgsentry-oss"
-Repository = "https://github.com/boredchilada/pkgsentry-oss"
-"Bug Tracker" = "https://github.com/boredchilada/pkgsentry-oss/issues"
-Changelog = "https://github.com/boredchilada/pkgsentry-oss/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/boredchilada/pkgward-oss"
+Repository = "https://github.com/boredchilada/pkgward-oss"
+"Bug Tracker" = "https://github.com/boredchilada/pkgward-oss/issues"
+Changelog = "https://github.com/boredchilada/pkgward-oss/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
-include = ["pkgsentry*"]
+include = ["pkgward*"]
 
 [tool.ruff]
 line-length = 100

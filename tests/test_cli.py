@@ -3,7 +3,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from pkgsentry.cli import app
+from pkgward.cli import app
 
 runner = CliRunner()
 
@@ -20,8 +20,8 @@ def test_help():
 
 def test_init_db_creates_file(tmp_path: Path, monkeypatch):
     url = f"sqlite:///{tmp_path/'cli.db'}"
-    monkeypatch.setenv("PKGSENTRY_DB_URL", url)
-    from pkgsentry.store import session as sess
+    monkeypatch.setenv("PKGWARD_DB_URL", url)
+    from pkgward.store import session as sess
     sess.reset_engine()
     r = runner.invoke(app, ["init-db"])
     assert r.exit_code == 0, r.stdout

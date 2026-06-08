@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from pkgsentry.ecosystems.pypi.fetch.extract import (
+from pkgward.ecosystems.pypi.fetch.extract import (
     ExtractionError,
     safe_extract,
 )
@@ -86,7 +86,7 @@ def test_reject_total_size(tmp_path):
 
 def test_safe_extract_crate_tarball(tmp_path):
     """A .crate file (gzipped tarball) is recognized and extracted."""
-    from pkgsentry.util.extract import safe_extract
+    from pkgward.util.extract import safe_extract
 
     # Create a fake .crate archive
     crate_dir = tmp_path / "build"

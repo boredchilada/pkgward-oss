@@ -1,13 +1,13 @@
-# Authoring opengrep rules for pkgsentry
+# Authoring opengrep rules for pkgward
 
-The opengrep layer (`pkgsentry/analyze/opengrep_scan.py`) runs the [opengrep](https://github.com/opengrep/opengrep) binary against every extracted package and converts each match into a pkgsentry `Finding`. This guide explains how to write new rules — both for the public baseline and for private overlays.
+The opengrep layer (`pkgward/analyze/opengrep_scan.py`) runs the [opengrep](https://github.com/opengrep/opengrep) binary against every extracted package and converts each match into a pkgward `Finding`. This guide explains how to write new rules — both for the public baseline and for private overlays.
 
 ## Where rules live
 
 | Tree | Path | Audience | License |
 |------|------|----------|---------|
-| Baseline (ships with the engine) | `pkgsentry/intel/baseline/opengrep/{python,rust,go,javascript}/*.yaml` | Public OSS users | Apache-2.0 |
-| Private overlay (operator-supplied) | `$PKGSENTRY_INTEL_PATH/opengrep/{python,rust,go,javascript}/*.yaml` | Single deployment | Operator's choice |
+| Baseline (ships with the engine) | `pkgward/intel/baseline/opengrep/{python,rust,go,javascript}/*.yaml` | Public OSS users | Apache-2.0 |
+| Private overlay (operator-supplied) | `$PKGWARD_INTEL_PATH/opengrep/{python,rust,go,javascript}/*.yaml` | Single deployment | Operator's choice |
 
 The two directories are **UNION-merged** at process start — same semantics as the YARA dirs. Both sets of rules run on every scan; baseline rules are not replaced by overlay rules, they coexist. Rule IDs must be globally unique across both sets.
 
@@ -15,7 +15,7 @@ opengrep itself walks each rule directory recursively for `*.yaml` and `*.yml`. 
 
 ## Anatomy of a rule
 
-Every pkgsentry opengrep rule is a YAML document with a `rules:` list. Most files ship a single rule; multi-rule files are allowed but harder to read.
+Every pkgward opengrep rule is a YAML document with a `rules:` list. Most files ship a single rule; multi-rule files are allowed but harder to read.
 
 ```yaml
 rules:
@@ -26,10 +26,10 @@ rules:
     languages: [python]                  # python | rust | go | javascript ([js, ts]) | generic
     severity: ERROR                      # opengrep's own scale: ERROR | WARNING | INFO
     metadata:
-      severity: critical                 # pkgsentry scale: low | medium | high | critical
-      confidence: high                   # pkgsentry scale: low | medium | high
+      severity: critical                 # pkgward scale: low | medium | high | critical
+      confidence: high                   # pkgward scale: low | medium | high
       category: installer                # category label for grouping in scoring
-      pkgsentry_layer: opengrep          # convention; lets you filter rules by source
+      pkgward_layer: opengrep          # convention; lets you filter rules by source
     pattern-sources:
       - patterns:
           - pattern-either:
@@ -46,16 +46,16 @@ rules:
 
 | Field | Why |
 |-------|-----|
-| `id` | Becomes the `rule_id` after pkgsentry prefixing (`opengrep.<id>` or `opengrep.shadow_<id>`). Use snake_case. Keep it descriptive — it shows up in alerts, DB rows, and Discord messages. |
+| `id` | Becomes the `rule_id` after pkgward prefixing (`opengrep.<id>` or `opengrep.shadow_<id>`). Use snake_case. Keep it descriptive — it shows up in alerts, DB rows, and Discord messages. |
 | `message` | Becomes the `evidence` string on the Finding. Operator-facing. Be concrete about what the rule fires on. |
-| `languages` | `[python]`, `[rust]`, `[go]`, `[javascript]` (use `[js, ts]` to cover TypeScript too), or `[generic]` for textual/regex rules. pkgsentry scans four ecosystems — PyPI (Python), crates.io (Rust), Go modules, and npm (JavaScript/TypeScript). |
+| `languages` | `[python]`, `[rust]`, `[go]`, `[javascript]` (use `[js, ts]` to cover TypeScript too), or `[generic]` for textual/regex rules. pkgward scans four ecosystems — PyPI (Python), crates.io (Rust), Go modules, and npm (JavaScript/TypeScript). |
 | `severity` (top-level) | opengrep's required field. Use `ERROR` for the most serious findings; opengrep filters by this when run with `--severity` flags (we don't, but it's still required). |
-| `metadata.severity` | **The pkgsentry-side severity.** Maps to scoring points: `low=1`, `medium=8`, `high=25`, `critical=60`. This is what actually drives the verdict. |
+| `metadata.severity` | **The pkgward-side severity.** Maps to scoring points: `low=1`, `medium=8`, `high=25`, `critical=60`. This is what actually drives the verdict. |
 | `metadata.confidence` | `low`, `medium`, `high`. Currently surfaced for analyst triage; doesn't change scoring math. |
 
 ### Severity normalization (what happens if you omit `metadata.severity`)
 
-`pkgsentry/analyze/opengrep_scan.py:_normalize_severity` falls back to opengrep's top-level `severity:` if `metadata.severity` is missing or invalid:
+`pkgward/analyze/opengrep_scan.py:_normalize_severity` falls back to opengrep's top-level `severity:` if `metadata.severity` is missing or invalid:
 
 - `ERROR` → `high`
 - `WARNING` → `medium`
@@ -124,7 +124,7 @@ Finding(
 )
 ```
 
-Scoring (`pkgsentry/detect/score.py`):
+Scoring (`pkgward/detect/score.py`):
 - Shadow findings (`opengrep.shadow_*`) are **excluded** from scoring entirely. They persist for offline comparison.
 - Non-shadow findings score normally: severity-points (low=1, med=8, high=25, crit=60), per-category cap of 30 points, verdict thresholds `suspicious≥20` and `malicious≥61`.
 - Critical-severity findings auto-promote verdict to malicious regardless of total score.
@@ -142,7 +142,7 @@ Exits 0 if the YAML parses and the patterns compile, non-zero otherwise.
 
 ### Test suite
 
-`tests/analyze/test_opengrep_rules_compile.py` runs `--validate` against every baseline rule. Tests skip cleanly when opengrep isn't on PATH (dev machines without the binary), and run in the Docker container / CI where the binary is installed. Drop a new rule into `pkgsentry/intel/baseline/opengrep/<lang>/` and the test picks it up automatically — no test changes required.
+`tests/analyze/test_opengrep_rules_compile.py` runs `--validate` against every baseline rule. Tests skip cleanly when opengrep isn't on PATH (dev machines without the binary), and run in the Docker container / CI where the binary is installed. Drop a new rule into `pkgward/intel/baseline/opengrep/<lang>/` and the test picks it up automatically — no test changes required.
 
 ### Unit tests — `--test` fixtures (recommended for every rule)
 
@@ -163,10 +163,12 @@ tools/test_opengrep_rules.sh javascript # one dir
 
 It runs `opengrep --test --config <dir> <dir>` per language, skips cleanly when the binary
 is absent, and exits non-zero if any rule misses an expected line or matches an `ok:` line.
-Run it in the scanner image where the binary lives (opengrep is not on dev hosts):
+Run it in the scanner image where the binary lives (opengrep is not on dev hosts).
+Build the `pkgward-scanner` tag first if you haven't — the compose files don't pin
+an `image:` name (`docker build -t pkgward-scanner .`):
 
 ```bash
-docker run --rm --entrypoint bash -v "$PWD:/src" -w /src pkgsentry-scanner \
+docker run --rm --entrypoint bash -v "$PWD:/src" -w /src pkgward-scanner \
   tools/test_opengrep_rules.sh javascript
 ```
 
@@ -179,7 +181,7 @@ For a quick one-off check, you can still run a rule against an ad-hoc fixture ma
 
 ```bash
 mkdir /tmp/fixture && echo '<minimal triggering source>' > /tmp/fixture/setup.py
-opengrep scan --json --quiet -f pkgsentry/intel/baseline/opengrep/python/your_rule.yaml /tmp/fixture | jq .results
+opengrep scan --json --quiet -f pkgward/intel/baseline/opengrep/python/your_rule.yaml /tmp/fixture | jq .results
 ```
 
 ## Shadow mode vs cutover
@@ -212,7 +214,7 @@ rules:
       severity: critical
       confidence: high
       category: installer
-      pkgsentry_layer: opengrep
+      pkgward_layer: opengrep
     pattern-sources:
       - patterns:
           - pattern-either:
@@ -244,7 +246,7 @@ Breaking it down:
 
 ## Iteration loop for a new rule
 
-1. Write the rule in `pkgsentry/intel/baseline/opengrep/<lang>/` (or the private overlay).
+1. Write the rule in `pkgward/intel/baseline/opengrep/<lang>/` (or the private overlay).
 2. `opengrep scan --validate -f <rule>` — parses cleanly.
 3. Build a triggering fixture, `opengrep scan --json -f <rule> <fixture>` — confirm it matches.
 4. Build a benign fixture that looks superficially similar (e.g. a setup.py that uses `urlopen` for a legitimate download but never feeds it to exec), confirm it does NOT match.
@@ -255,6 +257,6 @@ Breaking it down:
 
 - opengrep rules syntax: https://github.com/opengrep/opengrep
 - Semgrep rule registry (most syntax overlaps, useful for inspiration): https://semgrep.dev/r
-- pkgsentry analyzer source: `pkgsentry/analyze/opengrep_scan.py`
-- pkgsentry intel-pack loader: `pkgsentry/intel/pack.py` (look for `opengrep_dirs`)
+- pkgward analyzer source: `pkgward/analyze/opengrep_scan.py`
+- pkgward intel-pack loader: `pkgward/intel/pack.py` (look for `opengrep_dirs`)
 - Layer overview: [detection-rules.md](detection-rules.md) (Layer 12)
