@@ -121,7 +121,7 @@ Disclosures: see `SECURITY.md`. Please do not file a public issue for an active 
 ## Acknowledgments
 
 - **[t0asts](https://github.com/t0asts)** — for information and guidance on the opengrep static-analysis integration.
-- **[Cyb3rjerry])(https://github.com/Cyb3rjerry)** - for the upcoming feature of checking known bad dependencies against dependents.
+- **[Cyb3rjerry](https://github.com/Cyb3rjerry)** - for the upcoming feature of checking known bad dependencies against dependents.
 
 ## License
 
