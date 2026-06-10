@@ -55,6 +55,42 @@ _STORES: list[tuple[str, re.Pattern[bytes]]] = [
 
 _SWEEP_THRESHOLD = 3
 
+# --- Regex-literal denylist regions -----------------------------------------
+# A security/redaction module ENUMERATES credential files as regex literals in an
+# array (``[/^\.npmrc$/, /^Login Data$/, ...]``) so the agent can SKIP them — the
+# opposite of a harvest (octocode-mcp 15.0.0 FP, 2026-06-07: a 150-entry
+# SecurityRegistry denylist). A real stealer passes a credential path as a STRING
+# literal to a read call. So a store counts toward the sweep only when it occurs
+# OUTSIDE such a regex-literal array: an attacker can't both READ a file (the path
+# must appear as a string) and HIDE it (as a ``/regex/``) in the same place, and a
+# decoy array of throwaway regexes never contains the real string-path reads — so
+# this can't be disarmed by pasting marker tokens or filler regexes next to a live
+# harvest. ``etc_shadow`` uses the same span-aware set, so a denylisted
+# ``/^\/etc\/shadow$/`` doesn't fire either. A run of >= 3 comma-separated regex
+# literals is the array signature (a lone ``/re/`` elsewhere isn't a denylist).
+_REGEX_LITERAL_ARRAY = re.compile(
+    rb"(?:/(?:\\.|[^/\n\\]){1,200}/[gimsuyd]*\s*,\s*){3,}"
+)
+
+
+def _regex_array_spans(data: bytes) -> list[tuple[int, int]]:
+    return [(m.start(), m.end()) for m in _REGEX_LITERAL_ARRAY.finditer(data)]
+
+
+def _store_hits_outside_denylist(
+    data: bytes, spans: list[tuple[int, int]]
+) -> list[str]:
+    """Distinct stores with >= 1 occurrence OUTSIDE every regex-literal array."""
+    hits: set[str] = set()
+    for label, rx in _STORES:
+        if label in hits:
+            continue
+        for m in rx.finditer(data):
+            if not any(s <= m.start() < e for s, e in spans):
+                hits.add(label)
+                break
+    return sorted(hits)
+
 
 def analyze_secret_access(
     extracted_root: Path,
@@ -74,7 +110,8 @@ def analyze_secret_access(
         except OSError:
             continue
 
-        hits = sorted({label for label, rx in _STORES if rx.search(data)})
+        spans = _regex_array_spans(data)
+        hits = _store_hits_outside_denylist(data, spans)
         if "etc_shadow" in hits:
             out.append(Finding(
                 rule_id="malware.etc_shadow_read", category=CATEGORY,

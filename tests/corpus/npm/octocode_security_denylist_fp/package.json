@@ -1,0 +1,13 @@
+{
+  "name": "octo-secure-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for GitHub repository analysis and code discovery.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": { "octo-secure-mcp": "dist/index.js" },
+  "engines": { "node": ">=20.0.0" },
+  "license": "MIT",
+  "dependencies": {
+    "@octokit/core": "^7.0.0"
+  }
+}

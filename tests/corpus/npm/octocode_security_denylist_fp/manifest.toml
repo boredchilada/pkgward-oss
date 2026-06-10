@@ -1,0 +1,26 @@
+ecosystem = "npm"
+name = "octo-secure-mcp"
+version = "1.0.0"
+label = "good"
+expected_verdict = "clean"
+# yara.github_contents_api_exfil is a PRIVATE rule (intel/private overlay); it does
+# not load in the baseline public-tier run, so it is not pinned here — its octokit-
+# library exclusion fix lives in that rule's header and should be regression-covered
+# by a private/vault sample.
+forbid_rules = [
+    "malware.credential_store_sweep",
+    "yara.aes_gcm_hardcoded_eval",
+    "obfuscation.decrypt_then_exec",
+    "installer.npm_runtime_obfuscated_entrypoint",
+]
+notes = """Legit GitHub code-search MCP server (octocode-mcp 15.0.0 FP class, 2026-06-07). \
+Three benign surfaces each tripped a stealer rule on surface features: \
+(1) a SecurityRegistry DENYLIST of credential files the agent refuses to read \
+(SecretPatterns/extraIgnoredFilePatterns enumerated as /^...$/ regex literals) \
+tripped malware.credential_store_sweep; (2) at-rest AES-256-GCM encryption of the \
+user's OWN GitHub token keyed by randomBytes(32) — no hardcoded key, decrypt feeds \
+JSON.parse not eval — tripped yara.aes_gcm_hardcoded_eval; (3) octokit-based GitHub \
+Contents API usage tripped yara.github_contents_api_exfil. Must stay CLEAN: a \
+credential-file regex denylist is the opposite of a harvest, a random key is not a \
+hardcoded one, and a bundled @octokit client is not a hand-rolled exfil PUT."""
+provenance = "synthetic"
