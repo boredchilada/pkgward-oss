@@ -17,6 +17,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   losing a malware conviction.
 
 ### Added
+- **Staged-loader detection: `imports.marshalled_bytecode_loader` + `obfuscation.remote_fetch_eval`
+  (both critical, behavioral).** Two live misses shipped only a small loader stub with the real
+  payload staged elsewhere — at scan time the dangerous code isn't in the package, so the old
+  rules scored the loader soft and LLM triage cleared both. A module that `marshal.load()`s and
+  `exec()`s at import is a compiled-payload dropper (the mps-xtrap shape; alias-aware;
+  marshal-feeds-exec is ~zero in legit packages), and a base64-hidden fetch URL feeding a nearby
+  `eval` is a remote-payload loader (the trojanized `buffer`-clone shape; proximity-gated like
+  `charcode_eval`, with FP guards for marshal-without-exec and fetch/eval far apart). Both are
+  anchored in the regression corpus (`pypi/marshalled_loader_dropper`,
+  `npm/remote_fetch_eval_loader`) and convict on rules alone — staged loaders are exactly the
+  class where model triage can't be trusted. `analyze/imports.py`, `analyze/obfuscation.py`.
+- **`tools/llm_eval` two-axis triage prompt candidate.** `triage_system.risk_axis.txt` makes the
+  call structural instead of holistic: the model rates `behavior_risk` and `malicious_intent`
+  independently, and the verdict is hard-bound — "malicious" only with a cited hostile mechanism;
+  dangerous-but-unproven (dual-use, pentest tooling, minified bundles) routes to suspicious /
+  needs-review. Eval-harness candidate only, not the shipped default prompt.
 - **Version-anomaly absolute-delta size trigger (crates+pypi).** `detect_anomaly` now
   fires `size_jump` when the absolute byte delta between a version and its predecessor
   clears `PKGWARD_ANOMALY_SIZE_ABS_BYTES` (default 50 KB) **and** the baseline clears
@@ -192,6 +208,28 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recompiles the split `evasion_*.yar` set.
 
 ### Fixed
+- **Honeytoken canary self-matched the sandbox-launch command — every detonation fired
+  `dyn_honeytoken_exfil` (critical).** Decoys are planted via
+  `docker run -e DECOY=… -v …/.env:/root/.env`; Tetragon traces that HOST-side launch exec and
+  attributes it to the detonation, so its argv carries every planted decoy by construction — the
+  rule substring-matched our own launch command on every run, flipping high-profile legit
+  packages (microsoft-kiota, golang/dep, gopherjs, neon, value-trait, go-task, …) to malicious,
+  and the `-v …/.env` mounts tripped `RunSensitiveAccess` the same way. The rules engine now
+  drops the harness-launch exec (binary = docker/podman/runc/nerdctl/ctr) before sensitive-access
+  tracking and the rule loop; a package invoking those binaries *inside* the sandbox is still
+  evaluated. `detonation/internal/rules/engine.go`.
+- **Two opengrep rules were silently broken (caught by running `--validate`/`--test` in the Linux
+  scanner image).** `js_env_to_net.yaml` used YAML anchors/aliases, which opengrep's rule parser
+  rejects — the whole env-secret→network-call taint rule silently failed to load. Regex inlined
+  in both blocks. `pth_import_injection.yaml`'s `pattern-not-regex` exclusion filtered on a span
+  covering only `import <name>`, so the coverage.py exclusion tokens later on the line were never
+  in range — FP-ing on coverage.py's bundled `.pth`; the match now spans the whole import line.
+- **`js_env_to_net` was the noisiest opengrep rule: 2.0% precision over 2360 shadow-mode scans.**
+  The taint source was a bare `process.env`, so every package reading any env var
+  (PORT/NODE_ENV/LOG_LEVEL/npm_package_*) and making any network call matched — ordinary config
+  plumbing, ~98% of hits. The source is now restricted via metavariable-regex to
+  credential-named env reads (token/secret/password/api_key/private_key/aws_*/github_token/
+  database_url/…).
 - **`malware.credential_store_sweep` + `yara.aes_gcm_hardcoded_eval` fired on a security
   module's credential-file DENYLIST (octocode-mcp 15.0.0 FP class).** A security/redaction
   registry that enumerates credential files as regex literals (`[/^\.npmrc$/, /^Login Data$/, …]`)
