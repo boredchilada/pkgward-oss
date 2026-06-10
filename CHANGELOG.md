@@ -192,6 +192,19 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recompiles the split `evasion_*.yar` set.
 
 ### Fixed
+- **`malware.credential_store_sweep` + `yara.aes_gcm_hardcoded_eval` fired on a security
+  module's credential-file DENYLIST (octocode-mcp 15.0.0 FP class).** A security/redaction
+  registry that enumerates credential files as regex literals (`[/^\.npmrc$/, /^Login Data$/, …]`)
+  so an agent can refuse to read them tripped the sweep on surface tokens, and at-rest
+  AES-256-GCM encryption of the user's own token (key = `randomBytes(32)`, decrypt feeding
+  `JSON.parse`, not `eval`) tripped the "hardcoded key" YARA rule, which only checked
+  `Buffer.from(x,'hex')`. Both now match the mechanism, not the tokens: a store counts toward
+  the sweep only when it occurs OUTSIDE a run of ≥ 3 comma-separated regex literals (a real
+  stealer must pass the path as a STRING to a read call, so the discriminator can't be
+  disarmed by pasting decoy regexes beside a live harvest — `etc_shadow_read` shares the
+  span set), and the YARA rule now requires an actual hardcoded hex literal (≥ 16 bytes
+  quoted), which random/derived keys never produce. Synthetic denylist corpus anchor pinned
+  clean. `analyze/secret_access.py`, `intel/baseline/yara/aes_gcm_hardcoded_eval.yar`.
 - **Worker-timeout cancel deleted the extract tree under the still-running persist/triage
   thread → LLM triaged with NO source.** The 900s `asyncio.wait_for` timeout cancels only the
   `process_one` coroutine; `_persist_and_finalize` runs in a thread (`asyncio.to_thread`) and
